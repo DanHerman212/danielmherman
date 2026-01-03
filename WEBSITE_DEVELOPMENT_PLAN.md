@@ -1183,12 +1183,24 @@ python manage.py migrate --settings=personal_site.settings_production
 python manage.py createsuperuser --settings=personal_site.settings_production
 ```
 
-### Step 9.4: Configure Domain
-1. Go to Cloud Run console
-2. Click "Manage Custom Domains"
-3. Add your purchased domain
-4. Update DNS records with your domain provider
-5. Wait for SSL certificate provisioning
+### Step 9.4: Configure Domain (GoDaddy & GCP)
+
+#### 1. Get DNS Records from GCP
+- Go to Cloud Run console > "Manage Custom Domains"
+- Add your domain (e.g., `example.com`)
+- GCP will provide A Records (IPs) or CNAME records
+
+#### 2. Configure DNS in GoDaddy
+- Log in to GoDaddy > DNS Management
+- Add/Edit **A Record**: Host `@`, Value `[GCP IP Address]`
+- Add/Edit **CNAME Record**: Host `www`, Value `[Your domain or GCP alias]`
+
+#### 3. Update Django Settings
+- Update `ALLOWED_HOSTS` in `settings.py`:
+  ```python
+  ALLOWED_HOSTS = ['yourdomain.com', 'www.yourdomain.com', '127.0.0.1']
+  ```
+- Ensure `DEBUG = False`
 
 **Learning Goal**: Deploy Django application to production cloud environment
 
