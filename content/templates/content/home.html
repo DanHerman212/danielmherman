@@ -1,0 +1,34 @@
+<!-- content/templates/content/home.html-->
+ {% extends 'content/base.html' %}
+
+ {% block content %}
+ <div class="container">
+    <!-- Hero Section-->
+     <div class="jumbotron text-center bg-light p-5 rounded">
+        <h1 class="display-4">Thank You for Visiting!</h1>
+        <p class="lead"> I write about experiences with Tech, Music and Enlightenment</p>
+        <a href="{% url 'contact' %}" class="btn btn-primary btn-lg">Get in Touch</a>
+     </div>
+    <!-- Featured Articles-->
+     <div class="row mt-5">
+        <h2 class="mb-4">Latest Articles</h2>
+        {% for article in featured articles %}
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                {% if article.featured_image %}
+                <img src="{{ article.featured_image.url }}" class="card-img-top" alt="{{ article.title}}">
+                {% endif %}
+                <div class="card-body">
+                    <h5 class="card-title">{{ article.title }}</h5>
+                    <p class="card-test">{{ article.content|truncatewords:30 }}</p>
+                    <a href="{% url 'article_detail' article.slug %}" class="btn btn-primary">Read More</a>
+                </div>
+                <div class="card-footer text-muted">
+                    {{ article.published_date|date:"F d, Y" }}
+                </div>
+            </div>
+        </div>
+        {% endfor%}
+    </div> 
+ </div>
+ {% endblock %}
