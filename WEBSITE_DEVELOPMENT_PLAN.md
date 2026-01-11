@@ -8,7 +8,7 @@
 **Purpose**: Personal content website with multiple topic sections  
 **Framework**: Django (Python)  
 **Hosting**: Google Cloud Platform  
-**Menu Structure**: Tech | Music | Enlightenment | Resume | Services | Contact
+**Menu Structure**: Tech | Music | Enlightenment | Resume | Projects | Contact
 
 ---
 
@@ -106,7 +106,7 @@ class Category(models.Model):
         ('music', 'Music'),
         ('enlightenment', 'Enlightenment'),
         ('resume', 'Resume'),
-        ('services', 'Services'),
+        ('projects', 'Projects'),
         ('contact', 'Contact'),
     ]
     
@@ -147,16 +147,25 @@ class Article(models.Model):
         return self.title
 
 
-class Service(models.Model):
-    """Services you offer"""
+class Project(models.Model):
+    """Data Science Projects you are working on"""
     title = models.CharField(max_length=200)
+    slug = models.SlugField(max_length=200, unique=True, blank=True)
     description = models.TextField()
-    icon = models.CharField(max_length=50, help_text="FontAwesome icon class")
+    image = models.ImageField(upload_to='projects/', blank=True, null=True)
+    demo_link = models.URLField(blank=True, help_text="Link to the hosted UI")
+    github_link = models.URLField(blank=True, help_text="Link to source code")
+    technologies = models.CharField(max_length=200, help_text="e.g. Python, React, Pandas")
     order = models.IntegerField(default=0)
     is_active = models.BooleanField(default=True)
     
     class Meta:
         ordering = ['order']
+    
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = slugify(self.title)
+        super().save(*args, **kwargs)
     
     def __str__(self):
         return self.title
@@ -204,7 +213,7 @@ python manage.py createsuperuser
 **File**: `content/admin.py`
 ```python
 from django.contrib import admin
-from .models import Category, Article, Service, ContactMessage
+from .models import Category, Article, Project, ContactMessage
 
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
@@ -218,10 +227,11 @@ class ArticleAdmin(admin.ModelAdmin):
     search_fields = ['title', 'content']
     prepopulated_fields = {'slug': ('title',)}
 
-@admin.register(Service)
-class ServiceAdmin(admin.ModelAdmin):
+@admin.register(Project)
+class ProjectAdmin(admin.ModelAdmin):
     list_display = ['title', 'order', 'is_active']
     list_editable = ['order', 'is_active']
+    prepopulated_fields = {'slug': ('title',)}
 
 @admin.register(ContactMessage)
 class ContactMessageAdmin(admin.ModelAdmin):
@@ -234,7 +244,7 @@ class ContactMessageAdmin(admin.ModelAdmin):
 ```bash
 python manage.py runserver
 # Visit http://127.0.0.1:8000/admin/
-# Login with superuser credentials
+# Login with superuser credentials)
 # Add sample content for each category
 ```
 
@@ -242,7 +252,7 @@ python manage.py runserver
 
 ---
 
-## 📋 Phase 3: Views and URLs (Days 4-5)
+## 📋 Phase 3: Views and URLs (Days 4-5Project
 
 ### Step 3.1: Create Views
 
@@ -298,19 +308,21 @@ class ArticleDetailView(DetailView):
         return Article.objects.filter(is_published=True)
 
 
-class ResumeView(TemplateView):
-    """Resume page"""
-    template_name = 'content/resume.html'
-
-
-class ServicesView(ListView):
-    """Services page"""
-    model = Service
-    template_name = 'content/services.html'
-    context_object_name = 'services'
+class ProjectListView(ListView):
+    """Projects list page"""
+    model = Project
+    template_name = 'content/project_list.html'
+    context_object_name = 'projects'
     
     def get_queryset(self):
-        return Service.objects.filter(is_active=True)
+        return Project.objects.filter(is_active=True)
+
+
+class ProjectDetailView(DetailView):
+    """Project detail page"""
+    model = Project
+    template_name = 'content/project_detail.html'
+    context_object_name = 'project'
 
 
 class ContactView(TemplateView):
@@ -371,7 +383,8 @@ urlpatterns = [
     path('category/<str:category>/', views.CategoryView.as_view(), name='category'),
     path('article/<slug:slug>/', views.ArticleDetailView.as_view(), name='article_detail'),
     path('resume/', views.ResumeView.as_view(), name='resume'),
-    path('services/', views.ServicesView.as_view(), name='services'),
+    path('projects/', views.ProjectListView.as_view(), name='projects'),
+    path('projects/<slug:slug>/', views.ProjectDetailView.as_view(), name='project_detail'),
     path('contact/', views.ContactView.as_view(), name='contact'),
 ]
 ```
@@ -438,7 +451,7 @@ mkdir -p content/static/images
                         <a class="nav-link" href="{% url 'resume' %}">Resume</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{% url 'services' %}">Services</a>
+                        <a class="nav-link" href="{% url 'projects' %}">Projects</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'contact' %}">Contact</a>
@@ -686,33 +699,89 @@ mkdir -p content/static/images
 {% endblock %}
 ```
 
-**File**: `content/templates/content/services.html`
+**File**: `content/templates/content/project_list.html`
 ```html
 {% extends 'content/base.html' %}
 
-{% block title %}Services - My Website{% endblock %}
+{% block title %}Projects - My Website{% endblock %}
 
 {% block content %}
 <div class="container">
-    <h1 class="mb-4">Services</h1>
-    <p class="lead">Here's what I can help you with:</p>
+    <h1 class="mb-4">Projects</h1>
+    <p class="lead">Data Science Projects I am working on:</p>
     
     <div class="row mt-5">
-        {% for service in services %}
+        {% for project in projects %}
         <div class="col-md-4 mb-4">
-            <div class="card text-center h-100">
+            <div class="card h-100">
+                {% if project.image %}
+                <img src="{{ project.image.url }}" class="card-img-top" alt="{{ project.title }}">
+                {% endif %}
                 <div class="card-body">
-                    <i class="{{ service.icon }} fa-3x mb-3 text-primary"></i>
-                    <h5 class="card-title">{{ service.title }}</h5>
-                    <p class="card-text">{{ service.description }}</p>
+                    <h5 class="card-title">{{ project.title }}</h5>
+                    <p class="card-text">{{ project.description|truncatewords:20 }}</p>
+                    <a href="{% url 'project_detail' project.slug %}" class="btn btn-primary">View Details</a>
                 </div>
             </div>
         </div>
         {% endfor %}
     </div>
-    
-    <div class="text-center mt-5">
-        <a href="{% url 'contact' %}" class="btn btn-primary btn-lg">Get in Touch</a>
+</div>
+{% endblock %}
+```
+
+**File**: `content/templates/content/project_detail.html`
+```html
+{% extends 'content/base.html' %}
+
+{% block title %}{{ project.title }} - My Website{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-md-8">
+            <h1 class="mb-4">{{ project.title }}</h1>
+            
+            {% if project.image %}
+            <img src="{{ project.image.url }}" class="img-fluid mb-4 rounded" alt="{{ project.title }}">
+            {% endif %}
+            
+            <div class="project-description mb-4">
+                {{ project.description|linebreaks }}
+            </div>
+            
+            <div class="mb-4">
+                {% if project.demo_link %}
+                <a href="{{ project.demo_link }}" class="btn btn-primary me-2" target="_blank">
+                    <i class="fas fa-external-link-alt"></i> Live Demo
+                </a>
+                {% endif %}
+                
+                {% if project.github_link %}
+                <a href="{{ project.github_link }}" class="btn btn-dark" target="_blank">
+                    <i class="fas fa-github"></i> View Code
+                </a>
+                {% endif %}
+            </div>
+            
+            <a href="{% url 'projects' %}" class="btn btn-secondary">
+                ← Back to Projects
+            </a>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    Project Details
+                </div>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item">
+                        <strong>Technologies:</strong><br>
+                        {{ project.technologies }}
+                    </li>
+                </ul>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %}

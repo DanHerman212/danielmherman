@@ -1,0 +1,62 @@
+<!--content/templates/content/resume.html-->
+{% extends 'content/base.html' %}
+
+{% block title %}Resume - My Website{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 class="mb-4">Resume</h1>
+
+    <!-- Summary -->
+     <section class="mb-5">
+        <h2>Professional Summary</h2>
+        <p>Your professional summary goes here...</p>
+     </section>
+
+     <!--Experience-->
+     <section class="mb-5">
+        <h2>Experience</h2>
+        <div class="mb-4">
+            <h4>Job Title - Company Name</h4>
+            <p class="text-muted">Start Date - End Date</p>
+            <ul>
+                <li>Achievement or responsibility</li>
+                <li>Achievement or responsibility</li>
+            </ul>
+        </div>
+        <!-- Add more experience entries-->
+     </section>
+
+     <!-- Education -->
+      <section class="mb-5">
+        <h2>Education</h2>
+        <div class="mb-4">
+            <h4>Degree - Institution</h4>
+            <p class="text-muted">Graduation Year</p>
+        </div>
+      </section>
+
+      <!--Skills-->
+      <section class="mb-5">
+        <h2>Skills</h2>
+        <div class="row">
+            <div class="col-md-6">
+                <ul>
+                    <li>Skill 1</li>
+                    <li>Skill 2</li>
+                </ul>
+            </div>
+        <div class="col-md-6">
+            <ul>
+                <li>Skill 3</li>
+                <li>Skill 4</li>
+            </ul>
+        </div>
+    </div>
+</section>
+
+<a href="/path/to/resume.pdf" class="btn btn-primary" download>
+    <i class="fas fa-download"></i> Download PDF Resume
+</a>
+</div>
+{% endblock %}

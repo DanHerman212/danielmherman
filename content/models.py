@@ -9,7 +9,7 @@ class Category(models.Model):
             ('music', 'Music'),
             ('enlightenment', 'Enlightenment'),
             ('resume', 'Resume'),
-            ('services', 'Services'),
+            ('projects', 'Projects'),
             ('contact', 'Contact'),
     ]
      
@@ -49,16 +49,25 @@ class Article(models.Model):
         return self.title
 
     
-class Service(models.Model):
-    """Services you offer"""
+class Project(models.Model):
+    """data science projects I'm working on"""
     title = models.CharField(max_length=200)
+    slug = models.SlugField(max_length=200, unique=True, blank=True)
     description = models.TextField()
-    icon = models.CharField(max_length=50, help_text="FontAwesome icon class")
-    order = models.IntegerField(default=0)
+    image = models.ImageField(upload_to='projects/', blank=True, null=True)
+    demo_link = models.URLField(blank=True, help_text="Link to hosted UI")
+    github_link = models.URLField(blank=True, help_text="Link to source code")
+    technologies = models.CharField(max_length=200, help_text="e.g. Python, TensorFlow, GCO ")
+    order = models.IntegerField(default=0) 
     is_active = models.BooleanField(default=True)
 
     class Meta:
         ordering = ['order']
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = slugify(self.title)
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.title

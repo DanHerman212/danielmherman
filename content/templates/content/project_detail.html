@@ -1,0 +1,52 @@
+<!--content/templates/content/project_detail.html-->
+{% extends 'content/base.html' %}
+
+{% block content  %}
+<div class="container">
+    <div class="row">
+        <div class="col-md-8">
+            <h1 class="mb-4">{{ project.title  }}</h1>
+
+            {% if project.image  %}
+            <img src="{{ project.image.url }}" class="img-fluid mb-4 rounded" alt="{{ project.title }}">
+            {% endif  %}
+
+            <div class="project-description mb-4">
+                {{ project.description|linebreaks }}
+            </div>
+
+            <div class="mb-4">
+                {% if project.demo_link  %}
+                <a href="{{ project.demo_link }}" class="btn btn-primary me-2" target="_blank">
+                    <i class="fas fa-external-link-alt"></i> Live Demo
+                </a>
+            {% endif  %}
+
+            {% if project.github_link  %}
+            <a href="{{ project.github_link }}" class="btn btn-dark" target="_blank">
+                <i class="fas fa-github"></i> View Code
+            </a>
+            {%  endif %}
+            </div>
+        
+            <a href="{% url 'projects' %}" class="btn btn-secondary">
+                ← Back to Projects
+            </a>
+        </div>
+    
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    Project Details
+                </div>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item">
+                        <strong>Technologies:</strong><br>
+                        {{ project.technologies }}
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

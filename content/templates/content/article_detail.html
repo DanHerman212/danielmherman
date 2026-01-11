@@ -1,0 +1,29 @@
+<!--content/templates/content/article_detail.html -->
+{% extends 'content/base.html' %}
+
+{% block title %}{{ article.title }} - My Website{% endblock %}
+
+{% block content %}
+<div class="container">
+    <article>
+        <h1 class="mb-3">{{ article.title }}</h1>
+        <p class="text-muted">
+            Published on {{ article.published_date|date:"F d, Y" }} in
+            <a href="{% url 'category' article.category.name %}">{{ article.category.title }}</a>
+        </p>
+
+        {% if article.featured_image %}
+        <img src="{{ article.featured_image.url }}" class="img-fluid mb-4" alt="{{ article.title}}">
+        {% endif %}
+
+        <div class="article-content">
+            {{ article.content|linebreaks }}
+        </div>
+
+        <hr class="my-4">
+        <a href="{% url 'category' article.category.name %}" class="btn btn-secondary">
+            ← Back to {{ article.category.title }}
+        </a>
+    </article>
+</div>
+{% endblock %}

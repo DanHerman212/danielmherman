@@ -3,7 +3,7 @@ from typing import Any
 from django.shortcuts import render, get_object_or_404, redirect
 from django.views.generic import ListView, DetailView, TemplateView
 from django.contrib import messages
-from .models import Category, Article, Service, ContactMessage
+from .models import Category, Article, Project, ContactMessage
 
 class HomeView(TemplateView):
     """Homepage View"""
@@ -36,6 +36,7 @@ class CategoryView(ListView):
         context = super().get_context_data(**kwargs):
         context['category'] = self.category
         return context
+    
 class ArticleDetailView(DetailView):
     """Individual article view"""
     model = Article
@@ -49,14 +50,21 @@ class ResumeView(TemplateView):
     """Resume page"""
     template_name = 'content/resume.html'
 
-class ServicesView(ListView):
-    """Services page"""
-    model = Service
-    template_name = 'content/services.html'
-    context_object_name = 'services'
+class ProjectListView(ListView):
+    """Projects page"""
+    model = Project
+    template_name = 'content/project_list.html'
+    context_object_name = 'projects'
 
     def get_queryset(self):
-        return Service.objects.filter(is_active=True)
+        return Project.objects.filter(is_active=True)
+    
+class ProjectDetailView(DetailView):
+    """Project detail page"""
+    model = Project
+    template_name = 'content/project_detail.html'
+    context_object_name = 'project'
+        
     
 class ContactView(TemplateView):
     """Contact page with form"""

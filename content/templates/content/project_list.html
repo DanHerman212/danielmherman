@@ -1,0 +1,28 @@
+<!--project list-->
+{% extends 'content/base.html' %}
+
+{% block title %}Data Science Projects{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 class="mb-4">Projects</h1>
+    <p class="lead">Data Science Projects I'm working on:</p>
+
+    <div class="row mt-5">
+        {% for project in projects %}
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                {% if project.image %}
+                <img src="{{ project.image.url }}" class="card-img-top" alt="{{ project.title }}">
+                {% endif %}
+                <div class="card-body">
+                    <h5 class="card-title">{{ project.title }}</h5>
+                    <p class="card-text">{{ project.description|truncatewords:20 }}</p>
+                    <a href="{% url 'project_detail' project.slug %}" class="btn btn-primary">View Details</a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

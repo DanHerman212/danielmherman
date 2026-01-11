@@ -2,7 +2,7 @@
 from django.contrib import admin
 
 from django.contrib import admin
-from .models import Category, Article, Service, ContactMessage
+from .models import Category, Article, Project, ContactMessage
 
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
@@ -16,10 +16,11 @@ class ArticleAdmin(admin.ModelAdmin):
     search_fields = ['title', 'content']
     prepopulated_fields = {'slug': ('title',)}
 
-@admin.register(Service)
-class ServiceAdmin(admin.ModelAdmin):
+@admin.register(Project)
+class ProjectAdmin(admin.ModelAdmin):
     list_display = ['title', 'order', 'is_active']
     list_editable = ['order', 'is_active']
+    prepopulated_fields = {'slug':('title',)}
 
 @admin.register(ContactMessage)
 class ContactMessageAdmin(admin.ModelAdmin):
