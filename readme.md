@@ -8,22 +8,22 @@ The application follows the standard Django MVT (Model-View-Template) architectu
 
 ```mermaid
 graph TD
-    Client[User / Web Browser]
+    Client["User / Web Browser"]
     
     subgraph "Django Application"
-        Router[URL Dispatcher<br/>(urls.py)]
+        Router["URL Dispatcher<br/>(urls.py)"]
         
         subgraph "Content App"
-            Views[Views Logic<br/>(views.py)]
-            Models[Data Models<br/>(models.py)]
-            Templates[Templates<br/>(HTML/Tags)]
+            Views["Views Logic<br/>(views.py)"]
+            Models["Data Models<br/>(models.py)"]
+            Templates["Templates<br/>(HTML/Tags)"]
         end
         
-        Admin[Django Admin]
+        Admin["Django Admin"]
     end
     
-    Database[(SQLite3 DB)]
-    Static[Static Assets<br/>(CSS/Images)]
+    Database[("SQLite3 DB")]
+    Static["Static Assets<br/>(CSS/Images)"]
     
     %% Flow
     Client -->|HTTP GET/POST| Router
