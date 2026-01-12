@@ -1,6 +1,7 @@
 # content/models.py
 from django.db import models
 from django.utils.text import slugify
+from ckeditor.fields import RichTextField
 
 class Category(models.Model):
     """Represents the main menu categories"""
@@ -31,7 +32,7 @@ class Article(models.Model):
     category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='articles')
     title = models.CharField(max_length=200)
     slug = models.SlugField(max_length=200, unique=True, blank=True)
-    content = models.TextField()
+    content = RichTextField()
     featured_image = models.ImageField(upload_to='articles/', blank=True, null=True)
     published_date = models.DateTimeField(auto_now_add=True)
     updated_date = models.DateTimeField(auto_now=True)

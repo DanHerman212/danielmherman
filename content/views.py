@@ -10,7 +10,7 @@ class HomeView(TemplateView):
     template_name = 'content/home.html'
 
     def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs):
+        context = super().get_context_data(**kwargs)
         context['categories'] = Category.objects.filter(is_active=True)
         context['featured_articles'] = Article.objects.filter(is_published=True)[:3]
         return context
@@ -33,7 +33,7 @@ class CategoryView(ListView):
             is_published=True
         )
     def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs):
+        context = super().get_context_data(**kwargs)
         context['category'] = self.category
         return context
     
