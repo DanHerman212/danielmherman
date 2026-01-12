@@ -1,6 +1,8 @@
 asgiref==3.11.0
+bleach==4.1.0
 Django==6.0
-django-ckeditor==6.7.3
 django-js-asset==3.1.2
+django-summernote==0.8.20.0
 pillow==12.1.0
 sqlparse==0.5.5
+webencodings==0.5.1

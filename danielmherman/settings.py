@@ -38,17 +38,34 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'content', # added app
-    'ckeditor',
-    'ckeditor_uploader',
+    'django_summernote'
 ]
 
-CKEDITOR_UPLOAD_PATH ="uploads/"
-CKEDITOR_CONFIGS = {
-    'default': {
-        'toolbar': 'full',
-        'height': 300,
+# SUMMERNOTE_THEME = 'bs5'  # Commented out to use default theme which works better in Admin
+
+SUMMERNOTE_CONFIG = {
+    # Using SummernoteWidget - iframe mode, default
+    'iframe': True,
+
+    # Customizing what tags and attributes are allowed
+    'attachment_require_authentication': True,
+    'disable_attachment': False,
+    'summernote': {
+        'airMode': False,
+        # Toolbar customization
+        'toolbar': [
+            ['style', ['style']],
+            ['font', ['bold', 'italic', 'underline', 'clear']],
+            ['fontname', ['fontname']],
+            ['color', ['color']],
+            ['para', ['ul', 'ol', 'paragraph']],
+            ['table', ['table']],
+            ['insert', ['link', 'picture', 'video', 'hr']],
+            ['view', ['fullscreen', 'codeview', 'help']],
+        ],
     },
 }
+
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',

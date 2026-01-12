@@ -1,7 +1,6 @@
 # content/admin.py
 from django.contrib import admin
-
-from django.contrib import admin
+from django_summernote.admin import SummernoteModelAdmin
 from .models import Category, Article, Project, ContactMessage
 
 @admin.register(Category)
@@ -10,7 +9,8 @@ class CategoryAdmin(admin.ModelAdmin):
     list_editable = ['order', 'is_active']
 
 @admin.register(Article)
-class ArticleAdmin(admin.ModelAdmin):
+class ArticleAdmin(SummernoteModelAdmin):
+    summernote_fields = ('content',)
     list_display = ['title', 'category', 'published_date', 'is_published']
     list_filter = ['category', 'is_published', 'published_date']
     search_fields = ['title', 'content']

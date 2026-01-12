@@ -20,7 +20,7 @@
                 {% endif %}
                 <div class="card-body">
                     <h5 class="card-title">{{ article.title }}</h5>
-                    <p class="card-test">{{ article.content|truncatewords:30 }}</p>
+                    <p class="card-text">{{ article.content|striptags|truncatewords:30 }}</p>
                     <a href="{% url 'article_detail' article.slug %}" class="btn btn-primary">Read More</a>
                 </div>
                 <div class="card-footer text-muted">

@@ -44,6 +44,30 @@ main {
     color: var(--primary-color) !important;
 }
 
+/* Code Block Styling - VS Code style */
+.article-content pre[class*="language-"],
+.article-content pre {
+    padding: 0.5em 0.75em !important;
+    margin: 0.5em 0 !important;
+    border-radius: 4px;
+}
+
+.article-content pre code {
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 0.875em;
+    line-height: 1.4;
+    padding: 0 !important;
+}
+
+/* Mermaid diagram styling */
+.article-content .mermaid {
+    background: #1e1e1e;
+    padding: 1em;
+    border-radius: 4px;
+    margin: 0.5em 0;
+    text-align: center;
+}
+
 footer {
     margin-top: auto;
 }
