@@ -102,26 +102,45 @@
 <!-- Auto-highlight code blocks and render Mermaid diagrams -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Initialize Mermaid with dark theme to match code blocks
+    // Initialize Mermaid with GitHub-like light theme
     mermaid.initialize({
         startOnLoad: false,
-        theme: 'dark',
+        theme: 'default',
         securityLevel: 'loose',
-        flowchart: { htmlLabels: true }
+        flowchart: { 
+            htmlLabels: true,
+            curve: 'basis'
+        },
+        themeVariables: {
+            primaryColor: '#dce5f2',
+            primaryTextColor: '#24292f',
+            primaryBorderColor: '#8b949e',
+            lineColor: '#57606a',
+            secondaryColor: '#fff8dc',
+            tertiaryColor: '#f6f8fa',
+            background: '#ffffff'
+        }
     });
 
     // Find all pre elements in article content
     document.querySelectorAll('.article-content pre').forEach(function(pre) {
-        // Get innerHTML to preserve <br> tags, then convert to text
+        // Get innerHTML to preserve structure
         var rawContent = pre.innerHTML;
-        // Convert <br> tags to newlines for Mermaid
+        
+        // Convert paragraph and line break tags to newlines
         var content = rawContent
-            .replace(/<br\s*\/?>/gi, '\n')
-            .replace(/<[^>]+>/g, '')  // Remove any other HTML tags
+            .replace(/<\/p>\s*<p[^>]*>/gi, '\n')  // </p><p> to newline
+            .replace(/<p[^>]*>/gi, '')             // Remove opening <p> tags
+            .replace(/<\/p>/gi, '\n')              // </p> to newline
+            .replace(/<br\s*\/?>/gi, '\n')         // <br> to newline
+            .replace(/<[^>]+>/g, '')               // Remove any other HTML tags
+            .replace(/&nbsp;/gi, ' ')              // Non-breaking space to space
             .replace(/&lt;/g, '<')
             .replace(/&gt;/g, '>')
             .replace(/&amp;/g, '&')
             .replace(/&quot;/g, '"')
+            .replace(/&#39;/g, "'")
+            .replace(/\n\s*\n\s*\n/g, '\n\n')     // Collapse multiple blank lines
             .trim();
         
         // Check if this is a Mermaid diagram (starts with mermaid keywords)
@@ -135,11 +154,34 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         
         if (isMermaid) {
-            // Convert to Mermaid diagram
+            // Create container with controls like GitHub
+            var container = document.createElement('div');
+            container.className = 'mermaid-container';
+            
+            // Create Mermaid div
             var mermaidDiv = document.createElement('div');
             mermaidDiv.className = 'mermaid';
             mermaidDiv.textContent = content;
-            pre.replaceWith(mermaidDiv);
+            
+            // Create controls
+            var controls = document.createElement('div');
+            controls.className = 'mermaid-controls';
+            controls.innerHTML = `
+                <button title="Zoom in" onclick="this.closest('.mermaid-container').querySelector('svg').style.transform = 'scale(' + (parseFloat(this.closest('.mermaid-container').querySelector('svg').style.transform.replace('scale(','').replace(')','') || 1) + 0.2) + ')'">
+                    <i class="fas fa-search-plus"></i>
+                </button>
+                <button title="Zoom out" onclick="this.closest('.mermaid-container').querySelector('svg').style.transform = 'scale(' + Math.max(0.2, (parseFloat(this.closest('.mermaid-container').querySelector('svg').style.transform.replace('scale(','').replace(')','') || 1) - 0.2)) + ')'">
+                    <i class="fas fa-search-minus"></i>
+                </button>
+                <div class="divider"></div>
+                <button title="Reset zoom" onclick="this.closest('.mermaid-container').querySelector('svg').style.transform = 'scale(1)'">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+            `;
+            
+            container.appendChild(controls);
+            container.appendChild(mermaidDiv);
+            pre.replaceWith(container);
             return;
         }
         
@@ -159,8 +201,18 @@ document.addEventListener('DOMContentLoaded', function() {
         Prism.highlightElement(code);
     });
     
-    // Render all Mermaid diagrams
-    mermaid.run();
+    // Render all Mermaid diagrams with error handling
+    document.querySelectorAll('.mermaid').forEach(async function(el, index) {
+        try {
+            var id = 'mermaid-' + index;
+            var result = await mermaid.render(id, el.textContent);
+            el.innerHTML = result.svg;
+        } catch (error) {
+            console.error('Mermaid error:', error);
+            console.error('Diagram content:', el.textContent);
+            el.innerHTML = '<pre style="color: red;">Mermaid Error: ' + (error.message || JSON.stringify(error)) + '</pre>';
+        }
+    });
 });
 </script>
 {% block extra_js %}{% endblock %}

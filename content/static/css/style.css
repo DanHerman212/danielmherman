@@ -59,13 +59,56 @@ main {
     padding: 0 !important;
 }
 
-/* Mermaid diagram styling */
-.article-content .mermaid {
-    background: #1e1e1e;
+/* Mermaid diagram styling - GitHub-like */
+.article-content .mermaid-container {
+    position: relative;
+    background: #f6f8fa;
+    border: 1px solid #d0d7de;
+    border-radius: 6px;
     padding: 1em;
-    border-radius: 4px;
-    margin: 0.5em 0;
+    margin: 1em 0;
+}
+
+.article-content .mermaid {
     text-align: center;
+}
+
+.mermaid-controls {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    background: white;
+    border: 1px solid #d0d7de;
+    border-radius: 6px;
+    padding: 4px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.mermaid-controls button {
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #57606a;
+    font-size: 14px;
+}
+
+.mermaid-controls button:hover {
+    background: #f3f4f6;
+}
+
+.mermaid-controls .divider {
+    height: 1px;
+    background: #d0d7de;
+    margin: 2px 0;
 }
 
 footer {
