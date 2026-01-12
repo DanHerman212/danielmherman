@@ -1,47 +1,50 @@
+# Personal Website & Portfolio
+
+A Django-based content management system and portfolio website.
+
+## Software Architecture
+
+The application follows the standard Django MVT (Model-View-Template) architecture. Below is a high-level overview of the data flow and system components:
+
 ```mermaid
 graph TD
-    User((User / Browser))
-
-    subgraph "Django Project: danielmherman"
-        WSGI["wsgi.py / asgi.py<br/>(Entry Point)"]
-        Settings["settings.py<br/>(Configuration)"]
-        MainURLs["urls.py<br/>(Main Routing)"]
-    end
-
-    subgraph "Django App: content"
-        AppURLs["urls.py<br/>(App Routing)"]
-        Views["views.py<br/>(View Logic)"]
-        Models["models.py<br/>(Data Models)"]
-        Admin["admin.py<br/>(Admin Interface)"]
+    Client[User / Web Browser]
+    
+    subgraph "Django Application"
+        Router[URL Dispatcher<br/>(urls.py)]
         
-        subgraph "Presentation Layer"
-            Templates["Templates<br/>(HTML)"]
-            Static["Static Files<br/>(CSS, JS)"]
-            Media["Media Files<br/>(User Uploads)"]
+        subgraph "Content App"
+            Views[Views Logic<br/>(views.py)]
+            Models[Data Models<br/>(models.py)]
+            Templates[Templates<br/>(HTML/Tags)]
         end
+        
+        Admin[Django Admin]
     end
-
-    Database[("SQLite Database<br/>db.sqlite3")]
-
-    %% Request Flow
-    User -- "HTTP Request" --> WSGI
-    WSGI --> MainURLs
-    MainURLs -- "include('content.urls')" --> AppURLs
-    AppURLs -- "Routes to" --> Views
-
-    %% Logic & Data Flow
-    Views -- "Read/Write" --> Models
+    
+    Database[(SQLite3 DB)]
+    Static[Static Assets<br/>(CSS/Images)]
+    
+    %% Flow
+    Client -->|HTTP GET/POST| Router
+    Router --> Views
+    
+    Views -->|Query Data| Models
     Models <-->|ORM| Database
-    Admin -- "Manage" --> Models
-
-    %% Response Flow
-    Views -- "Render Context" --> Templates
-    Templates -.-> Static : "References"
-    Templates -.-> Media : "References"
-    Templates -- "HTML Response" --> User
-
-    %% Configuration dependency
-    Settings -.->|Configures| MainURLs
-    Settings -.->|Configures| Database
-    Settings -.->|Configures| Static
+    
+    Views -->|Context| Templates
+    Templates -->|HTML Response| Client
+    
+    Admin -->|Manage| Models
+    
+    %% Static link
+    Client -.->|Load| Static
 ```
+
+### Core Components
+*   **Models**: Defines structure for `Articles`, `Projects`, `Categories`, and `ContactMessages`.
+*   **Views**: Class-based views (CBVs) handling logic for lists, details, and form submissions.
+*   **Templates**: Responsive Bootstrap 5 layouts for presentation.
+*   **Services**: 
+    *   **CKEditor**: For rich text content creation.
+    *   **SQLite**: Lightweight database for development.
