@@ -3,6 +3,18 @@
     --primary-color: #007bff;
     --dark-color: #343a40; 
 }
+/* Default for home page cards */
+.card-img-top {
+    height: 350px;
+    object-fit: cover;
+    object-position: center top;
+}
+
+/* Taller images for category page wider cards */
+.col-md-6 .card-img-top {
+    height: 250px;
+    object-position: center top;
+}
 
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
