@@ -17,7 +17,8 @@ class ArticleAdmin(SummernoteModelAdmin):
     prepopulated_fields = {'slug': ('title',)}
 
 @admin.register(Project)
-class ProjectAdmin(admin.ModelAdmin):
+class ProjectAdmin(SummernoteModelAdmin):
+    summernote_fields = ('content',)
     list_display = ['title', 'order', 'is_active']
     list_editable = ['order', 'is_active']
     prepopulated_fields = {'slug':('title',)}

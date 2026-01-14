@@ -1,52 +1,61 @@
 <!--content/templates/content/project_detail.html-->
 {% extends 'content/base.html' %}
 
-{% block content  %}
+{% block content %}
 <div class="container">
-    <div class="row">
-        <div class="col-md-8">
-            <h1 class="mb-4">{{ project.title  }}</h1>
-
-            {% if project.image  %}
-            <img src="{{ project.image.url }}" class="img-fluid mb-4 rounded" alt="{{ project.title }}">
-            {% endif  %}
-
-            <div class="project-description mb-4">
-                {{ project.description|linebreaks }}
-            </div>
-
-            <div class="mb-4">
-                {% if project.demo_link  %}
-                <a href="{{ project.demo_link }}" class="btn btn-primary me-2" target="_blank">
-                    <i class="fas fa-external-link-alt"></i> Live Demo
-                </a>
-            {% endif  %}
-
-            {% if project.github_link  %}
-            <a href="{{ project.github_link }}" class="btn btn-dark" target="_blank">
-                <i class="fas fa-github"></i> View Code
-            </a>
-            {%  endif %}
-            </div>
-        
-            <a href="{% url 'projects' %}" class="btn btn-secondary">
-                ← Back to Projects
-            </a>
-        </div>
+    <!-- Title -->
+    <h1 class="mb-4">{{ project.title }}</h1>
     
+    <!-- Featured Image (full width) -->
+    {% if project.image %}
+    <img src="{{ project.image.url }}" class="article-featured-img mb-4" alt="{{ project.title }}">
+    {% endif %}
+
+    <div class="row">
+        <!-- Main Content Column -->
+        <div class="col-md-8">
+            <!-- Brief Description -->
+            <p class="lead mb-4">{{ project.description }}</p>
+
+            <!-- Project Content (article-style with diagrams, plots, etc.) -->
+            {% if project.content %}
+            <div class="article-content">
+                {{ project.content|safe }}
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Sidebar -->
         <div class="col-md-4">
-            <div class="card">
+            <!-- Technologies Card -->
+            <div class="card mb-3">
                 <div class="card-header">
-                    Project Details
+                    <strong>Technologies</strong>
                 </div>
                 <ul class="list-group list-group-flush">
-                    <li class="list-group-item">
-                        <strong>Technologies:</strong><br>
-                        {{ project.technologies }}
-                    </li>
+                    <li class="list-group-item">{{ project.technologies }}</li>
                 </ul>
+            </div>
+            
+            <!-- Action Buttons -->
+            <div class="d-grid gap-2">
+                {% if project.demo_link %}
+                <a href="{{ project.demo_link }}" class="btn btn-primary" target="_blank">
+                    <i class="fas fa-external-link-alt"></i> Live Demo
+                </a>
+                {% endif %}
+                {% if project.github_link %}
+                <a href="{{ project.github_link }}" class="btn btn-dark" target="_blank">
+                    <i class="fab fa-github"></i> View Code
+                </a>
+                {% endif %}
             </div>
         </div>
     </div>
+
+    <hr class="my-4">
+    <a href="{% url 'projects' %}" class="btn btn-secondary">
+        ← Back to Projects
+    </a>
 </div>
 {% endblock %}

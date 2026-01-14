@@ -53,7 +53,8 @@ class Project(models.Model):
     """data science projects I'm working on"""
     title = models.CharField(max_length=200)
     slug = models.SlugField(max_length=200, unique=True, blank=True)
-    description = models.TextField()
+    description = models.TextField(help_text="Brief description shown on project list page")
+    content = models.TextField(blank=True, help_text="Detailed project writeup with diagrams, plots, etc.")
     image = models.ImageField(upload_to='projects/', blank=True, null=True)
     demo_link = models.URLField(blank=True, help_text="Link to hosted UI")
     github_link = models.URLField(blank=True, help_text="Link to source code")

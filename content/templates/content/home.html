@@ -4,7 +4,7 @@
  {% block content %}
  <div class="container">
     <!-- Hero Section -->
-     <div class="text-center p-4 rounded"> 
+     <div class="text-center rounded"> 
         <!-- <p class="lead">Tech, Music and Enlightenment</p>
         </div> -->
         <!-- <a href="{% url 'contact' %}" class="btn btn-primary btn-lg">Get in Touch</a>
@@ -20,7 +20,7 @@
                 {% endif %}
                 <div class="card-body">
                     <h5 class="card-title">{{ article.title }}</h5>
-                    <p class="card-text">{{ article.content|striptags|truncatewords:30 }}</p>
+                    <p class="card-text">{{ article.content|striptags|truncatewords:30|safe }}</p>
                     <a href="{% url 'article_detail' article.slug %}" class="btn btn-primary">Read More</a>
                 </div>
                 <div class="card-footer text-muted">

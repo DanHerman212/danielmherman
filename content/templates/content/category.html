@@ -10,14 +10,14 @@
 
     <div class="row">
         {% for article in articles %}
-        <div class="col-md-6 mb-4">
+        <div class="col-md-4 mb-4">
             <div class="card">
                 {% if article.featured_image %}
                 <img src="{{ article.featured_image.url }}" class="card-img-top" alt="{{ article.title}}">
                 {% endif %}
                 <div class="card-body">
                     <h5 class="card-title">{{ article.title }}</h5>
-                    <p class="card-text">{{ article.content|striptags|truncatewords:50 }}</p>
+                    <p class="card-text">{{ article.content|striptags|truncatewords:50|safe }}</p>
                     <a href="{% url 'article_detail' article.slug %}" class="btn btn-primary">Read More</a>
                 </div>
                 <div class="card-footer text-muted">
