@@ -5,9 +5,11 @@
 
 {% block content %}
 <div class="container">
-    <article>
-        <h1 class="mb-3">{{ article.title }}</h1>
-        <p class="text-muted">
+    <article class="article-wrapper">
+        <header class="article-header">
+            <h1 class="mb-3">{{ article.title }}</h1>
+        </header>
+        <p class="text-muted article-meta">
             Published on {{ article.published_date|date:"F d, Y" }} in
             <a href="{% url 'category' article.category.name %}">{{ article.category.title }}</a>
         </p>
