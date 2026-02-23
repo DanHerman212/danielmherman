@@ -1,6 +1,7 @@
 # content/models.py
 from django.db import models
 from django.utils.text import slugify
+from django_ckeditor_5.fields import CKEditor5Field
 
 class Category(models.Model):
     """Represents the main menu categories"""
@@ -31,7 +32,7 @@ class Article(models.Model):
     category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='articles')
     title = models.CharField(max_length=200)
     slug = models.SlugField(max_length=200, unique=True, blank=True)
-    content = models.TextField()
+    content = CKEditor5Field('Content', config_name='default')
     featured_image = models.ImageField(upload_to='articles/', blank=True, null=True)
     published_date = models.DateTimeField(auto_now_add=True)
     updated_date = models.DateTimeField(auto_now=True)
@@ -54,7 +55,7 @@ class Project(models.Model):
     title = models.CharField(max_length=200)
     slug = models.SlugField(max_length=200, unique=True, blank=True)
     description = models.TextField(help_text="Brief description shown on project list page")
-    content = models.TextField(blank=True, help_text="Detailed project writeup with diagrams, plots, etc.")
+    content = CKEditor5Field('Content', config_name='default', blank=True)
     image = models.ImageField(upload_to='projects/', blank=True, null=True)
     demo_link = models.URLField(blank=True, help_text="Link to hosted UI")
     github_link = models.URLField(blank=True, help_text="Link to source code")

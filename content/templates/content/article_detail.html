@@ -14,10 +14,6 @@
             <a href="{% url 'category' article.category.name %}">{{ article.category.title }}</a>
         </p>
 
-        {% if article.featured_image %}
-        <img src="{{ article.featured_image.url }}" class="article-featured-img mb-4" alt="{{ article.title}}">
-        {% endif %}
-
         <div class="article-content">
             {{ article.content|safe }}
         </div>

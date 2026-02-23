@@ -38,31 +38,44 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'content', # added app
-    'django_summernote'
+    'django_ckeditor_5',
 ]
 
-# SUMMERNOTE_THEME = 'bs5'  # Commented out to use default theme which works better in Admin
+# CKEditor 5 Configuration
+CKEDITOR_5_FILE_STORAGE = 'django.core.files.storage.default_storage'
+CKEDITOR_5_UPLOAD_FILE_TYPES = ['jpeg', 'jpg', 'png', 'gif', 'webp']
 
-SUMMERNOTE_CONFIG = {
-    # Using SummernoteWidget - iframe mode, default
-    'iframe': True,
-
-    # Customizing what tags and attributes are allowed
-    'attachment_require_authentication': True,
-    'disable_attachment': False,
-    'summernote': {
-        'airMode': False,
-        # Toolbar customization
+CKEDITOR_5_CONFIGS = {
+    'default': {
         'toolbar': [
-            ['style', ['style']],
-            ['font', ['bold', 'italic', 'underline', 'clear']],
-            ['fontname', ['fontname']],
-            ['color', ['color']],
-            ['para', ['ul', 'ol', 'paragraph']],
-            ['table', ['table']],
-            ['insert', ['link', 'picture', 'video', 'hr']],
-            ['view', ['fullscreen', 'codeview', 'help']],
+            'heading', '|',
+            'bold', 'italic', 'underline', 'strikethrough', '|',
+            'bulletedList', 'numberedList', '|',
+            'link', 'insertImage', 'blockQuote', 'insertTable', '|',
+            'horizontalLine', 'sourceEditing', '|',
+            'undo', 'redo',
         ],
+        'heading': {
+            'options': [
+                {'model': 'paragraph', 'title': 'Paragraph', 'class': 'ck-heading_paragraph'},
+                {'model': 'heading2', 'view': 'h2', 'title': 'Heading 2', 'class': 'ck-heading_heading2'},
+                {'model': 'heading3', 'view': 'h3', 'title': 'Heading 3', 'class': 'ck-heading_heading3'},
+                {'model': 'heading4', 'view': 'h4', 'title': 'Heading 4', 'class': 'ck-heading_heading4'},
+            ]
+        },
+        'image': {
+            'toolbar': [
+                'imageTextAlternative', 'imageStyle:inline', 'imageStyle:block', 'imageStyle:side',
+            ],
+        },
+        'table': {
+            'contentToolbar': ['tableColumn', 'tableRow', 'mergeTableCells'],
+        },
+        'htmlSupport': {
+            'allow': [
+                {'name': '/.*/','attributes': True, 'classes': True, 'styles': True},
+            ]
+        },
     },
 }
 

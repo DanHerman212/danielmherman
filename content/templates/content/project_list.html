@@ -5,10 +5,11 @@
 
 {% block content %}
 <div class="container">
-    <h1 class="mb-4">Projects</h1>
-    <p class="lead">Data Science Projects I'm working on:</p>
+    <header class="project-list-header mb-4">
+        <h1>Projects</h1>
+    </header>
 
-    <div class="row mt-5">
+    <div class="row mt-4">
         {% for project in projects %}
         <div class="col-md-4 mb-4">
             <div class="card h-100">

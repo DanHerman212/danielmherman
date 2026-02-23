@@ -47,6 +47,24 @@
     margin-bottom: 1.5rem;
 }
 
+/* Project list page */
+.project-list-header {
+    text-align: center;
+    margin-bottom: 1rem;
+}
+
+.project-list-header .lead {
+    font-family: Georgia, serif;
+    color: #555;
+}
+
+/* Project detail - don't constrain width like articles */
+.project-content {
+    max-width: none;
+    margin-left: 0;
+    margin-right: 0;
+}
+
 body {
     font-family: Georgia, 'Times New Roman', serif;
     min-height: 100vh;
@@ -55,9 +73,9 @@ body {
     background-color: #fafafa;
 }
 
-/* Headings use Playfair Display */
+/* Headings use Inter for clean, minimalist look */
 h1, h2, h3, h4, h5, h6 {
-    font-family: 'Playfair Display', Georgia, serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     font-weight: 600;
 }
 
@@ -112,9 +130,17 @@ main {
     margin-right: auto;
 }
 
+/* Project content overrides - full width, not centered */
+.project-content {
+    max-width: 100% !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+}
+
 /* Uniform paragraph spacing */
 .article-content p {
-    margin-bottom: 1.25rem;
+    margin-bottom: 1rem;
+    margin-top: 0;
 }
 
 /* Article content images - tight text wrapping */
@@ -250,6 +276,64 @@ main {
 
 footer {
     margin-top: auto;
+}
+
+/* Auto-generated Table of Contents */
+.toc {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.toc-title {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #666;
+    margin: 0 0 0.75rem 0;
+}
+
+.toc-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.toc-list li {
+    padding: 0.35rem 0;
+    border-bottom: 1px solid #eee;
+}
+
+.toc-list li:last-child {
+    border-bottom: none;
+}
+
+.toc-list a {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.95rem;
+    color: #333;
+    text-decoration: none;
+    transition: color 0.2s ease;
+}
+
+.toc-list a:hover {
+    color: var(--primary-color);
+}
+
+/* Smooth scroll for anchor links */
+html {
+    scroll-behavior: smooth;
+}
+
+/* Offset for fixed headers if needed */
+.article-content h2[id],
+.article-content h3[id],
+.article-content h4[id] {
+    scroll-margin-top: 1rem;
 }
 
 /* responsive adjustments */
