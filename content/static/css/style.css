@@ -137,6 +137,23 @@ main {
     margin-right: 0 !important;
 }
 
+/* Superscript/subscript - prevent line shifting */
+.article-content sup,
+.article-content sub {
+    font-size: 0.75em;
+    line-height: 0;
+    position: relative;
+    vertical-align: baseline;
+}
+
+.article-content sup {
+    top: -0.5em;
+}
+
+.article-content sub {
+    bottom: -0.25em;
+}
+
 /* Uniform paragraph spacing */
 .article-content p {
     margin-bottom: 1rem;
@@ -342,3 +359,8 @@ html {
         font-size: 2rem;
     }
 }
+
+/* resume page */
+.resume-page h1 { font-size: 1.75rem; }
+.resume-page h2 { font-size: 1.25rem; }
+.resume-page h4 { font-size: .8rem; }

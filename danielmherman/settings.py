@@ -42,19 +42,25 @@ INSTALLED_APPS = [
 ]
 
 # CKEditor 5 Configuration
-CKEDITOR_5_FILE_STORAGE = 'django.core.files.storage.default_storage'
+CKEDITOR_5_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
 CKEDITOR_5_UPLOAD_FILE_TYPES = ['jpeg', 'jpg', 'png', 'gif', 'webp']
 
 CKEDITOR_5_CONFIGS = {
     'default': {
-        'toolbar': [
-            'heading', '|',
-            'bold', 'italic', 'underline', 'strikethrough', '|',
-            'bulletedList', 'numberedList', '|',
-            'link', 'insertImage', 'blockQuote', 'insertTable', '|',
-            'horizontalLine', 'sourceEditing', '|',
-            'undo', 'redo',
-        ],
+        'toolbar': {
+            'items': [
+                'heading', '|',
+                'bold', 'italic', 'underline', 'strikethrough', 'superscript', 'subscript', '|',
+                'fontColor', 'fontBackgroundColor', '|',
+                'bulletedList', 'numberedList', '|',
+                'undo', 'redo',
+                '-',  # Line break - second row
+                'fontSize', 'fontFamily', '|',
+                'link', 'insertImage', 'mediaEmbed', 'blockQuote', 'codeBlock', 'insertTable', '|',
+                'horizontalLine', 'sourceEditing',
+            ],
+            'shouldNotGroupWhenFull': True,
+        },
         'heading': {
             'options': [
                 {'model': 'paragraph', 'title': 'Paragraph', 'class': 'ck-heading_paragraph'},
@@ -62,6 +68,34 @@ CKEDITOR_5_CONFIGS = {
                 {'model': 'heading3', 'view': 'h3', 'title': 'Heading 3', 'class': 'ck-heading_heading3'},
                 {'model': 'heading4', 'view': 'h4', 'title': 'Heading 4', 'class': 'ck-heading_heading4'},
             ]
+        },
+        'fontFamily': {
+            'options': [
+                'default',
+                'Georgia, serif',
+                'Arial, sans-serif',
+                'Courier New, monospace',
+                'Inter, sans-serif',
+            ],
+        },
+        'fontSize': {
+            'options': [
+                'tiny', 'small', 'default', 'big', 'huge',
+            ],
+        },
+        'codeBlock': {
+            'languages': [
+                {'language': 'plaintext', 'label': 'Plain text'},
+                {'language': 'python', 'label': 'Python'},
+                {'language': 'javascript', 'label': 'JavaScript'},
+                {'language': 'html', 'label': 'HTML'},
+                {'language': 'css', 'label': 'CSS'},
+                {'language': 'sql', 'label': 'SQL'},
+                {'language': 'bash', 'label': 'Bash'},
+            ],
+        },
+        'mediaEmbed': {
+            'previewsInData': True,
         },
         'image': {
             'toolbar': [
