@@ -24,7 +24,7 @@ A complete step-by-step guide for deploying this Django app to **Google Cloud Ru
 14. [Deploy to Cloud Run (First Time — Manual)](#14-deploy-to-cloud-run-first-time--manual)
 15. [Run Database Migrations in Production](#15-run-database-migrations-in-production)
 16. [Create a Superuser in Production](#16-create-a-superuser-in-production)
-17. [Migrate Existing Data from SQLite (Optional)](#17-migrate-existing-data-from-sqlite-optional)
+17. [Clean-Sheet Launch (No Data Migration)](#17-clean-sheet-launch-no-data-migration)
 18. [Set Up Cloud Build CI/CD from GitHub](#18-set-up-cloud-build-cicd-from-github)
 19. [Connect Your GoDaddy Domain (danielmherman.com)](#19-connect-your-godaddy-domain-danielmhermancom)
 20. [Post-Deployment Checklist](#20-post-deployment-checklist)
@@ -86,7 +86,7 @@ gcloud init
 3. Follow the prompts to:
    - Log in with your Google account
    - Select your project (`danielmherman` or whatever you named it)
-   - Set a default region — choose **`us-central1`** (good general-purpose region)
+   - Set a default region — choose **`us-east1`** (matches the clinical copilot / MLOps project region, avoiding cross-region latency and egress)
 
 4. Confirm your config:
 
@@ -98,41 +98,68 @@ gcloud config list
 
 ## 4. Set Up Cloud SQL (PostgreSQL)
 
-### 4a. Create the Cloud SQL instance
+> **Password handling.** Generate both database passwords directly into Secret Manager *before* creating the instance, then read them back when needed. This way you never type a password into your shell, nothing lands in `~/.bash_history`, and Secret Manager is the single source of truth — so there's no way for the value in Cloud SQL to drift out of sync with the value Cloud Run injects at runtime.
+
+### 4a. Generate and store the database passwords
+
+Requires the Secret Manager API (`gcloud services enable secretmanager.googleapis.com`).
+
+```bash
+# Postgres superuser password — you will rarely need this, but store it properly
+python3 -c "import secrets; print(secrets.token_urlsafe(32), end='')" | \
+  gcloud secrets create db-root-password --data-file=-
+
+# Application user password — Cloud Run injects this as DB_PASSWORD
+python3 -c "import secrets; print(secrets.token_urlsafe(32), end='')" | \
+  gcloud secrets create db-password --data-file=-
+```
+
+> The `end=''` matters. A trailing newline becomes part of the secret value and causes
+> `password authentication failed` errors that are very hard to spot.
+
+### 4b. Create the Cloud SQL instance
 
 ```bash
 gcloud sql instances create danielmherman-db \
   --database-version=POSTGRES_15 \
   --tier=db-f1-micro \
-  --region=us-central1 \
-  --root-password=YOUR_DB_ROOT_PASSWORD
+  --region=us-east1 \
+  --root-password="$(gcloud secrets versions access latest --secret=db-root-password)"
 ```
 
 > **`db-f1-micro`** is the smallest/cheapest tier (~$7-10/month). Good for a personal site.
 
-### 4b. Create a database
+### 4c. Create a database
 
 ```bash
 gcloud sql databases create danielmherman --instance=danielmherman-db
 ```
 
-### 4c. Create a database user
+### 4d. Create the application database user
 
 ```bash
 gcloud sql users create djangouser \
   --instance=danielmherman-db \
-  --password=CHOOSE_A_STRONG_PASSWORD
+  --password="$(gcloud secrets versions access latest --secret=db-password)"
 ```
 
-### 4d. Note your connection name
+This is the account Django authenticates as. Because both this command and Cloud Run
+read from the same `db-password` secret, the two can never disagree.
+
+### 4e. Note your connection name
 
 ```bash
 gcloud sql instances describe danielmherman-db --format="value(connectionName)"
 ```
 
-This will output something like: `danielmherman-123456:us-central1:danielmherman-db`
+This will output something like: `danielmherman-123456:us-east1:danielmherman-db`
 
 **Save this value** — you'll need it later.
+
+> **If you ever need to rotate the password:** add a new secret version
+> (`gcloud secrets versions add db-password --data-file=-`), then apply it with
+> `gcloud sql users set-password djangouser --instance=danielmherman-db --prompt-for-password`,
+> then redeploy Cloud Run so it picks up the new version.
 
 ---
 
@@ -142,7 +169,7 @@ This bucket will store uploaded images (article images, CKEditor uploads, etc.).
 
 ```bash
 # Create the bucket (name must be globally unique)
-gsutil mb -l us-central1 gs://danielmherman-media
+gsutil mb -l us-east1 gs://danielmherman-media
 
 # Make uploaded files publicly readable (for serving images on your site)
 gsutil iam ch allUsers:objectViewer gs://danielmherman-media
@@ -173,7 +200,7 @@ Cloud Run needs a Serverless VPC Access connector to reach Memorystore (which ru
 
 ```bash
 gcloud compute networks vpc-access connectors create danielmherman-connector \
-  --region=us-central1 \
+  --region=us-east1 \
   --range=10.8.0.0/28
 ```
 
@@ -182,7 +209,7 @@ gcloud compute networks vpc-access connectors create danielmherman-connector \
 ```bash
 gcloud redis instances create danielmherman-redis \
   --size=1 \
-  --region=us-central1 \
+  --region=us-east1 \
   --redis-version=redis_7_0 \
   --tier=basic
 ```
@@ -192,7 +219,7 @@ gcloud redis instances create danielmherman-redis \
 ### 6c. Note the Redis host IP
 
 ```bash
-gcloud redis instances describe danielmherman-redis --region=us-central1 --format="value(host)"
+gcloud redis instances describe danielmherman-redis --region=us-east1 --format="value(host)"
 ```
 
 **Save this IP** — you'll need it for the `REDIS_HOST` environment variable in Cloud Run.
@@ -201,16 +228,20 @@ gcloud redis instances describe danielmherman-redis --region=us-central1 --forma
 
 ## 7. Store Secrets in Secret Manager
 
-Never hardcode secrets. Store them in GCP Secret Manager:
+Never hardcode secrets. The two database passwords were already created in Section 4a —
+this section adds the Django secret key and grants Cloud Run access to everything it needs.
 
 ```bash
-# Django secret key — generate a random one
-python -c "import secrets; print(secrets.token_urlsafe(50))" | \
+# Django SECRET_KEY — generated straight into Secret Manager, never printed to the terminal
+python3 -c "import secrets; print(secrets.token_urlsafe(50), end='')" | \
   gcloud secrets create django-secret-key --data-file=-
+```
 
-# Database password
-echo -n "CHOOSE_A_STRONG_PASSWORD" | \
-  gcloud secrets create db-password --data-file=-
+Verify all three secrets exist:
+
+```bash
+gcloud secrets list --format="table(name)"
+# expect: db-password, db-root-password, django-secret-key
 ```
 
 Grant the Cloud Run service account access to the secrets:
@@ -227,6 +258,9 @@ gcloud secrets add-iam-policy-binding db-password \
   --member="serviceAccount:${PROJECT_NUM}-compute@developer.gserviceaccount.com" \
   --role="roles/secretmanager.secretAccessor"
 ```
+
+> **`db-root-password` is deliberately not granted.** The application never authenticates
+> as the Postgres superuser, so Cloud Run has no reason to read it. Keep that blast radius small.
 
 ---
 
@@ -476,7 +510,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Collect static files
-RUN ENVIRONMENT=collectstatic python manage.py collectstatic --noinput 2>/dev/null || true
+# NOTE: this must succeed. Do NOT suppress errors (e.g. `2>/dev/null || true`) —
+# a silent failure here ships a container whose site loads with no CSS/JS and no error.
+RUN ENVIRONMENT=collectstatic python manage.py collectstatic --noinput
 
 # Expose port
 EXPOSE 8080
@@ -574,7 +610,7 @@ Artifact Registry stores your Docker container images.
 ```bash
 gcloud artifacts repositories create danielmherman-repo \
   --repository-format=docker \
-  --location=us-central1 \
+  --location=us-east1 \
   --description="Docker images for danielmherman.com"
 ```
 
@@ -590,19 +626,19 @@ For the first deployment, build and deploy manually to make sure everything work
 PROJECT_ID=$(gcloud config get-value project)
 
 # Build the image using Cloud Build
-gcloud builds submit --tag us-central1-docker.pkg.dev/${PROJECT_ID}/danielmherman-repo/danielmherman:latest
+gcloud builds submit --tag us-east1-docker.pkg.dev/${PROJECT_ID}/danielmherman-repo/danielmherman:latest
 ```
 
 ### 14b. Deploy to Cloud Run
 
 ```bash
 CLOUD_SQL_CONNECTION=$(gcloud sql instances describe danielmherman-db --format="value(connectionName)")
-REDIS_HOST=$(gcloud redis instances describe danielmherman-redis --region=us-central1 --format="value(host)")
+REDIS_HOST=$(gcloud redis instances describe danielmherman-redis --region=us-east1 --format="value(host)")
 
 gcloud run deploy danielmherman \
-  --image us-central1-docker.pkg.dev/${PROJECT_ID}/danielmherman-repo/danielmherman:latest \
+  --image us-east1-docker.pkg.dev/${PROJECT_ID}/danielmherman-repo/danielmherman:latest \
   --platform managed \
-  --region us-central1 \
+  --region us-east1 \
   --allow-unauthenticated \
   --add-cloudsql-instances ${CLOUD_SQL_CONNECTION} \
   --vpc-connector danielmherman-connector \
@@ -613,30 +649,38 @@ gcloud run deploy danielmherman \
   --set-env-vars "ALLOWED_HOSTS=danielmherman.com,www.danielmherman.com,.run.app" \
   --set-env-vars "CSRF_TRUSTED_ORIGINS=https://danielmherman.com,https://www.danielmherman.com" \
   --set-env-vars "REDIS_HOST=${REDIS_HOST}" \
-  --min-instances 1 \
+  --min-instances 0 \
   --max-instances 3 \
   --memory 512Mi
 ```
 
 > **Key differences from basic deployment:**
 > - `--vpc-connector` enables access to Memorystore Redis (private VPC)
-> - `--min-instances 1` avoids cold starts — important for future real-time dashboard apps
+> - `--min-instances 0` lets the service scale to zero — near-free when idle, at the
+>   cost of an occasional cold start. Raise it to `1` later if the clinical demo needs
+>   consistently snappy responses (~$3-5/month).
 > - `REDIS_HOST` env var connects Django Channels to Redis
 >
 > **If you skipped Memorystore (Section 6):** Remove the `--vpc-connector` and `REDIS_HOST` lines. You can add them later when you build your first real-time app.
 
-After deployment, you'll get a URL like `https://danielmherman-xxxxxxxxxx-uc.a.run.app`. Visit it to verify your site is running.
+After deployment, you'll get a URL like `https://danielmherman-xxxxxxxxxx-ue.a.run.app`. Visit it to verify your site is running.
 
 > **If you see errors**, check the logs:
 > ```bash
-> gcloud run services logs read danielmherman --region us-central1 --limit 50
+> gcloud run services logs read danielmherman --region us-east1 --limit 50
 > ```
 
 ---
 
 ## 15. Run Database Migrations in Production
 
-Cloud Run doesn't automatically run migrations. You need to run them after each deployment that includes model changes.
+Cloud Run doesn't automatically run migrations. You need to run them for each deployment that includes model changes.
+
+> **Ordering matters:** run migrations **before** the new revision starts serving.
+> If you deploy first and migrate second, the new code briefly runs against the old
+> schema and can 500. The CI/CD pipeline in Section 18 is ordered accordingly.
+> (The alternative is to only ever write backward-compatible migrations — harder to
+> guarantee in practice.)
 
 ### Option A: Use a Cloud Run Job (recommended)
 
@@ -645,8 +689,8 @@ PROJECT_ID=$(gcloud config get-value project)
 CLOUD_SQL_CONNECTION=$(gcloud sql instances describe danielmherman-db --format="value(connectionName)")
 
 gcloud run jobs create migrate \
-  --image us-central1-docker.pkg.dev/${PROJECT_ID}/danielmherman-repo/danielmherman:latest \
-  --region us-central1 \
+  --image us-east1-docker.pkg.dev/${PROJECT_ID}/danielmherman-repo/danielmherman:latest \
+  --region us-east1 \
   --set-env-vars "ENVIRONMENT=production" \
   --set-env-vars "GOOGLE_CLOUD_PROJECT=${PROJECT_ID}" \
   --set-env-vars "CLOUD_SQL_CONNECTION_NAME=${CLOUD_SQL_CONNECTION}" \
@@ -655,93 +699,103 @@ gcloud run jobs create migrate \
   --args "manage.py,migrate"
 
 # Execute the migration job
-gcloud run jobs execute migrate --region us-central1 --wait
+gcloud run jobs execute migrate --region us-east1 --wait
 ```
 
-For subsequent migrations, just execute the job again (after deploying the new image):
+For subsequent migrations, point the job at the new image and run it **before** deploying that image to the service:
 
 ```bash
 gcloud run jobs update migrate \
-  --image us-central1-docker.pkg.dev/${PROJECT_ID}/danielmherman-repo/danielmherman:latest \
-  --region us-central1
+  --image us-east1-docker.pkg.dev/${PROJECT_ID}/danielmherman-repo/danielmherman:latest \
+  --region us-east1
 
-gcloud run jobs execute migrate --region us-central1 --wait
+gcloud run jobs execute migrate --region us-east1 --wait
 ```
 
 ---
 
 ## 16. Create a Superuser in Production
 
-You need an admin user to access `/admin/`:
+You need an admin user to access `/admin/`.
+
+> **Do not pass the password as a plaintext env var.** It would be stored in the job
+> config, your shell history, and potentially Cloud Logging. Put it in Secret Manager
+> and reference it with `--set-secrets`.
 
 ```bash
 PROJECT_ID=$(gcloud config get-value project)
 CLOUD_SQL_CONNECTION=$(gcloud sql instances describe danielmherman-db --format="value(connectionName)")
+PROJECT_NUM=$(gcloud projects describe ${PROJECT_ID} --format="value(projectNumber)")
 
+# 1. Store the superuser password as a secret (prompts, so it isn't in shell history)
+read -rs -p "Superuser password: " SU_PASS && echo
+printf '%s' "$SU_PASS" | gcloud secrets create django-superuser-password --data-file=-
+unset SU_PASS
+
+# 2. Let the runtime service account read it
+gcloud secrets add-iam-policy-binding django-superuser-password \
+  --member="serviceAccount:${PROJECT_NUM}-compute@developer.gserviceaccount.com" \
+  --role="roles/secretmanager.secretAccessor"
+
+# 3. Create the job, injecting the password from Secret Manager
 gcloud run jobs create createsuperuser \
-  --image us-central1-docker.pkg.dev/${PROJECT_ID}/danielmherman-repo/danielmherman:latest \
-  --region us-central1 \
+  --image us-east1-docker.pkg.dev/${PROJECT_ID}/danielmherman-repo/danielmherman:latest \
+  --region us-east1 \
   --set-env-vars "ENVIRONMENT=production" \
   --set-env-vars "GOOGLE_CLOUD_PROJECT=${PROJECT_ID}" \
   --set-env-vars "CLOUD_SQL_CONNECTION_NAME=${CLOUD_SQL_CONNECTION}" \
   --set-env-vars "DJANGO_SUPERUSER_USERNAME=admin" \
   --set-env-vars "DJANGO_SUPERUSER_EMAIL=your-email@example.com" \
-  --set-env-vars "DJANGO_SUPERUSER_PASSWORD=CHOOSE_A_STRONG_PASSWORD" \
+  --set-secrets "DJANGO_SUPERUSER_PASSWORD=django-superuser-password:latest" \
   --set-cloudsql-instances ${CLOUD_SQL_CONNECTION} \
   --command "python" \
   --args "manage.py,createsuperuser,--noinput"
 
-gcloud run jobs execute createsuperuser --region us-central1 --wait
+gcloud run jobs execute createsuperuser --region us-east1 --wait
 ```
 
-> **Important:** After running this, delete the job so the password isn't stored:
+> **Cleanup:** once the superuser exists, delete the one-shot job:
 > ```bash
-> gcloud run jobs delete createsuperuser --region us-central1 --quiet
+> gcloud run jobs delete createsuperuser --region us-east1 --quiet
 > ```
+> Keep the secret if you want to rotate the password later, or delete it with
+> `gcloud secrets delete django-superuser-password --quiet`.
 
 ---
 
-## 17. Migrate Existing Data from SQLite (Optional)
+## 17. Clean-Sheet Launch (No Data Migration)
 
-If you have existing articles, projects, and categories you want to keep:
+**This deployment is a clean sheet.** Only the HTML templates (and static CSS/JS) carry
+over from the local project — none of the locally created content is migrated.
 
-### 17a. Export from SQLite locally
+### What carries over
 
-```bash
-python manage.py dumpdata content --indent 2 > data_export.json
-```
+- `content/templates/` — the HTML templates
+- `content/static/` — CSS / JS
+- The app's models, views, and URLs (the *code*, not the rows)
 
-### 17b. Upload to Cloud Storage
+### What does NOT carry over
 
-```bash
-gsutil cp data_export.json gs://danielmherman-media/data_export.json
-```
+- The local SQLite database (`db.sqlite3`) — already excluded by `.dockerignore`
+  and `.gitignore`
+- Locally created articles, projects, and categories
+- Local uploads in `media/` — already excluded by `.dockerignore`
 
-### 17c. Import into Cloud SQL via a Cloud Run Job
+### What this means operationally
 
-```bash
-PROJECT_ID=$(gcloud config get-value project)
-CLOUD_SQL_CONNECTION=$(gcloud sql instances describe danielmherman-db --format="value(connectionName)")
+- **Do not** run `dumpdata` / `loaddata`. There is nothing to import.
+- The production database starts **empty** after §15 (migrations) — this is expected.
+- After §16 (superuser), log in at `/admin/` and author content directly in
+  production. Production becomes the system of record.
+- The Cloud Storage media bucket starts empty; it fills as you upload images through
+  CKEditor in production.
 
-gcloud run jobs create loaddata \
-  --image us-central1-docker.pkg.dev/${PROJECT_ID}/danielmherman-repo/danielmherman:latest \
-  --region us-central1 \
-  --set-env-vars "ENVIRONMENT=production" \
-  --set-env-vars "GOOGLE_CLOUD_PROJECT=${PROJECT_ID}" \
-  --set-env-vars "CLOUD_SQL_CONNECTION_NAME=${CLOUD_SQL_CONNECTION}" \
-  --set-cloudsql-instances ${CLOUD_SQL_CONNECTION} \
-  --command "bash" \
-  --args "-c,gsutil cp gs://danielmherman-media/data_export.json /tmp/data.json && python manage.py loaddata /tmp/data.json"
+> **Why clean sheet?** The local database was scratch/dev content. Starting empty avoids
+> importing throwaway rows and sidesteps SQLite→PostgreSQL type and sequence quirks.
 
-gcloud run jobs execute loaddata --region us-central1 --wait
-```
-
-### 17d. Upload existing media files
-
-```bash
-# Upload all your local media files to the bucket
-gsutil -m cp -r media/* gs://danielmherman-media/
-```
+> **If you ever do need to import data later**, note that a `loaddata` job cannot shell
+> out to `gsutil` — the `python:3.12-slim` image does not include the gcloud SDK. Either
+> bake the fixture into the image, or download it with `google-cloud-storage` from Python.
 
 ---
 
@@ -768,9 +822,9 @@ steps:
     args:
       - 'build'
       - '-t'
-      - 'us-central1-docker.pkg.dev/$PROJECT_ID/danielmherman-repo/danielmherman:$COMMIT_SHA'
+      - 'us-east1-docker.pkg.dev/$PROJECT_ID/danielmherman-repo/danielmherman:$COMMIT_SHA'
       - '-t'
-      - 'us-central1-docker.pkg.dev/$PROJECT_ID/danielmherman-repo/danielmherman:latest'
+      - 'us-east1-docker.pkg.dev/$PROJECT_ID/danielmherman-repo/danielmherman:latest'
       - '.'
 
   # Push the image to Artifact Registry
@@ -778,23 +832,10 @@ steps:
     args:
       - 'push'
       - '--all-tags'
-      - 'us-central1-docker.pkg.dev/$PROJECT_ID/danielmherman-repo/danielmherman'
+      - 'us-east1-docker.pkg.dev/$PROJECT_ID/danielmherman-repo/danielmherman'
 
-  # Deploy to Cloud Run
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    entrypoint: gcloud
-    args:
-      - 'run'
-      - 'deploy'
-      - 'danielmherman'
-      - '--image'
-      - 'us-central1-docker.pkg.dev/$PROJECT_ID/danielmherman-repo/danielmherman:$COMMIT_SHA'
-      - '--region'
-      - 'us-central1'
-      - '--platform'
-      - 'managed'
-
-  # Run migrations
+  # Run migrations FIRST — before the new revision serves traffic.
+  # Deploying first would briefly run new code against the old schema.
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args:
@@ -803,10 +844,10 @@ steps:
       - 'update'
       - 'migrate'
       - '--image'
-      - 'us-central1-docker.pkg.dev/$PROJECT_ID/danielmherman-repo/danielmherman:$COMMIT_SHA'
+      - 'us-east1-docker.pkg.dev/$PROJECT_ID/danielmherman-repo/danielmherman:$COMMIT_SHA'
       - '--region'
-      - 'us-central1'
-    
+      - 'us-east1'
+
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args:
@@ -815,16 +856,38 @@ steps:
       - 'execute'
       - 'migrate'
       - '--region'
-      - 'us-central1'
+      - 'us-east1'
       - '--wait'
 
+  # Deploy to Cloud Run only after migrations succeed.
+  # If the migrate step fails, the build stops here and the old revision keeps serving.
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'danielmherman'
+      - '--image'
+      - 'us-east1-docker.pkg.dev/$PROJECT_ID/danielmherman-repo/danielmherman:$COMMIT_SHA'
+      - '--region'
+      - 'us-east1'
+      - '--platform'
+      - 'managed'
+
 images:
-  - 'us-central1-docker.pkg.dev/$PROJECT_ID/danielmherman-repo/danielmherman:$COMMIT_SHA'
-  - 'us-central1-docker.pkg.dev/$PROJECT_ID/danielmherman-repo/danielmherman:latest'
+  - 'us-east1-docker.pkg.dev/$PROJECT_ID/danielmherman-repo/danielmherman:$COMMIT_SHA'
+  - 'us-east1-docker.pkg.dev/$PROJECT_ID/danielmherman-repo/danielmherman:latest'
 
 options:
   logging: CLOUD_LOGGING_ONLY
 ```
+
+> **Migrations run before deploy.** This ordering keeps the old revision serving until
+> the schema is ready. It requires migrations to be **backward compatible** with the
+> currently deployed code (the old revision runs against the new schema for a few
+> seconds). For destructive changes (dropping/renaming a column), use the standard
+> two-deploy pattern: first deploy code that no longer uses the column, then a second
+> deploy that drops it.
 
 ### 18c. Grant Cloud Build permissions
 
@@ -936,7 +999,7 @@ dig danielmherman.com A +short
 dig www.danielmherman.com CNAME +short
 
 # Check SSL certificate status in GCP
-gcloud run domain-mappings describe --domain danielmherman.com --region us-central1
+gcloud run domain-mappings describe --domain danielmherman.com --region us-east1
 ```
 
 Once the certificate shows `ACTIVE`, visit:
@@ -962,7 +1025,7 @@ After everything is deployed, verify:
 - [ ] You can create/edit an article with CKEditor
 - [ ] Image uploads in CKEditor work (stored in Cloud Storage)
 - [ ] Static files load correctly (CSS, JS)
-- [ ] All existing content appears (if you migrated data)
+- [ ] Site starts with **no content** (expected — clean sheet); you can author a new article in `/admin/` and see it render
 - [ ] HTTPS works (no mixed content warnings)
 - [ ] `git push` to main triggers an automatic deployment
 
@@ -989,13 +1052,13 @@ Your day-to-day development process:
 
 ```bash
 # View Cloud Run logs
-gcloud run services logs read danielmherman --region us-central1 --limit 50
+gcloud run services logs read danielmherman --region us-east1 --limit 50
 
 # View Cloud Build history
 gcloud builds list --limit 5
 
 # Check service status
-gcloud run services describe danielmherman --region us-central1
+gcloud run services describe danielmherman --region us-east1
 
 # Connect to Cloud SQL (for debugging)
 gcloud sql connect danielmherman-db --user=djangouser --database=danielmherman
@@ -1005,7 +1068,7 @@ gcloud sql connect danielmherman-db --user=djangouser --database=danielmherman
 
 | Service | Estimated Cost |
 |---------|---------------|
-| Cloud Run (min-instances=1) | ~$3-5/month |
+| Cloud Run (min-instances=0, scales to zero) | ~$0-2/month |
 | Cloud SQL (db-f1-micro) | ~$7-10/month |
 | Memorystore Redis (1 GB basic) | ~$36/month (skip until needed) |
 | Cloud Storage | ~$0.02/GB/month (negligible) |
@@ -1078,7 +1141,7 @@ For each external prediction service, grant the web project's service account `r
 ```bash
 # Run this in the ML project (e.g., danielmherman-clinical)
 gcloud run services add-iam-policy-binding sepsis-predict \
-  --region=us-central1 \
+  --region=us-east1 \
   --member="serviceAccount:WEB_PROJECT_NUM-compute@developer.gserviceaccount.com" \
   --role="roles/run.invoker"
 ```
@@ -1088,10 +1151,10 @@ gcloud run services add-iam-policy-binding sepsis-predict \
 If you skipped Memorystore in Section 6, enable it when you add your first app that needs WebSocket support (e.g., real-time clinical dashboard). Then update the Cloud Run service to include the VPC connector and Redis host:
 
 ```bash
-REDIS_HOST=$(gcloud redis instances describe danielmherman-redis --region=us-central1 --format="value(host)")
+REDIS_HOST=$(gcloud redis instances describe danielmherman-redis --region=us-east1 --format="value(host)")
 
 gcloud run services update danielmherman \
-  --region us-central1 \
+  --region us-east1 \
   --vpc-connector danielmherman-connector \
   --update-env-vars "REDIS_HOST=${REDIS_HOST}"
 ```

@@ -1,8 +1,11 @@
 asgiref==3.11.0
 bleach==4.1.0
 Django==6.0
+django-ckeditor==6.7.3
 django-ckeditor-5==0.2.20
 django-js-asset==3.1.2
+packaging==25.0
 pillow==12.1.0
+six==1.17.0
 sqlparse==0.5.5
 webencodings==0.5.1
