@@ -10,22 +10,49 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
+import os
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# ---------- ENVIRONMENT ----------
+ENVIRONMENT = os.environ.get('ENVIRONMENT', 'development')
+IS_PRODUCTION = ENVIRONMENT == 'production'
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
+# ---------- SECRET KEY ----------
+if IS_PRODUCTION:
+    from google.cloud import secretmanager
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-81v8x+^5s3_(@!r@ga4_7tti5pghtnnyig0!0_g=gj_#h^cb5x'
+    client = secretmanager.SecretManagerServiceClient()
+    PROJECT_ID = os.environ.get('GOOGLE_CLOUD_PROJECT')
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+    def get_secret(secret_id):
+        name = f"projects/{PROJECT_ID}/secrets/{secret_id}/versions/latest"
+        response = client.access_secret_version(request={"name": name})
+        return response.payload.data.decode("UTF-8")
 
-ALLOWED_HOSTS = []
+    SECRET_KEY = get_secret('django-secret-key')
+else:
+    # Local development only. Override via DJANGO_SECRET_KEY if you need a
+    # stable key across restarts. The 'django-insecure-' prefix is Django's
+    # own convention and is flagged by `manage.py check --deploy`.
+    SECRET_KEY = os.environ.get(
+        'DJANGO_SECRET_KEY',
+        'django-insecure-local-dev-only-never-use-in-production',
+    )
+
+# ---------- DEBUG ----------
+DEBUG = not IS_PRODUCTION
+
+# ---------- ALLOWED HOSTS ----------
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+
+# ---------- CSRF ----------
+CSRF_TRUSTED_ORIGINS = os.environ.get(
+    'CSRF_TRUSTED_ORIGINS',
+    'http://localhost:8000'
+).split(',')
 
 
 # Application definition
@@ -39,6 +66,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'content', # added app
     'django_ckeditor_5',
+    'storages',   # Cloud Storage media backend
+    'channels',   # Django Channels (WebSocket/ASGI support)
 ]
 
 # CKEditor 5 Configuration
@@ -116,6 +145,7 @@ CKEDITOR_5_CONFIGS = {
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -147,12 +177,24 @@ WSGI_APPLICATION = 'danielmherman.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+if IS_PRODUCTION:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': 'danielmherman',
+            'USER': 'djangouser',
+            'PASSWORD': get_secret('db-password'),
+            'HOST': '/cloudsql/' + os.environ.get('CLOUD_SQL_CONNECTION_NAME', ''),
+            'PORT': '5432',
+        }
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 
 # Password validation
@@ -189,11 +231,59 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
-# configure static files
-STATIC_URL = 'static/'
+# ---------- STATIC FILES ----------
+STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = [BASE_DIR / 'static']
 
-# configure media files (for images, uploads)
-MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
+
+# ---------- MEDIA FILES ----------
+if IS_PRODUCTION:
+    STORAGES["default"] = {
+        "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
+    }
+    GS_BUCKET_NAME = os.environ.get('GS_BUCKET_NAME', 'danielmherman-media')
+    GS_DEFAULT_ACL = 'publicRead'
+    MEDIA_URL = f'https://storage.googleapis.com/{GS_BUCKET_NAME}/'
+else:
+    MEDIA_URL = '/media/'
+    MEDIA_ROOT = BASE_DIR / 'media'
+
+# ---------- SECURITY (production only) ----------
+if IS_PRODUCTION:
+    SECURE_SSL_REDIRECT = True
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+
+# ---------- ASGI / CHANNELS ----------
+ASGI_APPLICATION = 'danielmherman.asgi.application'
+
+# Redis is only required for cross-process WebSocket broadcast (group_send).
+# Without REDIS_HOST set, the in-memory layer is used — correct for
+# request/response and single-connection streaming workloads.
+REDIS_HOST = os.environ.get('REDIS_HOST')
+
+if REDIS_HOST:
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels_redis.core.RedisChannelLayer',
+            'CONFIG': {
+                'hosts': [(REDIS_HOST, 6379)],
+            },
+        },
+    }
+else:
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels.layers.InMemoryChannelLayer',
+        },
+    }

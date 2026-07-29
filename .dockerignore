@@ -1,0 +1,35 @@
+# Virtual environments (note: this project uses .venv, not venv)
+venv/
+.venv/
+
+# Python bytecode
+__pycache__/
+*.pyc
+*.pyo
+
+# Local database
+db.sqlite3
+
+# Version control
+.git/
+.gitignore
+
+# Docs and images (not needed at runtime)
+*.md
+docs/
+images/
+
+# Local media uploads — production serves these from Cloud Storage
+media/
+
+# Build output — collectstatic regenerates this inside the image.
+# Copying the local copy in bloats the image and can ship a stale manifest.
+staticfiles/
+
+# Secrets and OS cruft
+.env
+.DS_Store
+
+# Container files themselves
+Dockerfile
+.dockerignore

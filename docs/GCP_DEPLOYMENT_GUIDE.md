@@ -321,7 +321,12 @@ if IS_PRODUCTION:
     
     SECRET_KEY = get_secret('django-secret-key')
 else:
-    SECRET_KEY = 'django-insecure-81v8x+^5s3_(@!r@ga4_7tti5pghtnnyig0!0_g=gj_#h^cb5x'
+    # Local development only. Override via DJANGO_SECRET_KEY if you need a
+    # stable key across restarts. Never commit a real key here.
+    SECRET_KEY = os.environ.get(
+        'DJANGO_SECRET_KEY',
+        'django-insecure-local-dev-only-never-use-in-production',
+    )
 
 # ---------- DEBUG ----------
 DEBUG = not IS_PRODUCTION
@@ -517,13 +522,22 @@ RUN ENVIRONMENT=collectstatic python manage.py collectstatic --noinput
 # Expose port
 EXPOSE 8080
 
-# Run with uvicorn (ASGI) — supports HTTP + WebSocket
-CMD exec uvicorn danielmherman.asgi:application \
-    --host 0.0.0.0 \
-    --port 8080 \
-    --workers 2 \
-    --timeout-keep-alive 120
+# Run with uvicorn (ASGI). JSON/exec form: uvicorn runs as PID 1 and receives
+# SIGTERM directly, so Cloud Run scale-down and revision swaps shut down cleanly
+# instead of being SIGKILLed after the grace period.
+CMD ["uvicorn", "danielmherman.asgi:application", \
+     "--host", "0.0.0.0", \
+     "--port", "8080", \
+     "--workers", "2", \
+     "--timeout-keep-alive", "120"]
 ```
+
+> **Why JSON form for `CMD`?** The shell form (`CMD exec uvicorn ...`) also works,
+> because `exec` replaces the shell process. But Docker's linter emits a
+> `JSONArgsRecommended` warning for it, and the signal-handling guarantee then rests on
+> one easily-deleted keyword. JSON form makes it structural. The tradeoff: JSON form
+> does not expand environment variables, so the port is hardcoded to `8080` — which
+> matches both Cloud Run's default and the `--port 8080` used at deploy time.
 
 > **Why uvicorn instead of gunicorn?** Uvicorn is a native ASGI server that supports both regular HTTP requests and WebSocket connections. All existing Django views work identically. When you add real-time apps with Django Channels, they'll work without any server changes.
 
@@ -534,20 +548,52 @@ CMD exec uvicorn danielmherman.asgi:application \
 Create `.dockerignore` in your project root:
 
 ```
+# Virtual environments (note: this project uses .venv, not venv)
 venv/
+.venv/
+
+# Python bytecode
 __pycache__/
 *.pyc
+*.pyo
+
+# Local database
 db.sqlite3
+
+# Version control
 .git/
 .gitignore
+
+# Docs and images (not needed at runtime)
 *.md
-media/
-.env
-.DS_Store
-get-pip.py
 docs/
 images/
+
+# Local media uploads — production serves these from Cloud Storage
+media/
+
+# Build output — collectstatic regenerates this inside the image.
+# Copying the local copy in bloats the image and can ship a stale manifest.
+staticfiles/
+
+# Secrets and OS cruft
+.env
+.DS_Store
+
+# Container files themselves
+Dockerfile
+.dockerignore
 ```
+
+> **Why `staticfiles/` matters.** It is `STATIC_ROOT` — pure build output. Copying the
+> local copy into the image both bloats it and risks shipping a stale
+> `staticfiles.json` manifest that disagrees with the freshly collected assets. The
+> `RUN ... collectstatic` step regenerates it during the build.
+
+> **Why `.venv/` matters.** The guide originally listed only `venv/`. This project's
+> environment was renamed to `.venv`, which that pattern does not match — leaving it out
+> would copy hundreds of megabytes of host-specific, Linux-incompatible packages into
+> the image.
 
 ---
 
@@ -891,26 +937,104 @@ options:
 
 ### 18c. Grant Cloud Build permissions
 
-Cloud Build needs permission to deploy to Cloud Run and access Cloud SQL:
+> **Not on the critical path.** If anything in this section fights you, skip Section 18
+> entirely and keep deploying manually with Sections 14 and 15 — they perform the same
+> operations. CI is a convenience; it is not required for a working site.
+
+#### Pre-check: which service account will builds use?
+
+Projects created before ~mid-2024 have a **legacy** Cloud Build service account.
+Newer projects do not — Google stopped auto-creating it, and builds run as the
+**Compute Engine default** account instead. Find out which you have:
 
 ```bash
-PROJECT_NUM=$(gcloud projects describe $(gcloud config get-value project) --format="value(projectNumber)")
+gcloud iam service-accounts list --format="value(email)"
+```
 
-# Grant Cloud Run Admin
-gcloud projects add-iam-policy-binding $(gcloud config get-value project) \
-  --member="serviceAccount:${PROJECT_NUM}@cloudbuild.gserviceaccount.com" \
-  --role="roles/run.admin"
+- See `PROJECT_NUM@cloudbuild.gserviceaccount.com`? → **Path A**
+- Only see `PROJECT_NUM-compute@developer.gserviceaccount.com`? → **Path B** or **Path C**
 
-# Grant Service Account User (needed to deploy)
-gcloud projects add-iam-policy-binding $(gcloud config get-value project) \
-  --member="serviceAccount:${PROJECT_NUM}@cloudbuild.gserviceaccount.com" \
+> If you grant roles to a service account that doesn't exist, the binding may appear to
+> succeed while builds actually run as a different identity — then fail at the deploy
+> step with a confusing permission error. Run the pre-check first.
+
+#### Path A — legacy Cloud Build account exists
+
+```bash
+PROJECT_ID=$(gcloud config get-value project)
+PROJECT_NUM=$(gcloud projects describe "$PROJECT_ID" --format="value(projectNumber)")
+BUILD_SA="${PROJECT_NUM}@cloudbuild.gserviceaccount.com"
+
+for ROLE in roles/run.admin roles/iam.serviceAccountUser roles/artifactregistry.writer; do
+  gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+    --member="serviceAccount:${BUILD_SA}" \
+    --role="$ROLE" \
+    --condition=None
+done
+```
+
+Nothing else to change. Continue to 18d.
+
+#### Path B — quickest fix: grant the compute default account
+
+Same roles, applied to the account your builds already run as. Least effort; the
+trade-off is that this account is broadly used, so it accumulates permissions.
+
+```bash
+PROJECT_ID=$(gcloud config get-value project)
+PROJECT_NUM=$(gcloud projects describe "$PROJECT_ID" --format="value(projectNumber)")
+BUILD_SA="${PROJECT_NUM}-compute@developer.gserviceaccount.com"
+
+for ROLE in roles/run.admin roles/iam.serviceAccountUser roles/artifactregistry.writer roles/logging.logWriter; do
+  gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+    --member="serviceAccount:${BUILD_SA}" \
+    --role="$ROLE" \
+    --condition=None
+done
+```
+
+Continue to 18d. No trigger changes needed.
+
+#### Path C — dedicated build account (preferred)
+
+A purpose-built identity that only does CI. Cleaner blast radius and the modern
+recommended pattern.
+
+```bash
+PROJECT_ID=$(gcloud config get-value project)
+PROJECT_NUM=$(gcloud projects describe "$PROJECT_ID" --format="value(projectNumber)")
+
+gcloud iam service-accounts create cicd-deployer \
+  --display-name="Cloud Build deployer"
+
+BUILD_SA="cicd-deployer@${PROJECT_ID}.iam.gserviceaccount.com"
+
+# logging.logWriter is REQUIRED for user-specified service accounts —
+# the legacy account had it implicitly, a custom one does not.
+for ROLE in roles/run.admin roles/iam.serviceAccountUser roles/artifactregistry.writer roles/logging.logWriter; do
+  gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+    --member="serviceAccount:${BUILD_SA}" \
+    --role="$ROLE" \
+    --condition=None
+done
+
+# Allow the build account to act as the Cloud Run runtime account
+gcloud iam service-accounts add-iam-policy-binding \
+  "${PROJECT_NUM}-compute@developer.gserviceaccount.com" \
+  --member="serviceAccount:${BUILD_SA}" \
   --role="roles/iam.serviceAccountUser"
 
-# Grant Artifact Registry Writer
-gcloud projects add-iam-policy-binding $(gcloud config get-value project) \
-  --member="serviceAccount:${PROJECT_NUM}@cloudbuild.gserviceaccount.com" \
-  --role="roles/artifactregistry.writer"
+echo "Use this in the trigger (18d): ${BUILD_SA}"
 ```
+
+With Path C you must **name the account on the trigger** — see the note in 18d.
+
+> **`options: logging: CLOUD_LOGGING_ONLY` is mandatory here.** A build running as a
+> user-specified service account refuses to start without it (or an explicit
+> `logsBucket`). It is already present at the bottom of the `cloudbuild.yaml` in 18b —
+> don't remove it. The resulting error mentions `build.service_account` needing a logs
+> bucket and gives no hint that the service account is the cause.
+
 
 ### 18d. Create the trigger
 
@@ -923,6 +1047,8 @@ gcloud projects add-iam-policy-binding $(gcloud config get-value project) \
    - **Branch:** `^main$`
    - **Configuration:** Cloud Build configuration file
    - **Location:** `/cloudbuild.yaml`
+   - **Service account:** leave as default for Path A or B; for **Path C**, select
+     `cicd-deployer@PROJECT_ID.iam.gserviceaccount.com`
 4. Click **Create**
 
 ### 18e. Test it
@@ -934,6 +1060,16 @@ git push
 ```
 
 Go to **Cloud Build → History** in the GCP Console to watch the build run.
+
+**If the build fails on permissions**, confirm which identity actually ran it — this is
+usually different from the one you granted roles to:
+
+```bash
+gcloud builds list --limit=1 --format="value(id)"
+gcloud builds describe BUILD_ID --format="value(serviceAccount)"
+```
+
+Grant the four roles from 18c to whatever that command returns, or re-point the trigger.
 
 ---
 
