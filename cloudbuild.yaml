@@ -1,0 +1,64 @@
+steps:
+  # Build the Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'us-east1-docker.pkg.dev/$PROJECT_ID/danielmherman-repo/danielmherman:$COMMIT_SHA'
+      - '-t'
+      - 'us-east1-docker.pkg.dev/$PROJECT_ID/danielmherman-repo/danielmherman:latest'
+      - '.'
+
+  # Push the image to Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - '--all-tags'
+      - 'us-east1-docker.pkg.dev/$PROJECT_ID/danielmherman-repo/danielmherman'
+
+  # Run migrations FIRST — before the new revision serves traffic.
+  # Deploying first would briefly run new code against the old schema.
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'jobs'
+      - 'update'
+      - 'migrate'
+      - '--image'
+      - 'us-east1-docker.pkg.dev/$PROJECT_ID/danielmherman-repo/danielmherman:$COMMIT_SHA'
+      - '--region'
+      - 'us-east1'
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'jobs'
+      - 'execute'
+      - 'migrate'
+      - '--region'
+      - 'us-east1'
+      - '--wait'
+
+  # Deploy to Cloud Run only after migrations succeed.
+  # If the migrate step fails, the build stops here and the old revision keeps serving.
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'danielmherman'
+      - '--image'
+      - 'us-east1-docker.pkg.dev/$PROJECT_ID/danielmherman-repo/danielmherman:$COMMIT_SHA'
+      - '--region'
+      - 'us-east1'
+      - '--platform'
+      - 'managed'
+
+images:
+  - 'us-east1-docker.pkg.dev/$PROJECT_ID/danielmherman-repo/danielmherman:$COMMIT_SHA'
+  - 'us-east1-docker.pkg.dev/$PROJECT_ID/danielmherman-repo/danielmherman:latest'
+
+options:
+  logging: CLOUD_LOGGING_ONLY

@@ -287,3 +287,52 @@ else:
             'BACKEND': 'channels.layers.InMemoryChannelLayer',
         },
     }
+
+# ---------- LOGGING ----------
+# With DEBUG=False, Django routes unhandled exceptions to the 'django.request'
+# logger, whose only default handler is 'mail_admins'. With no email backend
+# configured that means production tracebacks are silently discarded — a 500 in
+# Cloud Run shows the status line and nothing else.
+#
+# Sending them to stdout is enough: Cloud Run captures stdout/stderr into Cloud
+# Logging automatically, so no logging agent or client library is needed.
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {name} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        # Unhandled view exceptions and 4xx/5xx responses.
+        'django.request': {
+            'handlers': ['console'],
+            'level': 'ERROR',
+            'propagate': False,
+        },
+        # Startup/runtime errors that are not tied to a request.
+        'django': {
+            'handlers': ['console'],
+            'level': 'INFO' if IS_PRODUCTION else 'WARNING',
+            'propagate': False,
+        },
+        # Application code: use logging.getLogger(__name__) in views/services.
+        'content': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'WARNING',
+    },
+}

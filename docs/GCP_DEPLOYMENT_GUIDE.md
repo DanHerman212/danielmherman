@@ -1,6 +1,9 @@
 # Deploying danielmherman.com to Google Cloud Platform
 
-A complete step-by-step guide for deploying this Django app to **Google Cloud Run** using **ASGI (uvicorn)**, with **GitHub CI/CD** via Cloud Build, **Cloud SQL (PostgreSQL)** for the database, **Cloud Storage** for media files, **Memorystore (Redis)** for Django Channels, and a **custom domain from GoDaddy**.
+A complete step-by-step guide for deploying this Django app to **Google Cloud Run** using **ASGI (uvicorn)**, with **GitHub CI/CD** via Cloud Build, **Cloud SQL (PostgreSQL)** for the database, **Cloud Storage** for media files, and a **custom domain from GoDaddy**.
+
+> **Memorystore (Redis) is deliberately not part of this deployment.** See Section 6 for
+> the reasoning and for instructions if you ever need to add it.
 
 > **Architecture note:** This deployment uses ASGI (uvicorn) instead of WSGI (gunicorn) to support WebSocket connections for future real-time applications (e.g., clinical dashboards, live data feeds). Standard HTTP views work identically under ASGI — there is no downside to starting with it. Future Django apps (clinical dashboard, recommendation system, etc.) will be added to this project and served as pages under the same domain. ML model inference will be served from separate GCP projects via dedicated prediction endpoints.
 
@@ -13,7 +16,7 @@ A complete step-by-step guide for deploying this Django app to **Google Cloud Ru
 3. [Install & Configure the gcloud CLI](#3-install--configure-the-gcloud-cli)
 4. [Set Up Cloud SQL (PostgreSQL)](#4-set-up-cloud-sql-postgresql)
 5. [Set Up a Cloud Storage Bucket (Media Files)](#5-set-up-a-cloud-storage-bucket-media-files)
-6. [Set Up Memorystore (Redis)](#6-set-up-memorystore-redis)
+6. [Set Up Memorystore (Redis) — SKIPPED](#6-set-up-memorystore-redis--skipped)
 7. [Store Secrets in Secret Manager](#7-store-secrets-in-secret-manager)
 8. [Update the Django App for Production](#8-update-the-django-app-for-production)
 9. [Create the Dockerfile](#9-create-the-dockerfile)
@@ -62,10 +65,13 @@ gcloud services enable \
   artifactregistry.googleapis.com \
   secretmanager.googleapis.com \
   storage.googleapis.com \
-  compute.googleapis.com \
-  redis.googleapis.com \
-  vpcaccess.googleapis.com
+  compute.googleapis.com
 ```
+
+> `redis.googleapis.com` and `vpcaccess.googleapis.com` are **not** enabled — this
+> deployment uses neither Memorystore nor a VPC connector (Section 6). Enabling an API
+> costs nothing, but leaving them off keeps the project surface honest about what is
+> actually in use.
 
 ---
 
@@ -190,13 +196,36 @@ gsutil cors set /tmp/cors.json gs://danielmherman-media
 
 ---
 
-## 6. Set Up Memorystore (Redis)
+## 6. Set Up Memorystore (Redis) — SKIPPED
 
-Redis is used as the channel layer backend for Django Channels, enabling WebSocket support for future real-time dashboard apps.
+> **Skip this entire section.** It is retained only as a reference for if the
+> requirements change.
+
+**Why it was dropped.** Redis would serve as the Django Channels *channel layer*, whose
+only job is passing messages **between processes** (`group_send`). A consumer that holds
+a connection and calls the agent inline never touches it. The demo is auth-gated with
+few users, and Cloud SQL (Postgres) already covers sessions, per-user quota, and
+LangGraph checkpointing — all shared across Cloud Run instances and durable, which
+Redis is not.
+
+Separately, the A2UI rendering layer does **not** require WebSockets: they are a
+*proposed, unimplemented* transport in that spec, and user actions travel as ordinary
+tool calls. So the one thing that might have forced a channel layer does not.
+
+**What it saves:** ~$36/month (Memorystore) + ~$7-10/month (VPC connector) ≈ **$43-46/month**.
+
+**The one case that would justify revisiting:** a live dashboard where several viewers
+must see the same updates pushed simultaneously. Postgres genuinely cannot do that
+well; that is the trigger to come back here.
+
+> **Note:** a VPC connector is *not* needed for Cloud SQL. Cloud Run reaches the
+> database through `--add-cloudsql-instances`, which uses the managed Cloud SQL Auth
+> Proxy rather than the VPC. The connector below exists solely for Memorystore.
+
+<details>
+<summary>Instructions, if Memorystore is ever needed</summary>
 
 ### 6a. Create a VPC Connector
-
-Cloud Run needs a Serverless VPC Access connector to reach Memorystore (which runs on a private VPC):
 
 ```bash
 gcloud compute networks vpc-access connectors create danielmherman-connector \
@@ -214,15 +243,16 @@ gcloud redis instances create danielmherman-redis \
   --tier=basic
 ```
 
-> **`basic` tier** is the cheapest (~$0.049/GB/hour ≈ ~$36/month for 1 GB). You can skip this step for the initial portfolio deployment and add it later when you build the first real-time app. If you skip it, also skip the `--vpc-connector` flag in the Cloud Run deploy command (Section 14).
-
 ### 6c. Note the Redis host IP
 
 ```bash
 gcloud redis instances describe danielmherman-redis --region=us-east1 --format="value(host)"
 ```
 
-**Save this IP** — you'll need it for the `REDIS_HOST` environment variable in Cloud Run.
+Then re-add `--vpc-connector danielmherman-connector` and `REDIS_HOST` to the Cloud Run
+deploy command, and enable `redis.googleapis.com` and `vpcaccess.googleapis.com`.
+
+</details>
 
 ---
 
@@ -288,7 +318,18 @@ channels==4.2.0
 channels-redis==4.2.1
 ```
 
-> **Key changes from WSGI plan:** `gunicorn` is replaced by `uvicorn[standard]`, and `channels` + `channels-redis` are added for WebSocket support.
+> **Key changes from WSGI plan:** `gunicorn` is replaced by `uvicorn[standard]`.
+>
+> **On `channels-redis`:** it is pinned but **currently unused**, because Memorystore is
+> not deployed (Section 6). It is harmless — roughly 1 MB, imported only if the channel
+> layer is configured to use it — and keeping it pinned means adding Redis later is a
+> config change rather than a dependency change. Drop it if you prefer a minimal
+> install; nothing in the running app imports it today.
+>
+> **On `django-ckeditor`:** if your `requirements.txt` omits it, a clean-sheet deploy
+> will fail during migrations. `content/migrations/0004_alter_article_content.py` has a
+> module-level `import ckeditor.fields`, and a fresh database replays every migration —
+> so the package must be installed even though the current models use CKEditor 5.
 
 ### 8b. Update `danielmherman/settings.py`
 
@@ -431,12 +472,17 @@ if IS_PRODUCTION:
 # ---------- ASGI / CHANNELS ----------
 ASGI_APPLICATION = 'danielmherman.asgi.application'
 
-if IS_PRODUCTION:
+# Redis is only required for cross-process WebSocket broadcast (group_send).
+# Without REDIS_HOST set, the in-memory layer is used — correct for
+# request/response and single-connection streaming workloads.
+REDIS_HOST = os.environ.get('REDIS_HOST')
+
+if REDIS_HOST:
     CHANNEL_LAYERS = {
         'default': {
             'BACKEND': 'channels_redis.core.RedisChannelLayer',
             'CONFIG': {
-                'hosts': [(os.environ.get('REDIS_HOST', '127.0.0.1'), 6379)],
+                'hosts': [(REDIS_HOST, 6379)],
             },
         },
     }
@@ -447,6 +493,75 @@ else:
         },
     }
 ```
+
+> **Key the channel layer on `REDIS_HOST`, not on `IS_PRODUCTION`.** The obvious version
+> of this block (`if IS_PRODUCTION:` → Redis) breaks the moment you deploy to production
+> *without* Memorystore: it would fall back to `127.0.0.1:6379`, where nothing is
+> listening, and every channel-layer operation would fail. Keying on the presence of the
+> variable means the same code is correct with or without Redis, and adding Memorystore
+> later is purely a deploy-flag change.
+
+### 8b-2. Add a `LOGGING` config
+
+Append this to `settings.py`. **Do not skip it** — without it, production 500s are
+invisible.
+
+```python
+# ---------- LOGGING ----------
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {name} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        'django.request': {
+            'handlers': ['console'],
+            'level': 'ERROR',
+            'propagate': False,
+        },
+        'django': {
+            'handlers': ['console'],
+            'level': 'INFO' if IS_PRODUCTION else 'WARNING',
+            'propagate': False,
+        },
+        'content': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'WARNING',
+    },
+}
+```
+
+> **Why this is necessary.** With `DEBUG=False`, Django routes unhandled view exceptions
+> to the `django.request` logger, whose *only* default handler is `mail_admins`. With no
+> email backend configured, those tracebacks are discarded. The symptom is a Cloud Run
+> log containing exactly one line —
+> `"GET / HTTP/1.1" 500 Internal Server Error` — and no indication of the cause.
+> Every production incident then starts from zero.
+>
+> Writing to stdout is sufficient: Cloud Run captures stdout and stderr into Cloud
+> Logging automatically, so no logging agent, sidecar, or `google-cloud-logging`
+> dependency is required.
+>
+> View them with:
+> ```bash
+> gcloud run services logs read danielmherman --region us-east1 --limit 50
+> ```
 
 ### 8c. Update `danielmherman/asgi.py`
 
@@ -501,11 +616,10 @@ ENV PYTHONUNBUFFERED=1
 # Set work directory
 WORKDIR /app
 
-# Install system dependencies (needed for psycopg2)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc \
-    libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
+# No system build dependencies needed.
+# `psycopg2-binary` ships precompiled wheels bundling their own libpq, so gcc and
+# libpq-dev are unnecessary. (They WOULD be required if this ever switches to
+# source-built `psycopg2` — if pip starts failing on a compile step, that is why.)
 
 # Install Python dependencies
 COPY requirements.txt .
@@ -540,6 +654,14 @@ CMD ["uvicorn", "danielmherman.asgi:application", \
 > matches both Cloud Run's default and the `--port 8080` used at deploy time.
 
 > **Why uvicorn instead of gunicorn?** Uvicorn is a native ASGI server that supports both regular HTTP requests and WebSocket connections. All existing Django views work identically. When you add real-time apps with Django Channels, they'll work without any server changes.
+
+> **Why no `apt-get` layer?** An earlier version of this guide installed `gcc` and
+> `libpq-dev` "for psycopg2". That is only necessary when building `psycopg2` from
+> source. This project pins **`psycopg2-binary`**, which ships manylinux wheels with
+> libpq statically bundled. Removing the layer cut the image from **540 MB to 354 MB**
+> and removes a compiler from the production runtime — a modest attack-surface win as
+> well as a size one. Verified with `import psycopg2` plus a full migrate + request
+> test inside the container.
 
 ---
 
@@ -679,7 +801,6 @@ gcloud builds submit --tag us-east1-docker.pkg.dev/${PROJECT_ID}/danielmherman-r
 
 ```bash
 CLOUD_SQL_CONNECTION=$(gcloud sql instances describe danielmherman-db --format="value(connectionName)")
-REDIS_HOST=$(gcloud redis instances describe danielmherman-redis --region=us-east1 --format="value(host)")
 
 gcloud run deploy danielmherman \
   --image us-east1-docker.pkg.dev/${PROJECT_ID}/danielmherman-repo/danielmherman:latest \
@@ -687,27 +808,50 @@ gcloud run deploy danielmherman \
   --region us-east1 \
   --allow-unauthenticated \
   --add-cloudsql-instances ${CLOUD_SQL_CONNECTION} \
-  --vpc-connector danielmherman-connector \
-  --set-env-vars "ENVIRONMENT=production" \
-  --set-env-vars "GOOGLE_CLOUD_PROJECT=${PROJECT_ID}" \
-  --set-env-vars "CLOUD_SQL_CONNECTION_NAME=${CLOUD_SQL_CONNECTION}" \
-  --set-env-vars "GS_BUCKET_NAME=danielmherman-media" \
-  --set-env-vars "ALLOWED_HOSTS=danielmherman.com,www.danielmherman.com,.run.app" \
-  --set-env-vars "CSRF_TRUSTED_ORIGINS=https://danielmherman.com,https://www.danielmherman.com" \
-  --set-env-vars "REDIS_HOST=${REDIS_HOST}" \
+  --set-env-vars "^@^ENVIRONMENT=production@GOOGLE_CLOUD_PROJECT=${PROJECT_ID}@CLOUD_SQL_CONNECTION_NAME=${CLOUD_SQL_CONNECTION}@GS_BUCKET_NAME=danielmherman-media@ALLOWED_HOSTS=danielmherman.com,www.danielmherman.com,.run.app@CSRF_TRUSTED_ORIGINS=https://danielmherman.com,https://www.danielmherman.com" \
   --min-instances 0 \
   --max-instances 3 \
   --memory 512Mi
 ```
 
-> **Key differences from basic deployment:**
-> - `--vpc-connector` enables access to Memorystore Redis (private VPC)
+> **Why the `^@^` prefix and one single `--set-env-vars`?** Two separate traps:
+>
+> 1. **Commas.** `--set-env-vars` splits pairs on commas by default, so
+>    `ALLOWED_HOSTS=a.com,b.com` is read as `ALLOWED_HOSTS=a.com` plus a malformed
+>    key `b.com`, and gcloud errors with *"Bad syntax for dict arg"*. The `^@^`
+>    prefix changes the delimiter to `@`, so commas stay inside the values — which
+>    `settings.py` needs, because it calls `.split(',')` on both variables.
+> 2. **Repetition silently overwrites.** `--set-env-vars` is a dictionary flag. Passing
+>    it several times does **not** accumulate — the last occurrence replaces all the
+>    earlier ones. A multi-flag version of this command deploys with only
+>    `CSRF_TRUSTED_ORIGINS` set, which means `ENVIRONMENT` is missing and the app boots
+>    in development mode: `DEBUG=True`, permissive hosts, no SSL redirect — and it
+>    *starts successfully*, so nothing looks wrong. Keeping every variable in one flag
+>    removes the hazard.
+>
+> Use `--update-env-vars` instead of `--set-env-vars` if you ever want to change one
+> variable without resupplying the rest.
+
+> **No Redis, no VPC connector.** Memorystore was dropped from this deployment
+> (see Section 6). Cloud SQL is reached through `--add-cloudsql-instances`, which uses
+> the managed Cloud SQL Auth Proxy — **not** the VPC — so no `--vpc-connector` is
+> needed either. Together these save roughly **$43/month**.
+>
+> `REDIS_HOST` is deliberately unset. `settings.py` keys the channel layer on the
+> *presence* of that variable, so with it absent the app uses
+> `InMemoryChannelLayer` and starts cleanly. Setting it to an unreachable host would
+> be worse than leaving it out.
+>
+> **Other notes:**
 > - `--min-instances 0` lets the service scale to zero — near-free when idle, at the
 >   cost of an occasional cold start. Raise it to `1` later if the clinical demo needs
 >   consistently snappy responses (~$3-5/month).
-> - `REDIS_HOST` env var connects Django Channels to Redis
+> - `--allow-unauthenticated` is what makes the site public. Revoking this binding is
+>   the clean way to take the site offline without deleting the service (which would
+>   destroy the domain mapping and force a 15-60 minute SSL re-provision).
 >
-> **If you skipped Memorystore (Section 6):** Remove the `--vpc-connector` and `REDIS_HOST` lines. You can add them later when you build your first real-time app.
+> **If you later add Memorystore**, you will need to re-add `--vpc-connector`, set
+> `REDIS_HOST`, and create the connector first.
 
 After deployment, you'll get a URL like `https://danielmherman-xxxxxxxxxx-ue.a.run.app`. Visit it to verify your site is running.
 
@@ -737,9 +881,7 @@ CLOUD_SQL_CONNECTION=$(gcloud sql instances describe danielmherman-db --format="
 gcloud run jobs create migrate \
   --image us-east1-docker.pkg.dev/${PROJECT_ID}/danielmherman-repo/danielmherman:latest \
   --region us-east1 \
-  --set-env-vars "ENVIRONMENT=production" \
-  --set-env-vars "GOOGLE_CLOUD_PROJECT=${PROJECT_ID}" \
-  --set-env-vars "CLOUD_SQL_CONNECTION_NAME=${CLOUD_SQL_CONNECTION}" \
+  --set-env-vars "ENVIRONMENT=production,GOOGLE_CLOUD_PROJECT=${PROJECT_ID},CLOUD_SQL_CONNECTION_NAME=${CLOUD_SQL_CONNECTION}" \
   --set-cloudsql-instances ${CLOUD_SQL_CONNECTION} \
   --command "python" \
   --args "manage.py,migrate"
@@ -747,6 +889,16 @@ gcloud run jobs create migrate \
 # Execute the migration job
 gcloud run jobs execute migrate --region us-east1 --wait
 ```
+
+> **All three variables must be in a single `--set-env-vars` flag.** Repeating the flag
+> does not accumulate — the last occurrence wins. If `ENVIRONMENT` were dropped that
+> way, the job would run in development mode against **ephemeral SQLite inside the
+> container**, report every migration as applied, exit `0`, and leave the Cloud SQL
+> database completely untouched. A green checkmark on a migration that did nothing is
+> the worst possible failure mode here.
+>
+> No value contains a comma, so the default comma delimiter is fine (unlike the deploy
+> command in Section 14b, which needs `^@^`).
 
 For subsequent migrations, point the job at the new image and run it **before** deploying that image to the service:
 
@@ -768,30 +920,55 @@ You need an admin user to access `/admin/`.
 > config, your shell history, and potentially Cloud Logging. Put it in Secret Manager
 > and reference it with `--set-secrets`.
 
+> **Run these one line at a time.** Do not paste the whole block at once — see the
+> warning after step 1 for why.
+
 ```bash
 PROJECT_ID=$(gcloud config get-value project)
 CLOUD_SQL_CONNECTION=$(gcloud sql instances describe danielmherman-db --format="value(connectionName)")
 PROJECT_NUM=$(gcloud projects describe ${PROJECT_ID} --format="value(projectNumber)")
+```
 
-# 1. Store the superuser password as a secret (prompts, so it isn't in shell history)
-read -rs -p "Superuser password: " SU_PASS && echo
-printf '%s' "$SU_PASS" | gcloud secrets create django-superuser-password --data-file=-
-unset SU_PASS
+**1. Generate the superuser password straight into Secret Manager.**
 
-# 2. Let the runtime service account read it
+Nothing is typed, echoed, or stored in shell history — the value goes from Python's
+CSPRNG into Secret Manager and is never held in a shell variable:
+
+```bash
+python3 -c "import secrets; print(secrets.token_urlsafe(24), end='')" | gcloud secrets create django-superuser-password --data-file=-
+```
+
+> **Why not `read -rs`?** An interactive `read` is unsafe to paste. When you paste a
+> multi-line block, the terminal buffers every line, and `read` consumes **the next
+> pasted line as its input**. The result is a password silently set to the text of the
+> following command, with the rest of the block executing out of order. Generating the
+> secret non-interactively removes the hazard completely — and produces a stronger
+> password than one you would invent.
+>
+> The `end=''` matters: a trailing newline becomes part of the secret and causes
+> authentication failures that are very hard to diagnose.
+
+**2. Retrieve the password when you need to log in:**
+
+```bash
+gcloud secrets versions access latest --secret=django-superuser-password
+```
+
+**3. Let the runtime service account read it:**
+
+```bash
 gcloud secrets add-iam-policy-binding django-superuser-password \
   --member="serviceAccount:${PROJECT_NUM}-compute@developer.gserviceaccount.com" \
   --role="roles/secretmanager.secretAccessor"
+```
 
-# 3. Create the job, injecting the password from Secret Manager
+**4. Create and run the job, injecting the password from Secret Manager:**
+
+```bash
 gcloud run jobs create createsuperuser \
   --image us-east1-docker.pkg.dev/${PROJECT_ID}/danielmherman-repo/danielmherman:latest \
   --region us-east1 \
-  --set-env-vars "ENVIRONMENT=production" \
-  --set-env-vars "GOOGLE_CLOUD_PROJECT=${PROJECT_ID}" \
-  --set-env-vars "CLOUD_SQL_CONNECTION_NAME=${CLOUD_SQL_CONNECTION}" \
-  --set-env-vars "DJANGO_SUPERUSER_USERNAME=admin" \
-  --set-env-vars "DJANGO_SUPERUSER_EMAIL=your-email@example.com" \
+  --set-env-vars "ENVIRONMENT=production,GOOGLE_CLOUD_PROJECT=${PROJECT_ID},CLOUD_SQL_CONNECTION_NAME=${CLOUD_SQL_CONNECTION},DJANGO_SUPERUSER_USERNAME=admin,DJANGO_SUPERUSER_EMAIL=your-email@example.com" \
   --set-secrets "DJANGO_SUPERUSER_PASSWORD=django-superuser-password:latest" \
   --set-cloudsql-instances ${CLOUD_SQL_CONNECTION} \
   --command "python" \
@@ -799,6 +976,15 @@ gcloud run jobs create createsuperuser \
 
 gcloud run jobs execute createsuperuser --region us-east1 --wait
 ```
+
+> **Single `--set-env-vars` flag again** — same reason as Section 15. Split across five
+> flags, only `DJANGO_SUPERUSER_EMAIL` would survive, and the job would create an admin
+> account in a throwaway SQLite file rather than in Cloud SQL. You would then be unable
+> to log in to `/admin/`, with nothing in the logs explaining why.
+>
+> **Do not use the `^@^` delimiter here** — the email address contains an `@`, which
+> would be parsed as a separator. The default comma delimiter is correct because no
+> value contains a comma.
 
 > **Cleanup:** once the superuser exists, delete the one-shot job:
 > ```bash
@@ -1202,17 +1388,29 @@ gcloud sql connect danielmherman-db --user=djangouser --database=danielmherman
 
 ### Estimated Monthly Costs
 
+**As actually deployed** (no Memorystore, no VPC connector):
+
 | Service | Estimated Cost |
 |---------|---------------|
 | Cloud Run (min-instances=0, scales to zero) | ~$0-2/month |
 | Cloud SQL (db-f1-micro) | ~$7-10/month |
-| Memorystore Redis (1 GB basic) | ~$36/month (skip until needed) |
 | Cloud Storage | ~$0.02/GB/month (negligible) |
 | Cloud Build | 120 free build-minutes/day |
 | Secret Manager | Free for low usage |
-| VPC Connector | ~$7/month (skip if no Memorystore) |
-| **Total (without Redis)** | **~$10-15/month** |
-| **Total (with Redis)** | **~$50-55/month** |
+| **Total** | **~$10-15/month** |
+
+> **Cloud SQL is the only component that bills while the site is idle** (~$0.25-0.35/day).
+> Cloud Run at `--min-instances 0` is genuinely free when nobody is visiting. If you want
+> to pause costs, stop the SQL instance — do **not** delete the Cloud Run service, since
+> that destroys the domain mapping and forces a 15-60 minute SSL re-provision on return.
+
+**If Memorystore is ever added** (see Section 6):
+
+| Additional Service | Estimated Cost |
+|---------|---------------|
+| Memorystore Redis (1 GB basic) | ~$36/month |
+| VPC Connector | ~$7-10/month |
+| **Revised total** | **~$50-55/month** |
 
 > **Cost-saving tip:** Deploy initially without Memorystore and the VPC Connector (~$10-15/month). Add them later when you build your first real-time app that needs WebSocket support.
 
@@ -1284,7 +1482,22 @@ gcloud run services add-iam-policy-binding sepsis-predict \
 
 ### When to enable Memorystore (Redis)
 
-If you skipped Memorystore in Section 6, enable it when you add your first app that needs WebSocket support (e.g., real-time clinical dashboard). Then update the Cloud Run service to include the VPC connector and Redis host:
+Memorystore is **not** deployed (Section 6). The trigger to add it is narrower than it
+first appears: you need it only when **multiple processes must broadcast to each other**
+— for example a live dashboard where several viewers see the same updates pushed
+simultaneously.
+
+You do **not** need it for:
+
+- Streaming one agent response to one user (SSE or a single WebSocket held by one
+  worker — Cloud Run pins a WebSocket to one instance for its lifetime anyway)
+- A2UI rendering — WebSockets are a *proposed, unimplemented* transport in that spec,
+  and user actions travel as ordinary tool calls
+- Sessions, per-user quota, or LangGraph checkpointing — Cloud SQL handles all three,
+  and unlike Redis it is durable
+
+If you do add it, create the resources from Section 6, enable `redis.googleapis.com` and
+`vpcaccess.googleapis.com`, then:
 
 ```bash
 REDIS_HOST=$(gcloud redis instances describe danielmherman-redis --region=us-east1 --format="value(host)")
@@ -1294,6 +1507,11 @@ gcloud run services update danielmherman \
   --vpc-connector danielmherman-connector \
   --update-env-vars "REDIS_HOST=${REDIS_HOST}"
 ```
+
+> `--update-env-vars` adds this variable without disturbing the others — unlike
+> `--set-env-vars`, which would replace the entire set. Because `settings.py` keys the
+> channel layer on the presence of `REDIS_HOST`, this one command is the whole switch;
+> no code change is required.
 
 ---
 
