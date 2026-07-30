@@ -1,0 +1,2 @@
+/* esm.sh - date-fns@4.4.0/differenceInCalendarDays */
+import{getTimezoneOffsetInMilliseconds as r}from"./date-fns_4.4.0_es2022__lib_getTimezoneOffsetInMilliseconds.mjs.js";import{normalizeDates as c}from"./date-fns_4.4.0_es2022__lib_normalizeDates.mjs.js";import{millisecondsInDay as p}from"./date-fns_4.4.0_es2022_constants.mjs.js";import{startOfDay as a}from"./date-fns_4.4.0_es2022_startOfDay.mjs.js";function D(o,n,i){let[m,s]=c(i?.in,o,n),t=a(m),e=a(s),f=+t-r(t),l=+e-r(e);return Math.round((f-l)/p)}var I=D;export{I as default,D as differenceInCalendarDays};

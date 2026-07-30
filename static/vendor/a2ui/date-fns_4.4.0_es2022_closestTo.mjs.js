@@ -1,0 +1,2 @@
+/* esm.sh - date-fns@4.4.0/closestTo */
+import{normalizeDates as m}from"./date-fns_4.4.0_es2022__lib_normalizeDates.mjs.js";import{closestIndexTo as s}from"./date-fns_4.4.0_es2022_closestIndexTo.mjs.js";import{constructFrom as f}from"./date-fns_4.4.0_es2022_constructFrom.mjs.js";function a(r,n,i){let[t,...e]=m(i?.in,r,...n),o=s(t,e);if(typeof o=="number"&&isNaN(o))return f(t,NaN);if(o!==void 0)return e[o]}var u=a;export{a as closestTo,u as default};

@@ -1,0 +1,2 @@
+/* esm.sh - date-fns@4.4.0/differenceInHours */
+import{getRoundingMethod as f}from"./date-fns_4.4.0_es2022__lib_getRoundingMethod.mjs.js";import{normalizeDates as d}from"./date-fns_4.4.0_es2022__lib_normalizeDates.mjs.js";import{millisecondsInHour as m}from"./date-fns_4.4.0_es2022_constants.mjs.js";function a(r,o,e){let[t,n]=d(e?.in,r,o),i=(+t-+n)/m;return f(e?.roundingMethod)(i)}var s=a;export{s as default,a as differenceInHours};

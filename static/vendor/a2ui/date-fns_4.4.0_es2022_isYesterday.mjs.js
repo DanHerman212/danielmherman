@@ -1,0 +1,2 @@
+/* esm.sh - date-fns@4.4.0/isYesterday */
+import{constructFrom as t}from"./date-fns_4.4.0_es2022_constructFrom.mjs.js";import{constructNow as m}from"./date-fns_4.4.0_es2022_constructNow.mjs.js";import{isSameDay as i}from"./date-fns_4.4.0_es2022_isSameDay.mjs.js";import{subDays as f}from"./date-fns_4.4.0_es2022_subDays.mjs.js";function n(r,o){return i(t(o?.in||r,r),f(m(o?.in||r),1))}var p=n;export{p as default,n as isYesterday};

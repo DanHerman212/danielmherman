@@ -10,8 +10,9 @@ import json
 from datetime import timedelta
 from unittest.mock import patch
 
+from django.conf import settings
 from django.contrib.auth.models import User
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -159,6 +160,19 @@ class AskEndpointTests(TestCase):
 
 
 class ConsoleTests(TestCase):
+    # The page references a static file through {% static %}, and the project
+    # serves static assets with a *manifest* storage backend, which raises for
+    # any file collectstatic has not hashed yet. That is correct in production
+    # and useless in a test, where no collectstatic has run — so the test uses
+    # the plain backend and asserts on the markup rather than on the pipeline.
+    @override_settings(
+        STORAGES={
+            **settings.STORAGES,
+            "staticfiles": {
+                "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"
+            },
+        }
+    )
     def test_console_lists_patients_and_labels_names_as_synthetic(self):
         user = User.objects.create_user('demo', password='x')
         self.client.force_login(user)
@@ -171,3 +185,5 @@ class ConsoleTests(TestCase):
         self.assertContains(response, 'Test Patient')
         # Section 14's obligation: the UI must never imply these are real names.
         self.assertContains(response, 'synthetic')
+        # The fallback element must exist even when the renderer never boots.
+        self.assertContains(response, 'id="prose"')

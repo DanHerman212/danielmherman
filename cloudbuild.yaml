@@ -29,6 +29,8 @@ steps:
       - 'us-east1-docker.pkg.dev/$PROJECT_ID/danielmherman-repo/danielmherman:$COMMIT_SHA'
       - '--region'
       - 'us-east1'
+      - '--service-account'
+      - 'website-sa@$PROJECT_ID.iam.gserviceaccount.com'
 
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
@@ -56,6 +58,8 @@ steps:
       - 'us-east1-docker.pkg.dev/$PROJECT_ID/danielmherman-repo/danielmherman:$COMMIT_SHA'
       - '--region'
       - 'us-east1'
+      - '--service-account'
+      - 'website-sa@$PROJECT_ID.iam.gserviceaccount.com'
 
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
@@ -70,6 +74,13 @@ steps:
 
   # Deploy to Cloud Run only after migrations succeed.
   # If the migrate step fails, the build stops here and the old revision keeps serving.
+  #
+  # --service-account is stated explicitly even though `run deploy --image` would
+  # preserve whatever the service already had. Leaving it implicit means the identity
+  # lives only in console state: anyone who recreates the service from this file gets
+  # the default compute account, which can read every bucket in the project. Naming it
+  # here makes the least-privilege choice part of the repo rather than a setting
+  # someone has to remember.
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args:
@@ -82,6 +93,8 @@ steps:
       - 'us-east1'
       - '--platform'
       - 'managed'
+      - '--service-account'
+      - 'website-sa@$PROJECT_ID.iam.gserviceaccount.com'
 
 images:
   - 'us-east1-docker.pkg.dev/$PROJECT_ID/danielmherman-repo/danielmherman:$COMMIT_SHA'

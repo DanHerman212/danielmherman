@@ -1,0 +1,2 @@
+/* esm.sh - date-fns@4.4.0/getWeek */
+import{millisecondsInWeek as f}from"./date-fns_4.4.0_es2022_constants.mjs.js";import{startOfWeek as m}from"./date-fns_4.4.0_es2022_startOfWeek.mjs.js";import{startOfWeekYear as a}from"./date-fns_4.4.0_es2022_startOfWeekYear.mjs.js";import{toDate as i}from"./date-fns_4.4.0_es2022_toDate.mjs.js";function n(r,t){let e=i(r,t?.in),o=+m(e,t)-+a(e,t);return Math.round(o/f)+1}var s=n;export{s as default,n as getWeek};

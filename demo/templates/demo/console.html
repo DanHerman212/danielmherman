@@ -1,77 +1,70 @@
 {% extends "content/base.html" %}
+{% load static %}
 {% comment %}
-Deliberately plain. Section 16 adds the A2UI rendering layer and section 17
-assembles the real demo page; this template exists so section 15's auth, quota
-and token exchange can be exercised end to end before any of that lands.
+The demo page. The risk card is rendered by A2UI (see static/js/demo_console.js);
+this template supplies the patient list, the shell, and the text fallback element
+the script uses whenever the renderer cannot boot.
+
+The A2UI module graph is vendored into static/vendor/a2ui/ rather than loaded
+from a CDN — see scripts/vendor_a2ui.py for why.
 {% endcomment %}
 
 {% block title %}Clinical Copilot Demo{% endblock %}
 
 {% block content %}
-<div class="container py-4">
-  <h1>Clinical readmission copilot</h1>
+<div class="container py-4" id="demo-root" data-ask-url="{% url 'demo:ask' %}">
 
-  <div class="alert alert-warning">
-    <strong>Patient names are synthetic.</strong> All clinical values are real
-    de-identified MIMIC-IV data. The names are invented so the cohort is easier
-    to talk about, and are never real patient names.
+  <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+    <div>
+      <h1 class="h3 mb-1">Clinical readmission copilot</h1>
+      <p class="text-muted mb-0">
+        A gradient-boosted model scores 30-day unplanned readmission risk from
+        MIMIC-IV admissions; an agent explains the result.
+      </p>
+    </div>
+    <span class="badge bg-light text-dark border align-self-center">
+      Requests left today: <strong id="remaining">{{ remaining }}</strong>
+    </span>
   </div>
 
-  <p class="text-muted">Requests remaining today: <strong id="remaining">{{ remaining }}</strong></p>
+  <div class="alert alert-warning py-2 small">
+    <strong>Patient names are synthetic.</strong> The clinical values are real
+    de-identified MIMIC-IV data; the names are invented so the cohort is easier to
+    talk about, and are never real patient names.
+  </div>
 
-  <div class="row">
-    <div class="col-md-5">
+  <div class="row g-3">
+    <div class="col-lg-5">
       <div class="list-group" id="patients">
         {% for p in patients %}
         <button type="button"
                 class="list-group-item list-group-item-action"
                 data-hadm-id="{{ p.hadm_id }}">
-          <strong>{{ p.display_name }}</strong>
-          <span class="badge bg-secondary">{{ p.age }}{{ p.sex }}</span>
+          <div class="d-flex justify-content-between align-items-center">
+            <strong>{{ p.display_name }}</strong>
+            <span class="badge bg-secondary">{{ p.age }}{{ p.sex }}</span>
+          </div>
           <div class="small text-muted">{{ p.summary }}</div>
         </button>
         {% empty %}
-        <div class="list-group-item">No patients seeded. Run <code>manage.py seed_demo_patients</code>.</div>
+        <div class="list-group-item">
+          No patients seeded. Run <code>manage.py seed_demo_patients</code>.
+        </div>
         {% endfor %}
       </div>
     </div>
 
-    <div class="col-md-7">
-      <pre id="output" class="bg-light p-3 border rounded" style="min-height: 12rem; white-space: pre-wrap;">Select a patient.</pre>
+    <div class="col-lg-7">
+      <div id="output" class="demo-status text-muted">Select a patient to see an assessment.</div>
+
+      {# The A2UI surface renders here. Hidden until there is something to show. #}
+      <div id="surface-host" hidden></div>
+
+      {# R8 fallback, and the model's narration when the card does render. #}
+      <p id="prose" class="demo-prose mt-3" hidden></p>
     </div>
   </div>
 </div>
 
-<script>
-  const output = document.getElementById('output');
-  const remaining = document.getElementById('remaining');
-
-  // Django requires the CSRF token on POST even for JSON, and even for a
-  // same-origin fetch.
-  function csrfToken() {
-    const match = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/);
-    return match ? match[1] : '';
-  }
-
-  document.getElementById('patients').addEventListener('click', async (event) => {
-    const button = event.target.closest('[data-hadm-id]');
-    if (!button) return;
-
-    output.textContent = 'Thinking… (a cold start can take up to a minute)';
-    try {
-      const response = await fetch('{% url "demo:ask" %}', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken()},
-        body: JSON.stringify({hadm_id: Number(button.dataset.hadmId)}),
-      });
-      const data = await response.json();
-      if (typeof data.remaining === 'number') remaining.textContent = data.remaining;
-      output.textContent = response.ok
-        ? (data.answer || JSON.stringify(data, null, 2))
-        : (data.error || `HTTP ${response.status}`);
-    } catch (err) {
-      output.textContent = `Request failed: ${err}`;
-    }
-  });
-</script>
+<script type="module" src="{% static 'js/demo_console.js' %}"></script>
 {% endblock %}

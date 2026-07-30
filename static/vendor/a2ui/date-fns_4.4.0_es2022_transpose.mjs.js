@@ -1,0 +1,2 @@
+/* esm.sh - date-fns@4.4.0/transpose */
+import{constructFrom as n}from"./date-fns_4.4.0_es2022_constructFrom.mjs.js";function r(e,t){let o=s(t)?new t(0):n(t,0);return o.setFullYear(e.getFullYear(),e.getMonth(),e.getDate()),o.setHours(e.getHours(),e.getMinutes(),e.getSeconds(),e.getMilliseconds()),o}function s(e){return typeof e=="function"&&e.prototype?.constructor===e}var i=r;export{i as default,r as transpose};

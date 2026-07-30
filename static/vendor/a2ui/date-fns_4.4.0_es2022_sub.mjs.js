@@ -1,0 +1,2 @@
+/* esm.sh - date-fns@4.4.0/sub */
+import{constructFrom as d}from"./date-fns_4.4.0_es2022_constructFrom.mjs.js";import{subDays as y}from"./date-fns_4.4.0_es2022_subDays.mjs.js";import{subMonths as S}from"./date-fns_4.4.0_es2022_subMonths.mjs.js";function T(s,t,o){let{years:n=0,months:u=0,weeks:r=0,days:c=0,hours:e=0,minutes:m=0,seconds:b=0}=t,i=S(s,u+n*12,o),h=y(i,c+r*7,o),f=m+e*60,a=(b+f*60)*1e3;return d(o?.in||s,+h-a)}var M=T;export{M as default,T as sub};

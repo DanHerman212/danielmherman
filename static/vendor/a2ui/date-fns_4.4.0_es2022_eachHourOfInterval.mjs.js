@@ -1,0 +1,2 @@
+/* esm.sh - date-fns@4.4.0/eachHourOfInterval */
+import{normalizeInterval as c}from"./date-fns_4.4.0_es2022__lib_normalizeInterval.mjs.js";import{constructFrom as f}from"./date-fns_4.4.0_es2022_constructFrom.mjs.js";function l(i,u){let{start:s,end:n}=c(u?.in,i),e=+s>+n,a=e?+s:+n,t=e?n:s;t.setMinutes(0,0,0);let r=u?.step??1;if(!r)return[];r<0&&(r=-r,e=!e);let o=[];for(;+t<=a;)o.push(f(s,t)),t.setHours(t.getHours()+r);return e?o.reverse():o}var p=l;export{p as default,l as eachHourOfInterval};

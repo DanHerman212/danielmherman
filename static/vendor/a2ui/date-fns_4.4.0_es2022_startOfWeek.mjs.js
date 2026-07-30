@@ -1,0 +1,2 @@
+/* esm.sh - date-fns@4.4.0/startOfWeek */
+import{getDefaultOptions as f}from"./date-fns_4.4.0_es2022__lib_defaultOptions.mjs.js";import{toDate as c}from"./date-fns_4.4.0_es2022_toDate.mjs.js";function O(s,e){let o=f(),a=e?.weekStartsOn??e?.locale?.options?.weekStartsOn??o.weekStartsOn??o.locale?.options?.weekStartsOn??0,t=c(s,e?.in),n=t.getDay(),r=(n<a?7:0)+n-a;return t.setDate(t.getDate()-r),t.setHours(0,0,0,0),t}var k=O;export{k as default,O as startOfWeek};

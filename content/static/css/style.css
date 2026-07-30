@@ -364,3 +364,48 @@ html {
 .resume-page h1 { font-size: 1.75rem; }
 .resume-page h2 { font-size: 1.25rem; }
 .resume-page h4 { font-size: .8rem; }
+
+/* ---------- clinical copilot demo ---------- */
+
+.demo-status {
+    min-height: 8rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    border: 1px dashed #d0d5dd;
+    border-radius: .5rem;
+    background: #fbfcfd;
+    text-align: center;
+}
+
+.demo-status--error {
+    border-color: #f1aeb5;
+    background: #fdf2f3;
+    color: #b02a37;
+}
+
+/* The A2UI surface styles itself through the catalog's own CSS custom
+   properties. These variables are the supported way to theme it — reaching
+   into its shadow DOM is not, and would break on any renderer upgrade. */
+#surface-host {
+    --a2ui-color-background: #ffffff;
+    --a2ui-color-on-background: #1f2933;
+    --a2ui-color-border: #e3e8ef;
+    --a2ui-border-radius: .5rem;
+}
+
+.demo-prose {
+    color: #4a5568;
+    font-size: .95rem;
+    line-height: 1.6;
+    border-left: 3px solid #e3e8ef;
+    padding-left: .875rem;
+    white-space: pre-wrap;
+}
+
+#patients .list-group-item-action.active {
+    background: #eef4ff;
+    border-color: #b6d0ff;
+    color: inherit;
+}

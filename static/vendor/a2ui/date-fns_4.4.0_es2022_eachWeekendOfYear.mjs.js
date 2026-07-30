@@ -1,0 +1,2 @@
+/* esm.sh - date-fns@4.4.0/eachWeekendOfYear */
+import{eachWeekendOfInterval as a}from"./date-fns_4.4.0_es2022_eachWeekendOfInterval.mjs.js";import{endOfYear as n}from"./date-fns_4.4.0_es2022_endOfYear.mjs.js";import{startOfYear as o}from"./date-fns_4.4.0_es2022_startOfYear.mjs.js";function m(r,e){let t=o(r,e),f=n(r,e);return a({start:t,end:f},e)}var p=m;export{p as default,m as eachWeekendOfYear};

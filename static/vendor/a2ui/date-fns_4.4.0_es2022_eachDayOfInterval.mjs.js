@@ -1,0 +1,2 @@
+/* esm.sh - date-fns@4.4.0/eachDayOfInterval */
+import{normalizeInterval as u}from"./date-fns_4.4.0_es2022__lib_normalizeInterval.mjs.js";import{constructFrom as f}from"./date-fns_4.4.0_es2022_constructFrom.mjs.js";function l(c,a){let{start:s,end:n}=u(a?.in,c),t=+s>+n,i=t?+s:+n,e=t?n:s;e.setHours(0,0,0,0);let r=a?.step??1;if(!r)return[];r<0&&(r=-r,t=!t);let o=[];for(;+e<=i;)o.push(f(s,e)),e.setDate(e.getDate()+r),e.setHours(0,0,0,0);return t?o.reverse():o}var p=l;export{p as default,l as eachDayOfInterval};

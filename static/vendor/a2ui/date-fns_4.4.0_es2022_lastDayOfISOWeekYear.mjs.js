@@ -1,0 +1,2 @@
+/* esm.sh - date-fns@4.4.0/lastDayOfISOWeekYear */
+import{constructFrom as f}from"./date-fns_4.4.0_es2022_constructFrom.mjs.js";import{getISOWeekYear as s}from"./date-fns_4.4.0_es2022_getISOWeekYear.mjs.js";import{startOfISOWeek as u}from"./date-fns_4.4.0_es2022_startOfISOWeek.mjs.js";function m(a,t){let o=s(a,t),e=f(t?.in||a,0);e.setFullYear(o+1,0,4),e.setHours(0,0,0,0);let r=u(e,t);return r.setDate(r.getDate()-1),r}var l=m;export{l as default,m as lastDayOfISOWeekYear};

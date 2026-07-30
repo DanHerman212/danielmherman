@@ -1,0 +1,2 @@
+/* esm.sh - date-fns@4.4.0/addMonths */
+import{constructFrom as s}from"./date-fns_4.4.0_es2022_constructFrom.mjs.js";import{toDate as a}from"./date-fns_4.4.0_es2022_toDate.mjs.js";function c(n,r,o){let t=a(n,o?.in);if(isNaN(r))return s(o?.in||n,NaN);if(!r)return t;let i=t.getDate(),e=s(o?.in||n,t.getTime());e.setMonth(t.getMonth()+r+1,0);let f=e.getDate();return i>=f?e:(t.setFullYear(e.getFullYear(),e.getMonth(),i),t)}var M=c;export{c as addMonths,M as default};

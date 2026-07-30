@@ -1,0 +1,2 @@
+/* esm.sh - date-fns@4.4.0/eachMonthOfInterval */
+import{normalizeInterval as f}from"./date-fns_4.4.0_es2022__lib_normalizeInterval.mjs.js";import{constructFrom as l}from"./date-fns_4.4.0_es2022_constructFrom.mjs.js";function m(c,a){let{start:n,end:o}=f(a?.in,c),e=+n>+o,i=e?+n:+o,t=e?o:n;t.setHours(0,0,0,0),t.setDate(1);let r=a?.step??1;if(!r)return[];r<0&&(r=-r,e=!e);let s=[];for(;+t<=i;)s.push(l(n,t)),t.setMonth(t.getMonth()+r);return e?s.reverse():s}var h=m;export{h as default,m as eachMonthOfInterval};

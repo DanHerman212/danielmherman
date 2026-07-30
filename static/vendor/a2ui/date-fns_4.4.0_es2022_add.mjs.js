@@ -1,0 +1,2 @@
+/* esm.sh - date-fns@4.4.0/add */
+import{addDays as y}from"./date-fns_4.4.0_es2022_addDays.mjs.js";import{addMonths as A}from"./date-fns_4.4.0_es2022_addMonths.mjs.js";import{constructFrom as T}from"./date-fns_4.4.0_es2022_constructFrom.mjs.js";import{toDate as D}from"./date-fns_4.4.0_es2022_toDate.mjs.js";function x(o,m,t){let{years:s=0,months:d=0,weeks:n=0,days:r=0,hours:a=0,minutes:i=0,seconds:u=0}=m,e=D(o,t?.in),c=d||s?A(e,d+s*12):e,f=r||n?y(c,r+n*7):c,h=i+a*60,p=(u+h*60)*1e3;return T(t?.in||o,+f+p)}var F=x;export{x as add,F as default};

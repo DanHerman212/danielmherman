@@ -1,0 +1,2 @@
+/* esm.sh - date-fns@4.4.0/setMonth */
+import{constructFrom as m}from"./date-fns_4.4.0_es2022_constructFrom.mjs.js";import{getDaysInMonth as i}from"./date-fns_4.4.0_es2022_getDaysInMonth.mjs.js";import{toDate as u}from"./date-fns_4.4.0_es2022_toDate.mjs.js";function M(n,e,r){let t=u(n,r?.in),s=t.getFullYear(),a=t.getDate(),o=m(r?.in||n,0);o.setFullYear(s,e,15),o.setHours(0,0,0,0);let c=i(o);return t.setMonth(e,Math.min(a,c)),t}var d=M;export{d as default,M as setMonth};

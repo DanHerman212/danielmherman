@@ -1,0 +1,2 @@
+/* esm.sh - date-fns@4.4.0/locale/_lib/buildMatchPatternFn */
+function h(t){return(e,c={})=>{let n=e.match(t.matchPattern);if(!n)return null;let u=n[0],a=e.match(t.parsePattern);if(!a)return null;let l=t.valueCallback?t.valueCallback(a[0]):a[0];l=c.valueCallback?c.valueCallback(l):l;let r=e.slice(u.length);return{value:l,rest:r}}}export{h as buildMatchPatternFn};

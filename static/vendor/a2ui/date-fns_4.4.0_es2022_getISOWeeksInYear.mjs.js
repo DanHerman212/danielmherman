@@ -1,0 +1,2 @@
+/* esm.sh - date-fns@4.4.0/getISOWeeksInYear */
+import{addWeeks as a}from"./date-fns_4.4.0_es2022_addWeeks.mjs.js";import{millisecondsInWeek as s}from"./date-fns_4.4.0_es2022_constants.mjs.js";import{startOfISOWeekYear as t}from"./date-fns_4.4.0_es2022_startOfISOWeekYear.mjs.js";function f(r,o){let e=t(r,o),n=+t(a(e,60))-+e;return Math.round(n/s)}var p=f;export{p as default,f as getISOWeeksInYear};

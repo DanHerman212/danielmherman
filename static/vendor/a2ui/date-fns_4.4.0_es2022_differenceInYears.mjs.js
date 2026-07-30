@@ -1,0 +1,2 @@
+/* esm.sh - date-fns@4.4.0/differenceInYears */
+import{normalizeDates as c}from"./date-fns_4.4.0_es2022__lib_normalizeDates.mjs.js";import{compareAsc as n}from"./date-fns_4.4.0_es2022_compareAsc.mjs.js";import{differenceInCalendarYears as m}from"./date-fns_4.4.0_es2022_differenceInCalendarYears.mjs.js";function p(o,s,i){let[e,r]=c(i?.in,o,s),t=n(e,r),f=Math.abs(m(e,r));e.setFullYear(1584),r.setFullYear(1584);let l=n(e,r)===-t,a=t*(f-+l);return a===0?0:a}var D=p;export{D as default,p as differenceInYears};

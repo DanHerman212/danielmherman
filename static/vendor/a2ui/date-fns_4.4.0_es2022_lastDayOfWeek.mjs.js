@@ -1,0 +1,2 @@
+/* esm.sh - date-fns@4.4.0/lastDayOfWeek */
+import{getDefaultOptions as f}from"./date-fns_4.4.0_es2022__lib_defaultOptions.mjs.js";import{toDate as c}from"./date-fns_4.4.0_es2022_toDate.mjs.js";function l(s,e){let a=f(),o=e?.weekStartsOn??e?.locale?.options?.weekStartsOn??a.weekStartsOn??a.locale?.options?.weekStartsOn??0,t=c(s,e?.in),n=t.getDay(),r=(n<o?-7:0)+6-(n-o);return t.setHours(0,0,0,0),t.setDate(t.getDate()+r),t}var k=l;export{k as default,l as lastDayOfWeek};

@@ -1,0 +1,2 @@
+/* esm.sh - date-fns@4.4.0/eachWeekendOfInterval */
+import{normalizeInterval as c}from"./date-fns_4.4.0_es2022__lib_normalizeInterval.mjs.js";import{constructFrom as f}from"./date-fns_4.4.0_es2022_constructFrom.mjs.js";import{eachDayOfInterval as l}from"./date-fns_4.4.0_es2022_eachDayOfInterval.mjs.js";import{isWeekend as d}from"./date-fns_4.4.0_es2022_isWeekend.mjs.js";function s(i,e){let{start:t,end:m}=c(e?.in,i),r=l({start:t,end:m},e),n=[],o=0;for(;o<r.length;){let a=r[o++];d(a)&&n.push(f(t,a))}return n}var I=s;export{I as default,s as eachWeekendOfInterval};

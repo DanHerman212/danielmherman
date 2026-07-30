@@ -1,0 +1,2 @@
+/* esm.sh - date-fns@4.4.0/getWeeksInMonth */
+import{differenceInCalendarWeeks as o}from"./date-fns_4.4.0_es2022_differenceInCalendarWeeks.mjs.js";import{lastDayOfMonth as f}from"./date-fns_4.4.0_es2022_lastDayOfMonth.mjs.js";import{startOfMonth as n}from"./date-fns_4.4.0_es2022_startOfMonth.mjs.js";import{toDate as a}from"./date-fns_4.4.0_es2022_toDate.mjs.js";function m(r,t){let e=a(r,t?.in);return o(f(e,t),n(e,t),t)+1}var l=m;export{l as default,m as getWeeksInMonth};

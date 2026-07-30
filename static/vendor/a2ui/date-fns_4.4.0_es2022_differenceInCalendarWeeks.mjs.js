@@ -1,0 +1,2 @@
+/* esm.sh - date-fns@4.4.0/differenceInCalendarWeeks */
+import{getTimezoneOffsetInMilliseconds as a}from"./date-fns_4.4.0_es2022__lib_getTimezoneOffsetInMilliseconds.mjs.js";import{normalizeDates as c}from"./date-fns_4.4.0_es2022__lib_normalizeDates.mjs.js";import{millisecondsInWeek as d}from"./date-fns_4.4.0_es2022_constants.mjs.js";import{startOfWeek as n}from"./date-fns_4.4.0_es2022_startOfWeek.mjs.js";function p(o,i,e){let[m,f]=c(e?.in,o,i),t=n(m,e),r=n(f,e),l=+t-a(t),s=+r-a(r);return Math.round((l-s)/d)}var D=p;export{D as default,p as differenceInCalendarWeeks};

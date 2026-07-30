@@ -1,0 +1,2 @@
+/* esm.sh - date-fns@4.4.0/setDay */
+import{getDefaultOptions as d}from"./date-fns_4.4.0_es2022__lib_defaultOptions.mjs.js";import{addDays as l}from"./date-fns_4.4.0_es2022_addDays.mjs.js";import{toDate as m}from"./date-fns_4.4.0_es2022_toDate.mjs.js";function O(s,t,e){let r=d(),c=e?.weekStartsOn??e?.locale?.options?.weekStartsOn??r.weekStartsOn??r.locale?.options?.weekStartsOn??0,o=m(s,e?.in),a=o.getDay(),f=(t%7+7)%7,n=7-c,i=t<0||t>6?t-(a+n)%7:(f+n)%7-(a+n)%7;return l(o,i,e)}var w=O;export{w as default,O as setDay};
