@@ -16,3 +16,8 @@ google-cloud-secret-manager==2.21.0
 whitenoise==6.8.2
 channels==4.2.0
 channels-redis==4.2.1
+# Both arrive transitively via google-cloud-secret-manager, but
+# demo/agent_client.py imports them directly to mint Cloud Run ID tokens.
+# Pin what you import.
+google-auth==2.56.2
+requests==2.34.2

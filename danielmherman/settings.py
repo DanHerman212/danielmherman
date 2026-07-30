@@ -54,6 +54,23 @@ CSRF_TRUSTED_ORIGINS = os.environ.get(
     'http://localhost:8000'
 ).split(',')
 
+# ---------- CLINICAL COPILOT DEMO ----------
+# The private Cloud Run agent. Must be the service URL with no path: it doubles
+# as the ID token audience, and a mismatched audience fails with a 401 that
+# looks exactly like a missing IAM binding.
+DEMO_AGENT_URL = os.environ.get(
+    'DEMO_AGENT_URL',
+    'https://agent-jamycsjjzq-ue.a.run.app',
+)
+# Generous on purpose: a cold agent instance and a cold MCP instance can land on
+# the same request, and both scale to zero.
+DEMO_AGENT_TIMEOUT = int(os.environ.get('DEMO_AGENT_TIMEOUT', '120'))
+DEMO_DAILY_LIMIT = int(os.environ.get('DEMO_DAILY_LIMIT', '10'))
+
+LOGIN_URL = 'login'
+LOGIN_REDIRECT_URL = 'demo:console'
+LOGOUT_REDIRECT_URL = 'home'
+
 
 # Application definition
 
@@ -65,6 +82,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'content', # added app
+    'demo',    # clinical copilot demo: patient cohort + quota
     'django_ckeditor_5',
     'storages',   # Cloud Storage media backend
     'channels',   # Django Channels (WebSocket/ASGI support)

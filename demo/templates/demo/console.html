@@ -1,0 +1,77 @@
+{% extends "content/base.html" %}
+{% comment %}
+Deliberately plain. Section 16 adds the A2UI rendering layer and section 17
+assembles the real demo page; this template exists so section 15's auth, quota
+and token exchange can be exercised end to end before any of that lands.
+{% endcomment %}
+
+{% block title %}Clinical Copilot Demo{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <h1>Clinical readmission copilot</h1>
+
+  <div class="alert alert-warning">
+    <strong>Patient names are synthetic.</strong> All clinical values are real
+    de-identified MIMIC-IV data. The names are invented so the cohort is easier
+    to talk about, and are never real patient names.
+  </div>
+
+  <p class="text-muted">Requests remaining today: <strong id="remaining">{{ remaining }}</strong></p>
+
+  <div class="row">
+    <div class="col-md-5">
+      <div class="list-group" id="patients">
+        {% for p in patients %}
+        <button type="button"
+                class="list-group-item list-group-item-action"
+                data-hadm-id="{{ p.hadm_id }}">
+          <strong>{{ p.display_name }}</strong>
+          <span class="badge bg-secondary">{{ p.age }}{{ p.sex }}</span>
+          <div class="small text-muted">{{ p.summary }}</div>
+        </button>
+        {% empty %}
+        <div class="list-group-item">No patients seeded. Run <code>manage.py seed_demo_patients</code>.</div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="col-md-7">
+      <pre id="output" class="bg-light p-3 border rounded" style="min-height: 12rem; white-space: pre-wrap;">Select a patient.</pre>
+    </div>
+  </div>
+</div>
+
+<script>
+  const output = document.getElementById('output');
+  const remaining = document.getElementById('remaining');
+
+  // Django requires the CSRF token on POST even for JSON, and even for a
+  // same-origin fetch.
+  function csrfToken() {
+    const match = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/);
+    return match ? match[1] : '';
+  }
+
+  document.getElementById('patients').addEventListener('click', async (event) => {
+    const button = event.target.closest('[data-hadm-id]');
+    if (!button) return;
+
+    output.textContent = 'Thinking… (a cold start can take up to a minute)';
+    try {
+      const response = await fetch('{% url "demo:ask" %}', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken()},
+        body: JSON.stringify({hadm_id: Number(button.dataset.hadmId)}),
+      });
+      const data = await response.json();
+      if (typeof data.remaining === 'number') remaining.textContent = data.remaining;
+      output.textContent = response.ok
+        ? (data.answer || JSON.stringify(data, null, 2))
+        : (data.error || `HTTP ${response.status}`);
+    } catch (err) {
+      output.textContent = `Request failed: ${err}`;
+    }
+  });
+</script>
+{% endblock %}

@@ -7,6 +7,10 @@ from django.conf.urls.static import static
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('ckeditor5/', include('django_ckeditor_5.urls')),
+    # Login/logout only. django.contrib.auth.urls deliberately does not include
+    # a signup route — demo accounts are issued, not self-registered.
+    path('accounts/', include('django.contrib.auth.urls')),
+    path('demo/', include('demo.urls')),
     path('', include('content.urls'))
 ]
 

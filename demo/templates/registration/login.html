@@ -1,0 +1,38 @@
+{% extends "content/base.html" %}
+{% comment %}
+django.contrib.auth.urls expects this at registration/login.html. There is no
+signup template and no signup route — demo accounts are created with
+`manage.py createsuperuser` or through the admin.
+{% endcomment %}
+
+{% block title %}Sign in{% endblock %}
+
+{% block content %}
+<div class="container py-5" style="max-width: 28rem;">
+  <h1 class="h3 mb-4">Sign in</h1>
+
+  {% if form.errors %}
+  <div class="alert alert-danger">Incorrect username or password.</div>
+  {% endif %}
+
+  <form method="post">
+    {% csrf_token %}
+    <div class="mb-3">
+      <label class="form-label" for="{{ form.username.id_for_label }}">Username</label>
+      <input type="text" name="username" id="{{ form.username.id_for_label }}"
+             class="form-control" autocomplete="username" autofocus required>
+    </div>
+    <div class="mb-3">
+      <label class="form-label" for="{{ form.password.id_for_label }}">Password</label>
+      <input type="password" name="password" id="{{ form.password.id_for_label }}"
+             class="form-control" autocomplete="current-password" required>
+    </div>
+    <input type="hidden" name="next" value="{{ next }}">
+    <button type="submit" class="btn btn-dark">Sign in</button>
+  </form>
+
+  <p class="text-muted small mt-4">
+    Demo accounts are issued on request. There is no self-registration.
+  </p>
+</div>
+{% endblock %}

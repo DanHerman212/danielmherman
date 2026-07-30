@@ -41,6 +41,33 @@ steps:
       - 'us-east1'
       - '--wait'
 
+  # Seed the demo cohort. Runs after migrate (the table must exist) and before
+  # deploy (the page should never go live listing zero patients). The command is
+  # idempotent — it update_or_creates on hadm_id — so re-running it on every
+  # build is harmless and keeps Cloud SQL in step with demo/data/demo_cohort.json.
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'jobs'
+      - 'update'
+      - 'seed-demo-patients'
+      - '--image'
+      - 'us-east1-docker.pkg.dev/$PROJECT_ID/danielmherman-repo/danielmherman:$COMMIT_SHA'
+      - '--region'
+      - 'us-east1'
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'jobs'
+      - 'execute'
+      - 'seed-demo-patients'
+      - '--region'
+      - 'us-east1'
+      - '--wait'
+
   # Deploy to Cloud Run only after migrations succeed.
   # If the migrate step fails, the build stops here and the old revision keeps serving.
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'

@@ -1,0 +1,260 @@
+{
+  "patients": [
+    {
+      "hadm_id": 22489815,
+      "display_name": "Erica Abernathy",
+      "age": 32,
+      "sex": "F",
+      "summary": "32F \u00b7 urgent admission \u00b7 2 prior admissions \u00b7 2 procedures \u00b7 3-day stay \u00b7 discharged to home",
+      "split_name": "test"
+    },
+    {
+      "hadm_id": 25828809,
+      "display_name": "Danielle Achebe",
+      "age": 31,
+      "sex": "F",
+      "summary": "31F \u00b7 urgent admission \u00b7 3 procedures \u00b7 3-day stay \u00b7 discharged to home",
+      "split_name": "test"
+    },
+    {
+      "hadm_id": 25768972,
+      "display_name": "Monique Vasquez",
+      "age": 36,
+      "sex": "F",
+      "summary": "36F \u00b7 urgent admission \u00b7 1 procedure \u00b7 2-day stay \u00b7 discharged to home",
+      "split_name": "test"
+    },
+    {
+      "hadm_id": 25069193,
+      "display_name": "Monique Ashford",
+      "age": 28,
+      "sex": "F",
+      "summary": "28F \u00b7 urgent admission \u00b7 1 procedure \u00b7 3-day stay \u00b7 discharged to home",
+      "split_name": "test"
+    },
+    {
+      "hadm_id": 29071979,
+      "display_name": "Sandra Guerrero",
+      "age": 66,
+      "sex": "F",
+      "summary": "66F \u00b7 observation admission \u00b7 3-day stay \u00b7 discharged to rehab",
+      "split_name": "test"
+    },
+    {
+      "hadm_id": 27580783,
+      "display_name": "Ashley Stroud",
+      "age": 38,
+      "sex": "F",
+      "summary": "38F \u00b7 emergency admission \u00b7 2 procedures \u00b7 2-day stay \u00b7 discharged to home",
+      "split_name": "test"
+    },
+    {
+      "hadm_id": 27657995,
+      "display_name": "Vincent Guerrero",
+      "age": 55,
+      "sex": "M",
+      "summary": "55M \u00b7 emergency admission \u00b7 3-day stay \u00b7 discharged to home",
+      "split_name": "test"
+    },
+    {
+      "hadm_id": 29214311,
+      "display_name": "Herbert Boyle",
+      "age": 75,
+      "sex": "M",
+      "summary": "75M \u00b7 emergency observation admission \u00b7 2-day stay",
+      "split_name": "test"
+    },
+    {
+      "hadm_id": 29580704,
+      "display_name": "Clarence Mensah",
+      "age": 78,
+      "sex": "M",
+      "summary": "78M \u00b7 emergency admission \u00b7 oncology history \u00b7 10 procedures \u00b7 21-day stay \u00b7 discharged to hospice",
+      "split_name": "test"
+    },
+    {
+      "hadm_id": 22147008,
+      "display_name": "Alan Tran",
+      "age": 59,
+      "sex": "M",
+      "summary": "59M \u00b7 observation admission \u00b7 9-day stay \u00b7 discharged to home",
+      "split_name": "test"
+    },
+    {
+      "hadm_id": 20258214,
+      "display_name": "Karen Hollingsworth",
+      "age": 60,
+      "sex": "F",
+      "summary": "60F \u00b7 emergency observation admission \u00b7 2-day stay",
+      "split_name": "test"
+    },
+    {
+      "hadm_id": 22298496,
+      "display_name": "Sandra Bellamy",
+      "age": 55,
+      "sex": "F",
+      "summary": "55F \u00b7 observation admission \u00b7 1 prior admission \u00b7 4-day stay \u00b7 discharged to home",
+      "split_name": "test"
+    },
+    {
+      "hadm_id": 29540756,
+      "display_name": "Margaret Tran",
+      "age": 78,
+      "sex": "F",
+      "summary": "78F \u00b7 observation admission \u00b7 4-day stay \u00b7 discharged to home with services",
+      "split_name": "test"
+    },
+    {
+      "hadm_id": 22425246,
+      "display_name": "Neil Marchetti",
+      "age": 55,
+      "sex": "M",
+      "summary": "55M \u00b7 emergency admission \u00b7 6 procedures \u00b7 6-day stay \u00b7 discharged to rehab",
+      "split_name": "test"
+    },
+    {
+      "hadm_id": 20317023,
+      "display_name": "Jared Stroud",
+      "age": 37,
+      "sex": "M",
+      "summary": "37M \u00b7 emergency admission \u00b7 1-day stay \u00b7 discharged to home",
+      "split_name": "test"
+    },
+    {
+      "hadm_id": 24769731,
+      "display_name": "Gloria Ellison",
+      "age": 89,
+      "sex": "F",
+      "summary": "89F \u00b7 emergency admission \u00b7 1 procedure \u00b7 3-day stay \u00b7 discharged to skilled nursing",
+      "split_name": "test"
+    },
+    {
+      "hadm_id": 22852067,
+      "display_name": "Melvin Stroud",
+      "age": 71,
+      "sex": "M",
+      "summary": "71M \u00b7 direct emergency admission \u00b7 6 procedures \u00b7 2-day stay \u00b7 discharged to home",
+      "split_name": "test"
+    },
+    {
+      "hadm_id": 29701286,
+      "display_name": "Vincent Ferraro",
+      "age": 56,
+      "sex": "M",
+      "summary": "56M \u00b7 emergency admission \u00b7 1 prior admission \u00b7 6 procedures \u00b7 3-day stay \u00b7 discharged to home",
+      "split_name": "test"
+    },
+    {
+      "hadm_id": 22779802,
+      "display_name": "Eugene Abernathy",
+      "age": 82,
+      "sex": "M",
+      "summary": "82M \u00b7 emergency admission \u00b7 1 procedure \u00b7 4-day stay",
+      "split_name": "test"
+    },
+    {
+      "hadm_id": 20924467,
+      "display_name": "Gloria Kowalski",
+      "age": 90,
+      "sex": "F",
+      "summary": "90F \u00b7 emergency admission \u00b7 2 prior admissions \u00b7 6-day stay \u00b7 discharged to skilled nursing",
+      "split_name": "validation"
+    },
+    {
+      "hadm_id": 24708502,
+      "display_name": "Shirley Petrov",
+      "age": 83,
+      "sex": "F",
+      "summary": "83F \u00b7 emergency admission \u00b7 6-day stay \u00b7 discharged to skilled nursing",
+      "split_name": "test"
+    },
+    {
+      "hadm_id": 23120636,
+      "display_name": "Theresa Abernathy",
+      "age": 62,
+      "sex": "F",
+      "summary": "62F \u00b7 emergency admission \u00b7 2 prior admissions \u00b7 3-day stay \u00b7 discharged to home with services",
+      "split_name": "test"
+    },
+    {
+      "hadm_id": 21192425,
+      "display_name": "Deborah Ellison",
+      "age": 61,
+      "sex": "F",
+      "summary": "61F \u00b7 ambulatory observation admission \u00b7 2 prior admissions \u00b7 2 procedures \u00b7 2-day stay",
+      "split_name": "test"
+    },
+    {
+      "hadm_id": 23367558,
+      "display_name": "Alicia Okafor",
+      "age": 32,
+      "sex": "F",
+      "summary": "32F \u00b7 emergency admission \u00b7 5 prior admissions \u00b7 1 procedure \u00b7 2-day stay \u00b7 discharged to home",
+      "split_name": "test"
+    },
+    {
+      "hadm_id": 26718943,
+      "display_name": "Walter Vasquez",
+      "age": 82,
+      "sex": "M",
+      "summary": "82M \u00b7 observation admission \u00b7 2 prior admissions \u00b7 5-day stay \u00b7 discharged to rehab",
+      "split_name": "test"
+    },
+    {
+      "hadm_id": 29610476,
+      "display_name": "Malik Mensah",
+      "age": 29,
+      "sex": "M",
+      "summary": "29M \u00b7 observation admission \u00b7 oncology history \u00b7 1 procedure \u00b7 8-day stay \u00b7 discharged to rehab",
+      "split_name": "test"
+    },
+    {
+      "hadm_id": 20724182,
+      "display_name": "Leonard Castellano",
+      "age": 70,
+      "sex": "M",
+      "summary": "70M \u00b7 observation admission \u00b7 8 prior admissions \u00b7 oncology history \u00b7 4-day stay \u00b7 discharged to home",
+      "split_name": "test"
+    },
+    {
+      "hadm_id": 22142985,
+      "display_name": "Kayla Castellano",
+      "age": 21,
+      "sex": "F",
+      "summary": "21F \u00b7 direct emergency admission \u00b7 1 prior admission \u00b7 4-day stay \u00b7 discharged to home",
+      "split_name": "test"
+    },
+    {
+      "hadm_id": 29865805,
+      "display_name": "Barbara Nyland",
+      "age": 84,
+      "sex": "F",
+      "summary": "84F \u00b7 emergency admission \u00b7 2 prior admissions \u00b7 1-day stay \u00b7 discharged to home with services",
+      "split_name": "test"
+    },
+    {
+      "hadm_id": 27090071,
+      "display_name": "Linda Lindqvist",
+      "age": 53,
+      "sex": "F",
+      "summary": "53F \u00b7 emergency admission \u00b7 27 prior admissions \u00b7 2-day stay \u00b7 discharged to home",
+      "split_name": "test"
+    },
+    {
+      "hadm_id": 28548047,
+      "display_name": "Raymond Berkowitz",
+      "age": 72,
+      "sex": "M",
+      "summary": "72M \u00b7 direct emergency admission \u00b7 oncology history \u00b7 2 procedures \u00b7 12-day stay \u00b7 discharged to home with services",
+      "split_name": "test"
+    },
+    {
+      "hadm_id": 23613002,
+      "display_name": "Alan Duval",
+      "age": 55,
+      "sex": "M",
+      "summary": "55M \u00b7 urgent admission \u00b7 1 prior admission \u00b7 3 procedures \u00b7 8-day stay \u00b7 discharged to home with services",
+      "split_name": "test"
+    }
+  ]
+}
