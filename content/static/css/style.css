@@ -369,6 +369,44 @@ html {
 .resume-page h2 { font-size: 1.25rem; }
 .resume-page h4 { font-size: .8rem; }
 
+/* resume — animated vertical timeline */
+.vertical-timeline {
+    position: relative;
+    max-width: 900px;
+    padding-left: 40px;
+}
+.vertical-timeline::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 15px;
+    width: 2px;
+    background: #dee2e6;
+}
+.timeline-event {
+    position: relative;
+    margin-bottom: 24px;
+}
+.timeline-dot {
+    position: absolute;
+    top: 6px;
+    left: -31px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #212529;
+    border: 3px solid #fff;
+    box-shadow: 0 0 0 1px #212529;
+}
+.timeline-card {
+    background: #fff;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    padding: 16px 20px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
 /* ---------- clinical copilot demo ---------- */
 
 .demo-status {

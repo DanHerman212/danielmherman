@@ -3,95 +3,75 @@
 
 {% block title %}Resume - My Website{% endblock %}
 
+{% load static %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'vendor/aos/aos.css' %}">
+{% endblock %}
+
 {% block content %}
 <div class="container resume-page">
     <h1 class="mb-4">Resume</h1>
 
     <!-- Summary -->
-     <section class="mb-5">
+    <section class="mb-5">
         <h2>Professional Summary</h2>
-        <p style="max-width: 900px;">Freelance Machine Learning Engineering, with 1 year experience, focused on building end to end production systems on Google Cloud Platform. Prior to Machine Learning, I worked in high value b2b enterprise sales for 20 years.  I specialized
-        in helping early stage companies break into complex markets, including Cybersecurity and FinTech industries</p> 
-     </section>
+        <p style="max-width: 900px;">Freelance Machine Learning Engineering, with 1+ years experience, focused on building end to end production AI systems on Google Cloud Platform. Intrinsic leader who operates with intellectual honesty, treats all people with dignity and is morally impeccable. Prior to Machine Learning, I worked in high value b2b enterprise sales for 20 years. I specialized
+        in helping early stage companies break into complex markets, including Cybersecurity and FinTech industries</p>
+    </section>
 
-     <!--Experience-->
-     <section class="mb-5">
+    <!-- Experience — animated vertical timeline (driven by views.py context) -->
+    <section class="mb-5">
         <h2>Experience</h2>
-        <div class="mb-4">
-            <h4>Machine Learning Engineer - Data Science Consulting, LLC</h4>
-            <p class="text-muted mb-0">April 2024 - Present</p>
-            <p class="text-muted">New York, NY</p>
-            <ul>
-                <li>System Design and Implementation for Production Machine Learning Systems</li>
-                <li>Industries Expertise Includes: Urban Transit, Healthcare, Ecommerce and Fintech</li>
-            </ul>
+        <div class="vertical-timeline">
+            {% for role in experience %}
+            <div class="timeline-event" data-aos="fade-up">
+                <div class="timeline-dot" aria-hidden="true"></div>
+                <div class="timeline-card">
+                    <h4>{{ role.role }}{% if role.company %} - {{ role.company }}{% endif %}</h4>
+                    <p class="text-muted mb-0">{{ role.period }}</p>
+                    {% if role.location %}<p class="text-muted">{{ role.location }}</p>{% endif %}
+                    {% if role.description %}<p>{{ role.description }}</p>{% endif %}
+                    {% if role.bullets %}
+                    <ul>
+                        {% for bullet in role.bullets %}
+                        <li>{{ bullet }}</li>
+                        {% endfor %}
+                    </ul>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
         </div>
-        <!-- Certification -->
-      <section class="mb-5">
-        <h2>Certification</h2>
-        <div class="mb-4">
-            <h4>Google Cloud Professional Machine Learning Engineer (PMLE) </h4>
-            <p class="text-muted mb-0">April, 2026</p>
-            <p class="text-muted">Certification Number: X11269325</p>
-        </div>
-      </section>
-    
-      <!--Skills-->
-      <section class="mb-5">
+    </section>
+
+    <!-- Skills -->
+    <section class="mb-5">
         <h2>Skills</h2>
         <div class="row">
             <div class="col-md-4">
                 <ul>
                     <li>MLOPs Infrastructure: Vertex AI, ZenML, Hydra, MLFlow</li>
-                    <li>Deep Learning (PyTorch, TensorFlow): Recomendation Systems, Computer Vision, Forecasting, Natural Language Processing</li>
+                    <li>Deep Learning (PyTorch, TensorFlow): Recommendation Systems, Computer Vision, Forecasting, Natural Language Processing</li>
                     <li>Data Pipelines: Batch and Stream Processing</li>
                 </ul>
             </div>
-        <div class="col-md-4">
-            <ul>
-                <li>Python, C++, SQL</li>
-                <li>Object Oriented Programming</li>
-                <li>Advanced Data Structures and Algorithms</li>
-                <li>Web and Mobile Applications</li>
-            </ul>
-        </div>
-    </div>
-</section>
-
-<!-- Add more experience entries-->
-        <h2>Experience Prior to Machine Learning</h2>
-        <div class="mb-4">
-            <h4>Strategic Account Executive - Intellect Design (Fintech)</h4>
-            <p class="text-muted mb-0">August 2017 - October 2019</p>
-            <p class="text-muted">New York, NY</p>
-            <ul>
-                <li>Built and Executed Go-to-market Strategy for New Customer acquisition of Tier 1/2 banking segment</li>
-                <li>Developed New Business Pipeline with $25 total contract value (TCV)</li>
-                <li>Built and Executed Account Based Marketing Strategy</li>
-            </ul>
-        </div>
-        <div class="mb-4">
-            <h4>Enterprise Account Executive - Backbase (Fintech)</h4>
-            <p class="text-muted mb-0">December 2014 - January 2015</p>
-            <p class="text-muted">New York, NY</p>
-            <ul>
-                <li>Closed 2 Tier 2 Bank Launch Customers, Including Keybank and Goldman Sachs</li>
-                <li>Delivered $4.5 million in New Business Revenue in first 15 months</li>
-            </ul>
-        </div>
-        <div class="mb-4">
-            <h4>Enterprise Account Executive - Melbourne IT Group (Cybersecurity)</h4>
-            <p class="text-muted mb-0">December 2006 - October 2011</p>
-            <p class="text-muted">New York, NY</p>
-            <ul>
-                <li>Global Sales Leader, 2011 - 2012</li>
-                <li>Delivered $26 million in new business during 6 year period</li>
-            </ul>
+            <div class="col-md-4">
+                <ul>
+                    <li>Python, SQL</li>
+                    <li>Object Oriented Programming</li>
+                    <li>Advanced Data Structures and Algorithms</li>
+                    <li>Web and Mobile Applications</li>
+                </ul>
+            </div>
         </div>
     </section>
-
-<a href="/path/to/resume.pdf" class="btn btn-primary" download>
-    <i class="fas fa-download"></i> Download PDF Resume
-</a>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'vendor/aos/aos.js' %}"></script>
+<script>
+    AOS.init({ once: true, duration: 700, offset: 80 });
+</script>
 {% endblock %}

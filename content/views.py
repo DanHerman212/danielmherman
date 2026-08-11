@@ -62,8 +62,61 @@ class ArticlePreviewView(DetailView):
     
     
 class ResumeView(TemplateView):
-    """Resume page"""
+    """Resume page — experience rendered as an animated vertical timeline."""
     template_name = 'content/resume.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['experience'] = [
+            {
+                'period': 'April 2024 - Present',
+                'role': 'Machine Learning Engineer',
+                'company': 'Data Science Consulting, LLC',
+                'location': 'New York, NY',
+                'bullets': [
+                    'AI System Design, including Agent Runtime, MCP and RAG',
+                    'System Design and Implementation for Production Machine Learning Systems',
+                    'Industries Expertise Includes: Urban Transit, Healthcare, Ecommerce and Fintech',
+                ],
+            },
+            {
+                'period': 'November 2019 - October 2022',
+                'role': 'Caregiving Career Break',
+                'description': 'I took a career break during the pandemic to raise my newborn daughter. During that period, I evaluated several career paths and by mid 2023, chose to pursue data science.',
+            },
+            {
+                'period': 'August 2017 - October 2019',
+                'role': 'Strategic Account Executive',
+                'company': 'Intellect Design (Fintech)',
+                'location': 'New York, NY',
+                'bullets': [
+                    'Built and Executed Go-to-market Strategy for New Customer acquisition of Tier 1/2 banking segment',
+                    'Developed New Business Pipeline with $25 total contract value (TCV)',
+                    'Built and Executed Account Based Marketing Strategy',
+                ],
+            },
+            {
+                'period': 'December 2014 - January 2015',
+                'role': 'Enterprise Account Executive',
+                'company': 'Backbase (Fintech)',
+                'location': 'New York, NY',
+                'bullets': [
+                    'Closed 2 Tier 2 Bank Launch Customers, Including Keybank and Goldman Sachs',
+                    'Delivered $4.5 million in New Business Revenue in first 15 months',
+                ],
+            },
+            {
+                'period': 'December 2006 - October 2011',
+                'role': 'Enterprise Account Executive',
+                'company': 'Melbourne IT Group (Cybersecurity)',
+                'location': 'New York, NY',
+                'bullets': [
+                    'Global Sales Leader, 2011 - 2012',
+                    'Delivered $26 million in new business during 6 year period',
+                ],
+            },
+        ]
+        return context
 
 class ProjectListView(ListView):
     """Projects page"""
