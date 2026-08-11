@@ -3,6 +3,8 @@ from typing import Any
 from django.shortcuts import render, get_object_or_404, redirect
 from django.views.generic import ListView, DetailView, TemplateView
 from django.contrib import messages
+from django.contrib.admin.views.decorators import staff_member_required
+from django.utils.decorators import method_decorator
 from .models import Category, Article, Project, ContactMessage
 
 class HomeView(TemplateView):
@@ -45,6 +47,19 @@ class ArticleDetailView(DetailView):
 
     def get_queryset(self):
         return Article.objects.filter(is_published=True)
+
+
+@method_decorator(staff_member_required, name='dispatch')
+class ArticlePreviewView(DetailView):
+    """Staff-only preview of an article — draft or published.
+
+    Renders the same detail template with no `is_published` filter, so a draft
+    preview is exactly the production look-and-feel before it goes live.
+    """
+    model = Article
+    template_name = 'content/article_detail.html'
+    context_object_name = 'article'
+    
     
 class ResumeView(TemplateView):
     """Resume page"""
@@ -61,6 +76,17 @@ class ProjectListView(ListView):
     
 class ProjectDetailView(DetailView):
     """Project detail page"""
+    model = Project
+    template_name = 'content/project_detail.html'
+    context_object_name = 'project'
+
+
+@method_decorator(staff_member_required, name='dispatch')
+class ProjectPreviewView(DetailView):
+    """Staff-only preview of a project — active or not.
+
+    Renders the same detail template with no `is_active` filter.
+    """
     model = Project
     template_name = 'content/project_detail.html'
     context_object_name = 'project'
