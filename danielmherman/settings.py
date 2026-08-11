@@ -132,6 +132,7 @@ CKEDITOR_5_CONFIGS = {
         },
         'codeBlock': {
             'languages': [
+                {'language': 'mermaid', 'label': 'Mermaid'},
                 {'language': 'plaintext', 'label': 'Plain text'},
                 {'language': 'python', 'label': 'Python'},
                 {'language': 'javascript', 'label': 'JavaScript'},

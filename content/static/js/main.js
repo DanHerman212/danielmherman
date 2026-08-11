@@ -45,14 +45,25 @@ document.addEventListener('DOMContentLoaded', function() {
             .replace(/\n\s*\n\s*\n/g, '\n\n')     // Collapse multiple blank lines
             .trim();
         
-        // Check if this is a Mermaid diagram (starts with mermaid keywords)
+        // Check if this is a Mermaid diagram (starts with mermaid keywords).
+        // Two realities of CKEditor-saved content:
+        //   1. The code-block feature can store the language label ("mermaid")
+        //      as the first line of the diagram text.
+        //   2. The class may be language-plaintext when 'mermaid' is not in the
+        //      editor's language list.
+        // So: accept class="language-mermaid" explicitly, and strip a leading
+        // "mermaid" marker line before matching keywords.
         var mermaidKeywords = ['graph ', 'graph\n', 'flowchart ', 'flowchart\n', 
                                'sequenceDiagram', 'classDiagram', 
                                'stateDiagram', 'erDiagram', 'gantt', 'pie ', 
                                'pie\n', 'journey', 'gitGraph', 'mindmap', 
                                'timeline', 'quadrantChart'];
-        var isMermaid = mermaidKeywords.some(function(keyword) {
-            return content.toLowerCase().startsWith(keyword.toLowerCase());
+        var codeEl = pre.querySelector('code');
+        var hasMermaidClass = !!(codeEl && codeEl.className &&
+            codeEl.className.split(/\s+/).indexOf('language-mermaid') !== -1);
+        var detectContent = content.replace(/^mermaid\s*\n/i, '');
+        var isMermaid = hasMermaidClass || mermaidKeywords.some(function(keyword) {
+            return detectContent.toLowerCase().startsWith(keyword.toLowerCase());
         });
         
         if (isMermaid) {
@@ -63,7 +74,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Create Mermaid div
             var mermaidDiv = document.createElement('div');
             mermaidDiv.className = 'mermaid';
-            mermaidDiv.textContent = content;
+            mermaidDiv.textContent = detectContent;
             
             // Create controls
             var controls = document.createElement('div');
