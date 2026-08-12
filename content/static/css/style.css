@@ -20,6 +20,16 @@
     object-position: center top;
 }
 
+/* On small screens cards stack full-width, so a fixed height makes a narrow,
+   disproportionate image box. Use a consistent aspect-ratio fill instead. */
+@media (max-width: 767.98px) {
+    .card-img-top,
+    .col-md-6 .card-img-top {
+        height: auto;
+        aspect-ratio: 4 / 3;
+    }
+}
+
 /* Article detail featured image */
 .article-featured-img {
     width: 100%;
