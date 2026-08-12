@@ -74,9 +74,9 @@ class ResumeView(TemplateView):
                 'company': 'Data Science Consulting, LLC',
                 'location': 'New York, NY',
                 'bullets': [
-                    'AI System Design, including Agent Runtime, MCP and RAG',
-                    'System Design and Implementation for Production Machine Learning Systems',
-                    'Industries Expertise Includes: Urban Transit, Healthcare, Ecommerce and Fintech',
+                    'AI System Design, including agent runtime, MCP and RAG',
+                    'ML System Design, including high performance model training with scalable inference',
+                    'Industry expertise: high tech sales and marketing, urban transit, healthcare, ecommerce and fintech',
                 ],
             },
             {
@@ -90,9 +90,9 @@ class ResumeView(TemplateView):
                 'company': 'Intellect Design (Fintech)',
                 'location': 'New York, NY',
                 'bullets': [
-                    'Built and Executed Go-to-market Strategy for New Customer acquisition of Tier 1/2 banking segment',
-                    'Developed New Business Pipeline with $25 total contract value (TCV)',
-                    'Built and Executed Account Based Marketing Strategy',
+                    'Built and executed go-to-market strategy for new customer acquisition of tier 1/2 banking segment',
+                    'Developed new business pipeline with $25 total contract value (TCV)',
+                    'Built and executed account based marketing strategy',
                 ],
             },
             {
@@ -101,8 +101,8 @@ class ResumeView(TemplateView):
                 'company': 'Backbase (Fintech)',
                 'location': 'New York, NY',
                 'bullets': [
-                    'Closed 2 Tier 2 Bank Launch Customers, Including Keybank and Goldman Sachs',
-                    'Delivered $4.5 million in New Business Revenue in first 15 months',
+                    'Closed 2 tier 2 bank launch customers, including Keybank and Goldman Sachs',
+                    'Delivered $4.5 million in new business revenue in first 15 months',
                 ],
             },
             {
@@ -111,7 +111,7 @@ class ResumeView(TemplateView):
                 'company': 'Melbourne IT Group (Cybersecurity)',
                 'location': 'New York, NY',
                 'bullets': [
-                    'Global Sales Leader, 2011 - 2012',
+                    'Global sales leader, 2011 - 2012',
                     'Delivered $26 million in new business during 6 year period',
                 ],
             },
