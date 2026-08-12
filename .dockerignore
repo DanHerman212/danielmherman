@@ -34,8 +34,8 @@ staticfiles/
 Dockerfile
 .dockerignore
 
-# Demo: real captured payloads (MIMIC-derived) — never in the image
-demo/data/demo_fixtures/
+# Demo: real captured note passages (MIMIC-derived) — never in the image
+demo/data/demo_fixtures/rag_*.json
 
 # Dev spikes
 static/spikes/

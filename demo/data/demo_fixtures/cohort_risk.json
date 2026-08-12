@@ -1,0 +1,1186 @@
+{
+  "20258214": {
+    "hadm_id": 20258214,
+    "probability": 0.094063,
+    "threshold": 0.12,
+    "decision": 0,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2551,
+        "direction": "decreases"
+      },
+      {
+        "feature": "rdw_max",
+        "contribution": -0.1775,
+        "direction": "decreases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.0858,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.0789,
+        "direction": "decreases"
+      },
+      {
+        "feature": "hemoglobin_min",
+        "contribution": -0.0571,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "BigQuery",
+    "provenance": "REAL \u2014 local run of the serving predictor (2026-08-11)"
+  },
+  "20317023": {
+    "hadm_id": 20317023,
+    "probability": 0.115903,
+    "threshold": 0.12,
+    "decision": 0,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.3011,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.1134,
+        "direction": "decreases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.0909,
+        "direction": "decreases"
+      },
+      {
+        "feature": "discharge_location",
+        "contribution": -0.077,
+        "direction": "decreases"
+      },
+      {
+        "feature": "rdw_max",
+        "contribution": -0.0697,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "BigQuery",
+    "provenance": "REAL \u2014 local run of the serving predictor (2026-08-11)"
+  },
+  "20724182": {
+    "hadm_id": 20724182,
+    "probability": 0.194512,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "oncology_flag",
+        "contribution": 0.2894,
+        "direction": "increases"
+      },
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": 0.2049,
+        "direction": "increases"
+      },
+      {
+        "feature": "recent_ed_visits",
+        "contribution": -0.1516,
+        "direction": "decreases"
+      },
+      {
+        "feature": "rdw_max",
+        "contribution": -0.0795,
+        "direction": "decreases"
+      },
+      {
+        "feature": "admission_type",
+        "contribution": -0.0762,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "BigQuery",
+    "provenance": "REAL \u2014 local run of the serving predictor (2026-08-11)"
+  },
+  "20924467": {
+    "hadm_id": 20924467,
+    "probability": 0.131398,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.1143,
+        "direction": "decreases"
+      },
+      {
+        "feature": "age",
+        "contribution": -0.0859,
+        "direction": "decreases"
+      },
+      {
+        "feature": "rdw_max",
+        "contribution": -0.0646,
+        "direction": "decreases"
+      },
+      {
+        "feature": "sodium_max",
+        "contribution": -0.0508,
+        "direction": "decreases"
+      },
+      {
+        "feature": "sodium_min",
+        "contribution": -0.0488,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "BigQuery",
+    "provenance": "REAL \u2014 local run of the serving predictor (2026-08-11)"
+  },
+  "21192425": {
+    "hadm_id": 21192425,
+    "probability": 0.157743,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "sodium_max",
+        "contribution": -0.0711,
+        "direction": "decreases"
+      },
+      {
+        "feature": "discharge_location",
+        "contribution": 0.0669,
+        "direction": "increases"
+      },
+      {
+        "feature": "sodium_min",
+        "contribution": -0.0661,
+        "direction": "decreases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.0597,
+        "direction": "decreases"
+      },
+      {
+        "feature": "sodium_last",
+        "contribution": -0.0579,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "BigQuery",
+    "provenance": "REAL \u2014 local run of the serving predictor (2026-08-11)"
+  },
+  "22142985": {
+    "hadm_id": 22142985,
+    "probability": 0.221825,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "admission_type",
+        "contribution": 0.1758,
+        "direction": "increases"
+      },
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.1408,
+        "direction": "decreases"
+      },
+      {
+        "feature": "age",
+        "contribution": 0.1302,
+        "direction": "increases"
+      },
+      {
+        "feature": "recent_ed_visits",
+        "contribution": 0.1272,
+        "direction": "increases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.1173,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "BigQuery",
+    "provenance": "REAL \u2014 local run of the serving predictor (2026-08-11)"
+  },
+  "22147008": {
+    "hadm_id": 22147008,
+    "probability": 0.092954,
+    "threshold": 0.12,
+    "decision": 0,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2336,
+        "direction": "decreases"
+      },
+      {
+        "feature": "rdw_max",
+        "contribution": -0.1942,
+        "direction": "decreases"
+      },
+      {
+        "feature": "recent_ed_visits",
+        "contribution": -0.1357,
+        "direction": "decreases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.1113,
+        "direction": "decreases"
+      },
+      {
+        "feature": "index_los_days",
+        "contribution": 0.0864,
+        "direction": "increases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "BigQuery",
+    "provenance": "REAL \u2014 local run of the serving predictor (2026-08-11)"
+  },
+  "22298496": {
+    "hadm_id": 22298496,
+    "probability": 0.10359,
+    "threshold": 0.12,
+    "decision": 0,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.1959,
+        "direction": "decreases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.0925,
+        "direction": "decreases"
+      },
+      {
+        "feature": "rdw_max",
+        "contribution": -0.0793,
+        "direction": "decreases"
+      },
+      {
+        "feature": "discharge_location",
+        "contribution": -0.0756,
+        "direction": "decreases"
+      },
+      {
+        "feature": "monocytes_min",
+        "contribution": -0.0743,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "BigQuery",
+    "provenance": "REAL \u2014 local run of the serving predictor (2026-08-11)"
+  },
+  "22425246": {
+    "hadm_id": 22425246,
+    "probability": 0.10733,
+    "threshold": 0.12,
+    "decision": 0,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2498,
+        "direction": "decreases"
+      },
+      {
+        "feature": "rdw_max",
+        "contribution": -0.2275,
+        "direction": "decreases"
+      },
+      {
+        "feature": "discharge_location",
+        "contribution": -0.1692,
+        "direction": "decreases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.1071,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.0895,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "BigQuery",
+    "provenance": "REAL \u2014 local run of the serving predictor (2026-08-11)"
+  },
+  "22489815": {
+    "hadm_id": 22489815,
+    "probability": 0.044731,
+    "threshold": 0.12,
+    "decision": 0,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2387,
+        "direction": "decreases"
+      },
+      {
+        "feature": "admission_type",
+        "contribution": -0.2203,
+        "direction": "decreases"
+      },
+      {
+        "feature": "medication_order_count",
+        "contribution": -0.1892,
+        "direction": "decreases"
+      },
+      {
+        "feature": "discharge_location",
+        "contribution": -0.1545,
+        "direction": "decreases"
+      },
+      {
+        "feature": "sodium_min",
+        "contribution": -0.1352,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "BigQuery",
+    "provenance": "REAL \u2014 local run of the serving predictor (2026-08-11)"
+  },
+  "22779802": {
+    "hadm_id": 22779802,
+    "probability": 0.128313,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2966,
+        "direction": "decreases"
+      },
+      {
+        "feature": "recent_ed_visits",
+        "contribution": -0.1824,
+        "direction": "decreases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.0935,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.0914,
+        "direction": "decreases"
+      },
+      {
+        "feature": "medication_order_count",
+        "contribution": 0.0539,
+        "direction": "increases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "BigQuery",
+    "provenance": "REAL \u2014 local run of the serving predictor (2026-08-11)"
+  },
+  "22852067": {
+    "hadm_id": 22852067,
+    "probability": 0.122395,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2513,
+        "direction": "decreases"
+      },
+      {
+        "feature": "admission_type",
+        "contribution": 0.1815,
+        "direction": "increases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.1015,
+        "direction": "decreases"
+      },
+      {
+        "feature": "sodium_min",
+        "contribution": -0.0915,
+        "direction": "decreases"
+      },
+      {
+        "feature": "discharge_location",
+        "contribution": -0.0904,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "BigQuery",
+    "provenance": "REAL \u2014 local run of the serving predictor (2026-08-11)"
+  },
+  "23120636": {
+    "hadm_id": 23120636,
+    "probability": 0.143492,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": 0.2278,
+        "direction": "increases"
+      },
+      {
+        "feature": "rdw_max",
+        "contribution": -0.2092,
+        "direction": "decreases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.0847,
+        "direction": "decreases"
+      },
+      {
+        "feature": "sodium_last",
+        "contribution": -0.0842,
+        "direction": "decreases"
+      },
+      {
+        "feature": "discharge_location",
+        "contribution": 0.063,
+        "direction": "increases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "BigQuery",
+    "provenance": "REAL \u2014 local run of the serving predictor (2026-08-11)"
+  },
+  "23367558": {
+    "hadm_id": 23367558,
+    "probability": 0.168789,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "rdw_max",
+        "contribution": -0.1203,
+        "direction": "decreases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.104,
+        "direction": "decreases"
+      },
+      {
+        "feature": "age",
+        "contribution": 0.0923,
+        "direction": "increases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": 0.0741,
+        "direction": "increases"
+      },
+      {
+        "feature": "discharge_location",
+        "contribution": -0.0683,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "BigQuery",
+    "provenance": "REAL \u2014 local run of the serving predictor (2026-08-11)"
+  },
+  "23613002": {
+    "hadm_id": 23613002,
+    "probability": 0.317592,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "rdw_max",
+        "contribution": 0.2108,
+        "direction": "increases"
+      },
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.1213,
+        "direction": "decreases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.092,
+        "direction": "decreases"
+      },
+      {
+        "feature": "discharge_location",
+        "contribution": 0.0777,
+        "direction": "increases"
+      },
+      {
+        "feature": "sodium_last",
+        "contribution": 0.0679,
+        "direction": "increases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "BigQuery",
+    "provenance": "REAL \u2014 local run of the serving predictor (2026-08-11)"
+  },
+  "24708502": {
+    "hadm_id": 24708502,
+    "probability": 0.135063,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.238,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.0811,
+        "direction": "decreases"
+      },
+      {
+        "feature": "medication_order_count",
+        "contribution": -0.0721,
+        "direction": "decreases"
+      },
+      {
+        "feature": "age",
+        "contribution": -0.07,
+        "direction": "decreases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.0596,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "BigQuery",
+    "provenance": "REAL \u2014 local run of the serving predictor (2026-08-11)"
+  },
+  "24769731": {
+    "hadm_id": 24769731,
+    "probability": 0.12017,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2804,
+        "direction": "decreases"
+      },
+      {
+        "feature": "recent_ed_visits",
+        "contribution": -0.2034,
+        "direction": "decreases"
+      },
+      {
+        "feature": "rdw_max",
+        "contribution": 0.1028,
+        "direction": "increases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.0885,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.071,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "BigQuery",
+    "provenance": "REAL \u2014 local run of the serving predictor (2026-08-11)"
+  },
+  "25069193": {
+    "hadm_id": 25069193,
+    "probability": 0.057271,
+    "threshold": 0.12,
+    "decision": 0,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2951,
+        "direction": "decreases"
+      },
+      {
+        "feature": "discharge_location",
+        "contribution": -0.1537,
+        "direction": "decreases"
+      },
+      {
+        "feature": "admission_type",
+        "contribution": -0.1339,
+        "direction": "decreases"
+      },
+      {
+        "feature": "sodium_min",
+        "contribution": -0.1105,
+        "direction": "decreases"
+      },
+      {
+        "feature": "medication_order_count",
+        "contribution": -0.1101,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "BigQuery",
+    "provenance": "REAL \u2014 local run of the serving predictor (2026-08-11)"
+  },
+  "25768972": {
+    "hadm_id": 25768972,
+    "probability": 0.052707,
+    "threshold": 0.12,
+    "decision": 0,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2836,
+        "direction": "decreases"
+      },
+      {
+        "feature": "medication_order_count",
+        "contribution": -0.1691,
+        "direction": "decreases"
+      },
+      {
+        "feature": "discharge_location",
+        "contribution": -0.1554,
+        "direction": "decreases"
+      },
+      {
+        "feature": "admission_type",
+        "contribution": -0.1302,
+        "direction": "decreases"
+      },
+      {
+        "feature": "sodium_min",
+        "contribution": -0.1131,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "BigQuery",
+    "provenance": "REAL \u2014 local run of the serving predictor (2026-08-11)"
+  },
+  "25828809": {
+    "hadm_id": 25828809,
+    "probability": 0.050617,
+    "threshold": 0.12,
+    "decision": 0,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2996,
+        "direction": "decreases"
+      },
+      {
+        "feature": "medication_order_count",
+        "contribution": -0.1859,
+        "direction": "decreases"
+      },
+      {
+        "feature": "sodium_max",
+        "contribution": -0.1752,
+        "direction": "decreases"
+      },
+      {
+        "feature": "sodium_last",
+        "contribution": -0.1479,
+        "direction": "decreases"
+      },
+      {
+        "feature": "sodium_min",
+        "contribution": -0.1418,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "BigQuery",
+    "provenance": "REAL \u2014 local run of the serving predictor (2026-08-11)"
+  },
+  "26718943": {
+    "hadm_id": 26718943,
+    "probability": 0.187954,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "discharge_location",
+        "contribution": -0.2125,
+        "direction": "decreases"
+      },
+      {
+        "feature": "rdw_max",
+        "contribution": 0.1857,
+        "direction": "increases"
+      },
+      {
+        "feature": "recent_ed_visits",
+        "contribution": -0.1451,
+        "direction": "decreases"
+      },
+      {
+        "feature": "age",
+        "contribution": -0.1241,
+        "direction": "decreases"
+      },
+      {
+        "feature": "sodium_last",
+        "contribution": 0.1087,
+        "direction": "increases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "BigQuery",
+    "provenance": "REAL \u2014 local run of the serving predictor (2026-08-11)"
+  },
+  "27090071": {
+    "hadm_id": 27090071,
+    "probability": 0.281488,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": 0.5537,
+        "direction": "increases"
+      },
+      {
+        "feature": "rdw_max",
+        "contribution": -0.2566,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": 0.2344,
+        "direction": "increases"
+      },
+      {
+        "feature": "hemoglobin_min",
+        "contribution": -0.071,
+        "direction": "decreases"
+      },
+      {
+        "feature": "sodium_last",
+        "contribution": 0.0598,
+        "direction": "increases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "BigQuery",
+    "provenance": "REAL \u2014 local run of the serving predictor (2026-08-11)"
+  },
+  "27580783": {
+    "hadm_id": 27580783,
+    "probability": 0.073314,
+    "threshold": 0.12,
+    "decision": 0,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.3233,
+        "direction": "decreases"
+      },
+      {
+        "feature": "discharge_location",
+        "contribution": -0.1442,
+        "direction": "decreases"
+      },
+      {
+        "feature": "medication_order_count",
+        "contribution": -0.1188,
+        "direction": "decreases"
+      },
+      {
+        "feature": "sodium_min",
+        "contribution": -0.0987,
+        "direction": "decreases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.0977,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "BigQuery",
+    "provenance": "REAL \u2014 local run of the serving predictor (2026-08-11)"
+  },
+  "27657995": {
+    "hadm_id": 27657995,
+    "probability": 0.07543,
+    "threshold": 0.12,
+    "decision": 0,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2878,
+        "direction": "decreases"
+      },
+      {
+        "feature": "recent_ed_visits",
+        "contribution": -0.1715,
+        "direction": "decreases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.1083,
+        "direction": "decreases"
+      },
+      {
+        "feature": "medication_order_count",
+        "contribution": -0.0936,
+        "direction": "decreases"
+      },
+      {
+        "feature": "rbc_last",
+        "contribution": -0.0929,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "BigQuery",
+    "provenance": "REAL \u2014 local run of the serving predictor (2026-08-11)"
+  },
+  "28548047": {
+    "hadm_id": 28548047,
+    "probability": 0.287029,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "oncology_flag",
+        "contribution": 0.6063,
+        "direction": "increases"
+      },
+      {
+        "feature": "race",
+        "contribution": -0.3247,
+        "direction": "decreases"
+      },
+      {
+        "feature": "admission_type",
+        "contribution": 0.3226,
+        "direction": "increases"
+      },
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2779,
+        "direction": "decreases"
+      },
+      {
+        "feature": "recent_ed_visits",
+        "contribution": -0.0989,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "BigQuery",
+    "provenance": "REAL \u2014 local run of the serving predictor (2026-08-11)"
+  },
+  "29071979": {
+    "hadm_id": 29071979,
+    "probability": 0.067528,
+    "threshold": 0.12,
+    "decision": 0,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2541,
+        "direction": "decreases"
+      },
+      {
+        "feature": "discharge_location",
+        "contribution": -0.167,
+        "direction": "decreases"
+      },
+      {
+        "feature": "rdw_max",
+        "contribution": -0.1581,
+        "direction": "decreases"
+      },
+      {
+        "feature": "recent_ed_visits",
+        "contribution": -0.1534,
+        "direction": "decreases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.1106,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "BigQuery",
+    "provenance": "REAL \u2014 local run of the serving predictor (2026-08-11)"
+  },
+  "29214311": {
+    "hadm_id": 29214311,
+    "probability": 0.082002,
+    "threshold": 0.12,
+    "decision": 0,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2342,
+        "direction": "decreases"
+      },
+      {
+        "feature": "recent_ed_visits",
+        "contribution": -0.2014,
+        "direction": "decreases"
+      },
+      {
+        "feature": "rdw_max",
+        "contribution": -0.1342,
+        "direction": "decreases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.0932,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.0803,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "BigQuery",
+    "provenance": "REAL \u2014 local run of the serving predictor (2026-08-11)"
+  },
+  "29540756": {
+    "hadm_id": 29540756,
+    "probability": 0.106589,
+    "threshold": 0.12,
+    "decision": 0,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.214,
+        "direction": "decreases"
+      },
+      {
+        "feature": "discharge_location",
+        "contribution": 0.1099,
+        "direction": "increases"
+      },
+      {
+        "feature": "medication_order_count",
+        "contribution": -0.0915,
+        "direction": "decreases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.0845,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.0704,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "BigQuery",
+    "provenance": "REAL \u2014 local run of the serving predictor (2026-08-11)"
+  },
+  "29580704": {
+    "hadm_id": 29580704,
+    "probability": 0.087655,
+    "threshold": 0.12,
+    "decision": 0,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "discharge_location",
+        "contribution": -0.7666,
+        "direction": "decreases"
+      },
+      {
+        "feature": "recent_ed_visits",
+        "contribution": -0.2621,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.1663,
+        "direction": "decreases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": 0.1338,
+        "direction": "increases"
+      },
+      {
+        "feature": "procedure_count",
+        "contribution": 0.079,
+        "direction": "increases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "BigQuery",
+    "provenance": "REAL \u2014 local run of the serving predictor (2026-08-11)"
+  },
+  "29610476": {
+    "hadm_id": 29610476,
+    "probability": 0.190288,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "oncology_flag",
+        "contribution": 0.3586,
+        "direction": "increases"
+      },
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2241,
+        "direction": "decreases"
+      },
+      {
+        "feature": "discharge_location",
+        "contribution": -0.1449,
+        "direction": "decreases"
+      },
+      {
+        "feature": "age",
+        "contribution": 0.1161,
+        "direction": "increases"
+      },
+      {
+        "feature": "rdw_max",
+        "contribution": -0.0796,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "BigQuery",
+    "provenance": "REAL \u2014 local run of the serving predictor (2026-08-11)"
+  },
+  "29701286": {
+    "hadm_id": 29701286,
+    "probability": 0.122662,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2769,
+        "direction": "decreases"
+      },
+      {
+        "feature": "rdw_max",
+        "contribution": 0.184,
+        "direction": "increases"
+      },
+      {
+        "feature": "recent_ed_visits",
+        "contribution": -0.1734,
+        "direction": "decreases"
+      },
+      {
+        "feature": "rbc_last",
+        "contribution": -0.1518,
+        "direction": "decreases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.1127,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "BigQuery",
+    "provenance": "REAL \u2014 local run of the serving predictor (2026-08-11)"
+  },
+  "29865805": {
+    "hadm_id": 29865805,
+    "probability": 0.275712,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "sodium_last",
+        "contribution": 0.1869,
+        "direction": "increases"
+      },
+      {
+        "feature": "discharge_location",
+        "contribution": 0.1316,
+        "direction": "increases"
+      },
+      {
+        "feature": "rdw_max",
+        "contribution": 0.0992,
+        "direction": "increases"
+      },
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": 0.0771,
+        "direction": "increases"
+      },
+      {
+        "feature": "age",
+        "contribution": -0.0762,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "BigQuery",
+    "provenance": "REAL \u2014 local run of the serving predictor (2026-08-11)"
+  }
+}
