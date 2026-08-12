@@ -33,3 +33,9 @@ staticfiles/
 # Container files themselves
 Dockerfile
 .dockerignore
+
+# Demo: real captured payloads (MIMIC-derived) — never in the image
+demo/data/demo_fixtures/
+
+# Dev spikes
+static/spikes/

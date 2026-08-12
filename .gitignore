@@ -17,3 +17,9 @@ media/
 
 # macOS
 .DS_Store
+
+# Demo: real captured payloads (MIMIC-derived) — must never ship
+demo/data/demo_fixtures/
+
+# Dev spikes (A2UI proof-of-concept)
+static/spikes/

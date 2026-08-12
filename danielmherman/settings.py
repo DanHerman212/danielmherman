@@ -67,6 +67,13 @@ DEMO_AGENT_URL = os.environ.get(
 DEMO_AGENT_TIMEOUT = int(os.environ.get('DEMO_AGENT_TIMEOUT', '120'))
 DEMO_DAILY_LIMIT = int(os.environ.get('DEMO_DAILY_LIMIT', '10'))
 
+# When True (default while the Vertex endpoints are torn down), the demo answers
+# the starter chips from captured real payloads (demo/data/demo_fixtures/)
+# instead of calling the live agent. Set DEMO_FIXTURE_MODE=false to go live.
+DEMO_FIXTURE_MODE = os.environ.get(
+    'DEMO_FIXTURE_MODE', 'true'
+).strip().lower() in ('1', 'true', 'yes', 'on')
+
 LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'demo:console'
 LOGOUT_REDIRECT_URL = 'home'
