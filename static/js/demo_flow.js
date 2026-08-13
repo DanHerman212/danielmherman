@@ -213,6 +213,13 @@ export function createDemoFlow({ root, askUrl, renderCanvas, onCite }) {
     const prob = row.dataset.probability;
     state.current = { hadmId, name, meta: `${age} · ${band}${prob ? ` · ${pct(prob)}` : ''}` };
 
+    // Parity with the search box: selecting a patient isolates the rail to
+    // them the same way typing their name would (and keeps them highlighted),
+    // so both selection methods leave the list in the same state.
+    els.search.value = name;
+    state.page = 1;
+    renderPatientList();
+
     els.threadName.textContent = name;
     els.threadMeta.textContent = state.current.meta;
     els.backBtn.hidden = false;
