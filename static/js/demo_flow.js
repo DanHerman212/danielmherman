@@ -358,7 +358,7 @@ export function createDemoFlow({ root, askUrl, renderCanvas, onCite }) {
 
     const text = document.createElement('div');
     text.className = 'turn-text';
-    text.appendChild(citedParagraph(turn.text, index, episode));
+    text.appendChild(citedMarkdown(turn.text, index, episode));
     block.appendChild(text);
 
     if (turn.meta) {
@@ -370,31 +370,75 @@ export function createDemoFlow({ root, askUrl, renderCanvas, onCite }) {
     return block;
   }
 
-  /** Render agent prose, turning ^[n] markers into clickable citations. */
-  function citedParagraph(text, turnIndex, episode) {
-    const p = document.createElement('p');
-    const escaped = esc(text);
-    const parts = escaped.split(/(\^\[\d+\])/g);
-    for (const part of parts) {
-      const m = part.match(/^\^\[(\d+)\]$/);
-      if (m) {
-        const sup = document.createElement('sup');
-        sup.className = 'cite';
-        sup.textContent = m[1];
-        sup.title = 'Show the cited note passage';
-        sup.addEventListener('click', () => {
-          if (typeof onCite === 'function') {
-            onCite(episode, turnIndex, Number(m[1]), api);
-          } else {
-            paint(episodeFor(state.current.hadmId));
-          }
-        });
-        p.appendChild(sup);
-      } else if (part) {
-        p.appendChild(document.createTextNode(part));
+  /** Lightweight inline markdown for agent prose — operates on ESCAPED text,
+      so the output is safe to inject (no raw HTML survives esc()). */
+  function renderAgentMarkdown(escapedText) {
+    const out = [];
+    let list = null;                       // 'ul' | 'ol' | null
+    const closeList = () => {
+      if (list) { out.push(`</${list}>`); list = null; }
+    };
+    const inline = (t) => t
+      .replace(/`([^`]+)`/g, '<code>$1</code>')
+      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*([^*]+)\*/g, '<em>$1</em>');
+    for (const raw of escapedText.split(/\n/)) {
+      const line = raw.trimEnd();
+      const bullet = line.match(/^[*\-]\s+(.*)$/);
+      const ordered = line.match(/^\d+\.\s+(.*)$/);
+      const item = bullet || ordered;
+      const tag = bullet ? 'ul' : 'ol';
+      if (item) {
+        if (list !== tag) { closeList(); out.push(`<${tag}>`); list = tag; }
+        out.push(`<li>${inline(item[1])}</li>`);
+      } else {
+        closeList();
+        if (line.trim()) out.push(`<p>${inline(line)}</p>`);
       }
     }
-    return p;
+    closeList();
+    return out.join('');
+  }
+
+  /** Turn ^[n] text markers in the rendered prose into clickable superscripts. */
+  function wireCitations(root, turnIndex, episode) {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const nodes = [];
+    while (walker.nextNode()) {
+      const n = walker.currentNode;
+      if (n.nodeValue && /\^\[\d+\]/.test(n.nodeValue)) nodes.push(n);
+    }
+    for (const node of nodes) {
+      const frag = document.createDocumentFragment();
+      for (const part of node.nodeValue.split(/(\^\[\d+\])/g)) {
+        const m = part.match(/^\^\[(\d+)\]$/);
+        if (m) {
+          const sup = document.createElement('sup');
+          sup.className = 'cite';
+          sup.textContent = m[1];
+          sup.title = 'Show the cited note passage';
+          sup.addEventListener('click', () => {
+            if (typeof onCite === 'function') {
+              onCite(episode, turnIndex, Number(m[1]), api);
+            } else {
+              paint(episodeFor(state.current.hadmId));
+            }
+          });
+          frag.appendChild(sup);
+        } else if (part) {
+          frag.appendChild(document.createTextNode(part));
+        }
+      }
+      node.parentNode.replaceChild(frag, node);
+    }
+  }
+
+  /** Render agent prose: safe light markdown + clickable ^[n] citations. */
+  function citedMarkdown(text, turnIndex, episode) {
+    const escaped = esc(text);
+    const root = document.createRange().createContextualFragment(renderAgentMarkdown(escaped));
+    wireCitations(root, turnIndex, episode);
+    return root;
   }
 
   function agentTurnFromResponse(question, data) {

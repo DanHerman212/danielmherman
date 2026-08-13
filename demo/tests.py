@@ -337,8 +337,8 @@ class A2uiCanvasTests(TestCase):
         self.assertContains(response, 'id="trace-toggle"')
         # Cache-busted stylesheet + module links so the shell CSS and the A2UI
         # component module are never stale in the browser.
-        self.assertContains(response, 'demo_splitpane.css?v=2')
-        self.assertContains(response, 'demo_a2ui.js?v=5')
+        self.assertContains(response, 'demo_splitpane.css?v=3')
+        self.assertContains(response, 'demo_a2ui.js?v=6')
 
 
 @override_settings(DEMO_FIXTURE_MODE=False)
@@ -387,6 +387,28 @@ class A2uiAskLiveTests(TestCase):
         response = self._post({'question': 'Why was this patient flagged?'})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(mocked.call_args.args[0], 'Why was this patient flagged?')
+
+    @patch('demo.views.ask_agent', return_value=dict(A2UI_AGENT_REPLY))
+    def test_chip_maps_to_chip_question(self, mocked):
+        """The meds chip must send the medications question (not the risk
+        question), so the live agent actually calls rag_search and cites ^[n]."""
+        self._post({'hadm_id': 20924467, 'chip': 'meds'})
+        self.assertIn('medications', mocked.call_args.args[0])
+        self.assertIn('20924467', mocked.call_args.args[0])
+
+    @patch('demo.views.ask_agent', return_value=dict(A2UI_AGENT_REPLY))
+    def test_summarize_chip_maps_to_summarize_question(self, mocked):
+        self._post({'hadm_id': 20924467, 'chip': 'summarize'})
+        self.assertIn('Summarize', mocked.call_args.args[0])
+        self.assertIn('20924467', mocked.call_args.args[0])
+
+    @patch('demo.views.ask_agent')
+    def test_unknown_chip_rejected_before_quota(self, mocked):
+        DemoQuota.objects.create(user=self.user, daily_limit=5)
+        response = self._post({'hadm_id': 20924467, 'chip': 'bogus'})
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(DemoQuota.remaining(self.user), 5)
+        mocked.assert_not_called()
 
     @patch('demo.views.ask_agent')
     def test_quota_exhaustion_returns_429_without_calling_the_agent(self, mocked):

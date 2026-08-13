@@ -237,7 +237,15 @@ body:has(#demo-root), body:has(#a2ui-root) { overflow-x: auto; }
 .turn { display: flex; flex-direction: column; gap: 3px; }
 .turn-label { font-size: 0.7rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
 .turn-text { font-size: 0.88rem; line-height: 1.5; }
-.turn-text p { margin: 0; }
+.turn-text p { margin: 0 0 6px; }
+.turn-text p:last-child { margin-bottom: 0; }
+.turn-text ul, .turn-text ol { margin: 0 0 6px; padding-left: 20px; }
+.turn-text ul:last-child, .turn-text ol:last-child { margin-bottom: 0; }
+.turn-text li { margin: 2px 0; }
+.turn-text code {
+  font-family: 'SF Mono', ui-monospace, monospace; font-size: 0.85em;
+  background: var(--surface-2); padding: 1px 4px; border-radius: 4px;
+}
 .turn-user .turn-text { background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 9px 12px; }
 .turn-meta { font-size: 0.7rem; color: var(--muted); }
 .cite {

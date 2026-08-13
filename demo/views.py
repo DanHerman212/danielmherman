@@ -14,7 +14,7 @@ from django.views.decorators.http import require_POST
 
 from .agent_client import AgentError, ask as ask_agent
 from .a2ui_canvas import compose_risk_canvas
-from .fixtures import band_for, fixture_ask, risk_for
+from .fixtures import CHIPS, band_for, fixture_ask, risk_for
 from .models import DemoPatient, DemoQuota
 
 MAX_QUESTION_CHARS = 2000
@@ -48,9 +48,11 @@ def console(request):
 def _question_for(payload):
     """Turn the request body into a question, or return (None, error).
 
-    Two ways in: pick a patient from the cohort, or type a question. The picker
-    sends an id and lets the server compose the wording, so the phrasing stays
-    consistent across every demo and cannot be edited into a leading question.
+    Three ways in: a starter chip (mapped to the chip's question so the live
+    agent answers the chosen intent — risk, medications, summarize — instead of
+    always the risk question), a picked patient id, or typed free text. Chips
+    and the picker send an id so the server embeds it in the wording — the
+    phrasing stays consistent and cannot be edited into a leading question.
     """
     hadm_id = payload.get('hadm_id')
     if hadm_id is not None:
@@ -60,6 +62,13 @@ def _question_for(payload):
             return None, 'hadm_id must be an integer.'
         if hadm_id <= 0:
             return None, 'hadm_id must be positive.'
+
+        chip = payload.get('chip')
+        if chip is not None:
+            question = CHIPS.get(chip)
+            if not question:
+                return None, 'unknown chip.'
+            return f'{question} For admission {hadm_id}.', None
         return f'Assess the 30-day readmission risk for admission {hadm_id}.', None
 
     question = payload.get('question')
