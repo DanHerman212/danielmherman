@@ -145,12 +145,7 @@ class ProjectDetailView(DetailView):
         project = self.object
         context['is_drilldown'] = project.drilldown
         if project.drilldown:
-            sections = decorate_sections(project.content)
-            context['sections'] = sections
-            # The Architecture section stays visible on the landing as a hero
-            # so the page has immediate substance; it is also its own card.
-            context['hero_section'] = next(
-                (s for s in sections if s['slug'] == 'architecture'), None)
+            context['sections'] = decorate_sections(project.content)
         return context
 
 

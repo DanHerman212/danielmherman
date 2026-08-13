@@ -8,8 +8,7 @@
 
     {% if is_drilldown %}
     <!-- Drill-down landing: the section cards ARE the page; each section is
-         its own URL. The Architecture section is kept as a hero below the
-         cards so the landing has immediate substance. -->
+         its own URL. -->
     <div class="row">
         <!-- Main Content Column -->
         <div class="col-md-8">
@@ -30,13 +29,6 @@
                     {% endfor %}
                 </div>
             </nav>
-            {% endif %}
-
-            {% if hero_section %}
-            <h2 class="mt-4">{{ hero_section.title }}</h2>
-            <div class="article-content project-content">
-                {{ hero_section.body|safe }}
-            </div>
             {% endif %}
         </div>
 
