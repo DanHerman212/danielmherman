@@ -1,11 +1,13 @@
 # content/views.py
 from typing import Any
+from django.http import Http404
 from django.shortcuts import render, get_object_or_404, redirect
 from django.views.generic import ListView, DetailView, TemplateView
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.utils.decorators import method_decorator
 from .models import Category, Article, Project, ContactMessage
+from .sectioning import decorate_sections
 
 class HomeView(TemplateView):
     """Homepage View"""
@@ -128,10 +130,49 @@ class ProjectListView(ListView):
         return Project.objects.filter(is_active=True)
     
 class ProjectDetailView(DetailView):
-    """Project detail page"""
+    """Project detail page.
+
+    Drill-down projects (Project.drilldown) render the section card grid plus
+    the first section as a hero, and each section lives on its own URL.
+    Others keep the classic single-page linear layout.
+    """
     model = Project
     template_name = 'content/project_detail.html'
     context_object_name = 'project'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        project = self.object
+        context['is_drilldown'] = project.drilldown
+        if project.drilldown:
+            sections = decorate_sections(project.content)
+            context['sections'] = sections
+            # The Architecture section stays visible on the landing as a hero
+            # so the page has immediate substance; it is also its own card.
+            context['hero_section'] = next(
+                (s for s in sections if s['slug'] == 'architecture'), None)
+        return context
+
+
+class ProjectSectionView(DetailView):
+    """A single section of a drill-down project."""
+    model = Project
+    template_name = 'content/project_section.html'
+    context_object_name = 'project'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        project = self.object
+        if not project.drilldown:
+            raise Http404('This project does not use section pages.')
+        sections = decorate_sections(project.content)
+        section = next(
+            (s for s in sections if s['slug'] == self.kwargs['section']), None)
+        if section is None:
+            raise Http404('No such section.')
+        context['section'] = section
+        context['sections'] = sections  # sibling nav
+        return context
 
 
 @method_decorator(staff_member_required, name='dispatch')

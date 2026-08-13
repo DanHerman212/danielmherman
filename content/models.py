@@ -62,6 +62,10 @@ class Project(models.Model):
     technologies = models.CharField(max_length=200, help_text="e.g. Python, TensorFlow, GCO ")
     order = models.IntegerField(default=0) 
     is_active = models.BooleanField(default=True)
+    drilldown = models.BooleanField(
+        default=False,
+        help_text="Split content into section cards + per-section pages",
+    )
 
     class Meta:
         ordering = ['order']

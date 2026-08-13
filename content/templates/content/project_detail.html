@@ -6,6 +6,48 @@
     <!-- Title -->
     <h1 class="mb-4">{{ project.title }}</h1>
 
+    {% if is_drilldown %}
+    <!-- Drill-down landing: the section cards ARE the page; each section is
+         its own URL. The Architecture section is kept as a hero below the
+         cards so the landing has immediate substance. -->
+    <div class="row">
+        <!-- Main Content Column -->
+        <div class="col-md-8">
+            <p class="lead mb-4">{{ project.description }}</p>
+
+            {% if sections %}
+            <nav class="toc toc-cards" aria-label="Sections">
+                <h4 class="toc-title">Contents</h4>
+                <div class="toc-card-grid">
+                    {% for s in sections %}
+                    <a class="toc-card" href="{% url 'project_section' project.slug s.slug %}">
+                        <span class="toc-card-icon"><i class="fas {{ s.icon }}"></i></span>
+                        <span class="toc-card-body">
+                            <span class="toc-card-title">{{ s.title }}</span>
+                            {% if s.blurb %}<span class="toc-card-desc">{{ s.blurb }}</span>{% endif %}
+                        </span>
+                    </a>
+                    {% endfor %}
+                </div>
+            </nav>
+            {% endif %}
+
+            {% if hero_section %}
+            <h2 class="mt-4">{{ hero_section.title }}</h2>
+            <div class="article-content project-content">
+                {{ hero_section.body|safe }}
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Sidebar -->
+        <div class="col-md-4">
+            {% include 'content/_project_sidebar.html' %}
+        </div>
+    </div>
+
+    {% else %}
+    <!-- Classic linear layout -->
     <div class="row">
         <!-- Main Content Column -->
         <div class="col-md-8">
@@ -22,31 +64,10 @@
 
         <!-- Sidebar -->
         <div class="col-md-4">
-            <!-- Technologies Card -->
-            <div class="card mb-3">
-                <div class="card-header">
-                    <strong>Technologies</strong>
-                </div>
-                <ul class="list-group list-group-flush">
-                    <li class="list-group-item">{{ project.technologies }}</li>
-                </ul>
-            </div>
-            
-            <!-- Action Buttons -->
-            <div class="d-grid gap-2">
-                {% if project.demo_link %}
-                <a href="{{ project.demo_link }}" class="btn btn-primary" target="_blank">
-                    <i class="fas fa-external-link-alt"></i> Live Demo
-                </a>
-                {% endif %}
-                {% if project.github_link %}
-                <a href="{{ project.github_link }}" class="btn btn-dark" target="_blank">
-                    <i class="fab fa-github"></i> View Code
-                </a>
-                {% endif %}
-            </div>
+            {% include 'content/_project_sidebar.html' %}
         </div>
     </div>
+    {% endif %}
 
     <hr class="my-4">
     <a href="{% url 'projects' %}" class="btn btn-secondary">

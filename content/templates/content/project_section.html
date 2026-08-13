@@ -1,0 +1,61 @@
+<!--content/templates/content/project_section.html
+    One section of a drill-down project: breadcrumb + back link + section body,
+    with the project sidebar (Technologies / CTAs) persisting on the right and
+    the other sections offered as cards below. -->
+{% extends 'content/base.html' %}
+
+{% block content %}
+<div class="container">
+    <!-- Breadcrumb -->
+    <nav class="project-breadcrumb" aria-label="Breadcrumb">
+        <a href="{% url 'projects' %}">Projects</a>
+        <span class="sep">›</span>
+        <a href="{% url 'project_detail' project.slug %}">{{ project.title }}</a>
+        <span class="sep">›</span>
+        <span class="current">{{ section.title }}</span>
+    </nav>
+
+    <div class="row">
+        <!-- Main Content Column -->
+        <div class="col-md-8">
+            <a href="{% url 'project_detail' project.slug %}" class="back-link">
+                <i class="fas fa-arrow-left"></i> Back to {{ project.title }}
+            </a>
+
+            <h1 class="mb-3">{{ section.title }}</h1>
+
+            <div class="article-content project-content">
+                {{ section.body|safe }}
+            </div>
+
+            <!-- Other sections in this project -->
+            {% if sections|length > 1 %}
+            <h4 class="toc-title mt-5">More in this project</h4>
+            <div class="toc-card-grid">
+                {% for s in sections %}
+                {% if s.slug != section.slug %}
+                <a class="toc-card" href="{% url 'project_section' project.slug s.slug %}">
+                    <span class="toc-card-icon"><i class="fas {{ s.icon }}"></i></span>
+                    <span class="toc-card-body">
+                        <span class="toc-card-title">{{ s.title }}</span>
+                        {% if s.blurb %}<span class="toc-card-desc">{{ s.blurb }}</span>{% endif %}
+                    </span>
+                </a>
+                {% endif %}
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Sidebar -->
+        <div class="col-md-4">
+            {% include 'content/_project_sidebar.html' %}
+        </div>
+    </div>
+
+    <hr class="my-4">
+    <a href="{% url 'projects' %}" class="btn btn-secondary">
+        ← Back to Projects
+    </a>
+</div>
+{% endblock %}

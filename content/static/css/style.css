@@ -346,6 +346,102 @@ footer {
     color: var(--primary-color);
 }
 
+/* Project card-style table of contents */
+.toc-card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+    gap: 12px;
+    margin: 0;
+}
+
+.toc-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px 16px;
+    border: 1px solid #e9ecef;
+    border-radius: 10px;
+    background: #fff;
+    color: #333;
+    text-decoration: none;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.toc-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--primary-color);
+    box-shadow: 0 4px 14px rgba(0, 123, 255, 0.12);
+    text-decoration: none;
+}
+
+.toc-card-icon {
+    flex: none;
+    width: 36px;
+    height: 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    background: rgba(0, 123, 255, 0.1);
+    color: var(--primary-color);
+    font-size: 0.95rem;
+}
+
+.toc-card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+}
+
+.toc-card-title {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #222;
+    line-height: 1.25;
+}
+
+.toc-card:hover .toc-card-title {
+    color: var(--primary-color);
+}
+
+.toc-card-desc {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.82rem;
+    color: #666;
+    line-height: 1.45;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* Drill-down project pages: breadcrumb + back link */
+.project-breadcrumb {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.85rem;
+    color: #888;
+    padding: 0.6rem 0 1rem;
+}
+.project-breadcrumb a {
+    color: var(--primary-color);
+    text-decoration: none;
+}
+.project-breadcrumb a:hover { text-decoration: underline; }
+.project-breadcrumb .sep { margin: 0 6px; color: #bbb; }
+.project-breadcrumb .current { color: #555; }
+
+.back-link {
+    display: inline-block;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.85rem;
+    color: var(--primary-color);
+    text-decoration: none;
+    margin-bottom: 0.5rem;
+}
+.back-link:hover { text-decoration: underline; }
+
 /* Smooth scroll for anchor links */
 html {
     scroll-behavior: smooth;

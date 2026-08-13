@@ -1,0 +1,24 @@
+<!-- Shared project sidebar: Technologies + CTAs. Used by the landing and each
+     section page so the "about this project / call-to-action" rail persists
+     everywhere in a drill-down project. -->
+<div class="card mb-3">
+    <div class="card-header">
+        <strong>Technologies</strong>
+    </div>
+    <ul class="list-group list-group-flush">
+        <li class="list-group-item">{{ project.technologies }}</li>
+    </ul>
+</div>
+
+<div class="d-grid gap-2">
+    {% if project.demo_link %}
+    <a href="{{ project.demo_link }}" class="btn btn-primary" target="_blank">
+        <i class="fas fa-external-link-alt"></i> Live Demo
+    </a>
+    {% endif %}
+    {% if project.github_link %}
+    <a href="{{ project.github_link }}" class="btn btn-dark" target="_blank">
+        <i class="fab fa-github"></i> View Code
+    </a>
+    {% endif %}
+</div>
