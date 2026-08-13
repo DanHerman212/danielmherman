@@ -424,6 +424,33 @@ class A2uiAskLiveTests(TestCase):
         self.assertEqual(response.status_code, 502)
         self.assertEqual(DemoQuota.remaining(self.user), 5)
 
+    @patch('demo.views.ask_agent')
+    def test_failed_predict_tool_returns_honest_canvas_not_500(self, mocked):
+        """A predict tool that errored (e.g. the endpoint is down) must not
+        500 the canvas composer — it renders an honest 'no usable estimate'
+        note plus the cited source, so the front-end gets JSON, not an HTML
+        error page."""
+        reply = dict(A2UI_AGENT_REPLY)
+        reply['tool_calls'] = [
+            {'name': 'predict_readmission',
+             'args': {'hadm_id': 20924467},
+             'response': {'error': 'upstream 503', 'status': 'failed'}},
+            dict(A2UI_AGENT_REPLY['tool_calls'][1]),
+        ]
+        mocked.return_value = reply
+        response = self._post({'hadm_id': 20924467, 'chip': 'risk'})
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        comps = body['a2ui']['messages'][1]['updateComponents']['components']
+        types = {c['component'] for c in comps}
+        self.assertNotIn('RiskBar', types)
+        self.assertNotIn('FactorBars', types)
+        note = next(c for c in comps if c['component'] == 'Text'
+                    and c.get('variant') == 'h2')
+        self.assertIn('did not return a usable estimate', note['text'])
+        # the cited source (if any) still renders
+        self.assertIn('SourceCard', types)
+
     @patch('demo.views.ask_agent', return_value=dict(A2UI_AGENT_REPLY))
     def test_bad_input_is_rejected_before_the_quota_is_touched(self, mocked):
         DemoQuota.objects.create(user=self.user, daily_limit=5)
