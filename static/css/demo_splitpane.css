@@ -193,7 +193,7 @@ body:has(#demo-root), body:has(#a2ui-root) { overflow-x: auto; }
 /* ---------- panes (Screen 2) ---------- */
 .demo-main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); min-width: 0; }
 .pane { display: flex; flex-direction: column; min-width: 0; background: var(--surface); }
-.pane-thread { border-right: 1px solid var(--line); }
+.pane-thread { position: relative; border-right: 1px solid var(--line); }
 .pane-head {
   display: flex; justify-content: space-between; align-items: center; gap: 8px;
   padding: 10px 14px; font-size: 0.8rem; font-weight: 600;
@@ -255,7 +255,7 @@ body:has(#demo-root), body:has(#a2ui-root) { overflow-x: auto; }
 .cite:hover { background: #dbe6ff; }
 
 /* ---------- canvas (Screen 2/3) ---------- */
-.canvas { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+.canvas { position: relative; flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 12px; }
 .canvas-empty {
   margin: auto; text-align: center; color: var(--muted); max-width: 320px; font-size: 0.9rem;
 }
@@ -349,4 +349,93 @@ body:has(#demo-root), body:has(#a2ui-root) { overflow-x: auto; }
   --a2ui-card-margin: 0;
   --a2ui-column-gap: 12px;               /* matches .canvas gap */
   --a2ui-text-caption-color: #6b7280;
+}
+
+/* ------------------------------------------------------------------ */
+/* Composer (pinned bottom): contextual chips + ask bar.               */
+/* ------------------------------------------------------------------ */
+.composer {
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+  padding: 10px 14px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.composer-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.composer-chips[hidden] { display: none; }
+
+/* ------------------------------------------------------------------ */
+/* Chapter-ized thread (Copilot-chat style).                           */
+/* ------------------------------------------------------------------ */
+.chapter { display: flex; flex-direction: column; gap: 6px; }
+.chapter-head {
+  font-size: 0.7rem; font-weight: 600; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 4px; margin-bottom: 2px;
+}
+.chapter-earlier { margin-bottom: 4px; }
+.chapter-earlier-toggle {
+  font: inherit; font-size: 0.75rem; color: var(--accent);
+  background: var(--surface-2); border: 1px solid var(--line);
+  border-radius: 999px; padding: 4px 12px; cursor: pointer;
+}
+.chapter-earlier-toggle:hover { background: #eef2ff; }
+.chapter-earlier-body { margin-top: 10px; display: flex; flex-direction: column; gap: 14px; }
+.chapter-earlier-body[hidden] { display: none; }
+
+/* ------------------------------------------------------------------ */
+/* "Agent is working" animations.                                      */
+/* ------------------------------------------------------------------ */
+.typing-dots { display: inline-flex; gap: 4px; align-items: center; padding: 4px 0; }
+.typing-dots span {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--accent); animation: typing-blink 1.2s infinite ease-in-out;
+}
+.typing-dots span:nth-child(2) { animation-delay: 0.18s; }
+.typing-dots span:nth-child(3) { animation-delay: 0.36s; }
+@keyframes typing-blink {
+  0%, 60%, 100% { opacity: 0.25; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(-3px); }
+}
+
+/* Moving gradient border on the thread pane while a request is in flight. */
+@property --thread-angle { syntax: "<angle>"; initial-value: 0deg; inherits: false; }
+.pane-thread.is-working::after {
+  content: "";
+  position: absolute; inset: 0; padding: 2px;
+  background: conic-gradient(
+    from var(--thread-angle, 0deg),
+    transparent 0deg 300deg,
+    var(--accent) 345deg,
+    transparent 360deg);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+          mask-composite: exclude;
+  pointer-events: none; z-index: 2;
+  animation: thread-border-spin 2.4s linear infinite;
+}
+@keyframes thread-border-spin { to { --thread-angle: 360deg; } }
+
+/* Canvas shimmer while the agent composes the surface. */
+.canvas.is-working::after {
+  content: "";
+  position: absolute; inset: 0; z-index: 3; pointer-events: none;
+  background: linear-gradient(
+    110deg, transparent 30%, rgba(255,255,255,0.55) 50%, transparent 70%);
+  background-size: 220% 100%;
+  animation: canvas-shimmer 1.5s linear infinite;
+}
+@keyframes canvas-shimmer { to { background-position: -220% 0; } }
+
+/* Reduced motion: static "working" affordance instead of animation. */
+@media (prefers-reduced-motion: reduce) {
+  .pane-thread.is-working::after,
+  .canvas.is-working::after,
+  .typing-dots span {
+    animation: none !important;
+  }
+  .pane-thread.is-working { outline: 2px solid var(--accent); outline-offset: -2px; }
 }

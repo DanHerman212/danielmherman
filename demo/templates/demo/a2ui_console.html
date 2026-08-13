@@ -15,7 +15,7 @@ emitted (the trace element).
 {% block title %}Enterprise Clinical Copilot · A2UI{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'css/demo_splitpane.css' %}?v=3">
+<link rel="stylesheet" href="{% static 'css/demo_splitpane.css' %}?v=4">
 {% endblock %}
 
 {% block content %}
@@ -128,16 +128,20 @@ emitted (the trace element).
               <span id="thread-patient-meta" class="pane-head-meta"></span>
             </div>
 
-            {# Ask bar, kept close to the starter chips. #}
-            <div class="thread-input">
-              <input id="question-input" type="text" placeholder="Ask a question…"
-                     aria-label="Ask a question" disabled>
-              <button id="ask-btn" type="button" class="demo-btn demo-btn-primary" disabled>
-                <i class="fa-solid fa-paper-plane"></i> Ask
-              </button>
-            </div>
-
             <div class="thread" id="thread" aria-live="polite"></div>
+
+            <!-- Composer: contextual chips + ask bar, pinned to the bottom so
+                 the compose area never walks down the page as the thread grows. -->
+            <div class="composer">
+              <div class="composer-chips" id="composer-chips" hidden></div>
+              <div class="thread-input">
+                <input id="question-input" type="text" placeholder="Ask a question…"
+                       aria-label="Ask a question" disabled>
+                <button id="ask-btn" type="button" class="demo-btn demo-btn-primary" disabled>
+                  <i class="fa-solid fa-paper-plane"></i> Ask
+                </button>
+              </div>
+            </div>
           </section>
 
           <section class="pane pane-canvas" aria-label="Context canvas">

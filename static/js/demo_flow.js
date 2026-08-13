@@ -137,6 +137,7 @@ export function createDemoFlow({ root, askUrl, renderCanvas, onCite }) {
     thread: document.getElementById('thread'),
     input: document.getElementById('question-input'),
     askBtn: document.getElementById('ask-btn'),
+    composerChips: document.getElementById('composer-chips'),
     canvas: document.getElementById('canvas') || document.getElementById('a2ui-host'),
     canvasMode: document.getElementById('canvas-mode'),
     backBtn: document.getElementById('back-btn'),
@@ -232,6 +233,7 @@ export function createDemoFlow({ root, askUrl, renderCanvas, onCite }) {
     els.input.disabled = true;
     els.askBtn.disabled = true;
     els.thread.replaceChildren();
+    if (els.composerChips) els.composerChips.hidden = true;
     paint(null);
     // Reset the left rail to its starting position too: clear the search and
     // return to page 1 so the user browses all patients from the top again.
@@ -294,53 +296,91 @@ export function createDemoFlow({ root, askUrl, renderCanvas, onCite }) {
 
   /* ---------- thread (Screen 2, left) ---------- */
 
+  /** Toggle the "agent is working" affordances (moving border + canvas
+      shimmer). Cleared when the response lands, success or error. */
+  function setWorking(working) {
+    const pane = els.thread.closest('.pane-thread');
+    if (pane) pane.classList.toggle('is-working', working);
+    if (els.canvas) els.canvas.classList.toggle('is-working', working);
+  }
+
+  /** Render the thread as chapters: turns grouped into [user, agent] pairs,
+      older chapters collapsed under an "Earlier messages" toggle (Copilot-chat
+      style), the latest chapter expanded. Chips live in the pinned composer,
+      not re-emitted after every turn. */
   function renderThread(episode) {
     els.thread.replaceChildren();
-    if (episode.turns.length === 0) {
-      els.thread.appendChild(starterBlock());
-    } else {
-      for (let i = 0; i < episode.turns.length; i++) {
-        els.thread.appendChild(turnBlock(episode.turns[i], i, episode));
-      }
-      // Follow-up chips after the first turn so the user can keep asking
-      // (episodic memory: the thread persists for this patient).
-      els.thread.appendChild(followUpBlock(episode));
+    renderComposerChips(episode);
+
+    if (episode.turns.length === 0) return;
+
+    const chapters = [];
+    for (let i = 0; i < episode.turns.length; i += 2) {
+      chapters.push(episode.turns.slice(i, i + 2));
     }
+    const older = chapters.slice(0, -1);
+    const latest = chapters[chapters.length - 1];
+
+    if (older.length > 0) {
+      const earlier = document.createElement('div');
+      earlier.className = 'chapter-earlier';
+      const toggle = document.createElement('button');
+      toggle.type = 'button';
+      toggle.className = 'chapter-earlier-toggle';
+      const label = () => `Earlier messages (${older.length})`;
+      toggle.textContent = label();
+      const body = document.createElement('div');
+      body.className = 'chapter-earlier-body';
+      body.hidden = true;
+      let turnIndex = 0;
+      for (const ch of older) {
+        body.appendChild(chapterBlock(ch, turnIndex, episode));
+        turnIndex += ch.length;
+      }
+      toggle.addEventListener('click', () => {
+        body.hidden = !body.hidden;
+        toggle.textContent = body.hidden ? label() : 'Show fewer';
+        if (!body.hidden) els.thread.scrollTop = 0;
+      });
+      earlier.appendChild(toggle);
+      earlier.appendChild(body);
+      els.thread.appendChild(earlier);
+    }
+
+    let turnIndex = 0;
+    for (const ch of older) turnIndex += ch.length;
+    els.thread.appendChild(chapterBlock(latest, turnIndex, episode));
     els.thread.scrollTop = els.thread.scrollHeight;
   }
 
-  /** A compact chip row offered after the conversation starts. */
-  function followUpBlock(episode) {
+  /** A chapter = one question + its answer, headed by the question text. */
+  function chapterBlock(pair, startIndex, episode) {
     const wrap = document.createElement('div');
-    wrap.className = 'starter starter-followup';
-    const title = document.createElement('div');
-    title.className = 'starter-title';
-    title.textContent = 'Ask another question';
-    wrap.appendChild(title);
-    const chips = document.createElement('div');
-    chips.className = 'chips';
-    for (const chip of CHIPS) {
-      if (chip.dynamic && episode.assessments.length === 0) continue;
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'chip';
-      btn.textContent = chip.label;
-      btn.dataset.chip = chip.key;
-      chips.appendChild(btn);
-    }
-    wrap.appendChild(chips);
+    wrap.className = 'chapter';
+    const head = document.createElement('div');
+    head.className = 'chapter-head';
+    head.textContent = chapterTitle(pair[0] ? pair[0].text : '');
+    wrap.appendChild(head);
+    pair.forEach((turn, offset) => {
+      wrap.appendChild(turnBlock(turn, startIndex + offset, episode));
+    });
     return wrap;
   }
 
-  function starterBlock() {
-    const wrap = document.createElement('div');
-    wrap.className = 'starter';
+  function chapterTitle(text) {
+    const t = String(text || '').trim();
+    return t.length > 46 ? `${t.slice(0, 46)}…` : t;
+  }
 
-    const title = document.createElement('div');
-    title.className = 'starter-title';
-    title.textContent = `Ask about ${state.current.name}`;
-    wrap.appendChild(title);
-
+  /** Contextual starter chips in the pinned composer (hidden until a patient
+      is selected). */
+  function renderComposerChips(episode) {
+    if (!els.composerChips) return;
+    els.composerChips.replaceChildren();
+    if (!state.current) {
+      els.composerChips.hidden = true;
+      return;
+    }
     const chips = document.createElement('div');
     chips.className = 'chips';
     for (const chip of CHIPS) {
@@ -351,8 +391,8 @@ export function createDemoFlow({ root, askUrl, renderCanvas, onCite }) {
       btn.dataset.chip = chip.key;
       chips.appendChild(btn);
     }
-    wrap.appendChild(chips);
-    return wrap;
+    els.composerChips.appendChild(chips);
+    els.composerChips.hidden = false;
   }
 
   function turnBlock(turn, index, episode) {
@@ -379,7 +419,15 @@ export function createDemoFlow({ root, askUrl, renderCanvas, onCite }) {
 
     const text = document.createElement('div');
     text.className = 'turn-text';
-    text.appendChild(citedMarkdown(turn.text, index, episode));
+    if (turn.pending) {
+      const dots = document.createElement('span');
+      dots.className = 'typing-dots';
+      dots.setAttribute('aria-label', 'Working…');
+      dots.innerHTML = '<span></span><span></span><span></span>';
+      text.appendChild(dots);
+    } else {
+      text.appendChild(citedMarkdown(turn.text, index, episode));
+    }
     block.appendChild(text);
 
     if (turn.meta) {
@@ -519,10 +567,11 @@ export function createDemoFlow({ root, askUrl, renderCanvas, onCite }) {
     episode.turns.push({ role: 'user', text: userText });
     renderThread(episode);
 
-    // pending indicator
-    const pending = { role: 'agent', text: '…', meta: 'working' };
+    // pending indicator + working animation
+    const pending = { role: 'agent', text: '…', meta: 'working', pending: true };
     episode.turns.push(pending);
     renderThread(episode);
+    setWorking(true);
 
     let data;
     try {
@@ -550,6 +599,8 @@ export function createDemoFlow({ root, askUrl, renderCanvas, onCite }) {
       };
       renderThread(episode);
       return;
+    } finally {
+      setWorking(false);
     }
 
     const turn = agentTurnFromResponse(userText, data);
@@ -579,10 +630,12 @@ export function createDemoFlow({ root, askUrl, renderCanvas, onCite }) {
     post({ hadm_id: state.current.hadmId, chip }, chipDef ? chipDef.label : chip);
   }
 
-  els.thread.addEventListener('click', (event) => {
-    const chip = event.target.closest('[data-chip]');
-    if (chip) askChip(chip.dataset.chip);
-  });
+  if (els.composerChips) {
+    els.composerChips.addEventListener('click', (event) => {
+      const chip = event.target.closest('[data-chip]');
+      if (chip) askChip(chip.dataset.chip);
+    });
+  }
 
   function askFreeText() {
     const text = els.input.value.trim();
