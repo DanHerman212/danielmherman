@@ -85,6 +85,7 @@ body:has(#demo-root), body:has(#a2ui-root) { overflow-x: auto; }
 .demo-shell {
   display: grid;
   grid-template-columns: var(--nav-w) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   height: calc(100vh - var(--header-h));
   min-height: 480px;
 }
@@ -131,6 +132,7 @@ body:has(#demo-root), body:has(#a2ui-root) { overflow-x: auto; }
 .demo-layout {
   display: grid;
   grid-template-columns: 300px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   gap: 0;
   height: 100%;
 }
@@ -191,7 +193,7 @@ body:has(#demo-root), body:has(#a2ui-root) { overflow-x: auto; }
 .demo-rail-legend span { display: inline-flex; align-items: center; gap: 5px; }
 
 /* ---------- panes (Screen 2) ---------- */
-.demo-main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); min-width: 0; }
+.demo-main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); min-width: 0; }
 .pane { display: flex; flex-direction: column; min-width: 0; background: var(--surface); }
 .pane-thread { position: relative; border-right: 1px solid var(--line); }
 .pane-head {

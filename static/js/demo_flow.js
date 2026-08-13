@@ -454,22 +454,32 @@ export function createDemoFlow({ root, askUrl, renderCanvas, onCite }) {
     const closeList = () => {
       if (list) { out.push(`</${list}>`); list = null; }
     };
+    const openList = (tag, start) => {
+      out.push(start && start !== 1 ? `<${tag} start="${start}">` : `<${tag}>`);
+      list = tag;
+    };
     const inline = (t) => t
       .replace(/`([^`]+)`/g, '<code>$1</code>')
       .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
       .replace(/\*([^*]+)\*/g, '<em>$1</em>');
     for (const raw of escapedText.split(/\n/)) {
-      const line = raw.trimEnd();
+      const line = raw.trim();
+      if (!line) continue;                 // blank lines keep a list OPEN so
+                                           // 1. 2. 3. render as one <ol>, not
+                                           // three lists all restarting at 1
       const bullet = line.match(/^[*\-]\s+(.*)$/);
-      const ordered = line.match(/^\d+\.\s+(.*)$/);
+      const ordered = line.match(/^(\d+)[.)]\s+(.*)$/);
       const item = bullet || ordered;
       const tag = bullet ? 'ul' : 'ol';
       if (item) {
-        if (list !== tag) { closeList(); out.push(`<${tag}>`); list = tag; }
-        out.push(`<li>${inline(item[1])}</li>`);
+        if (list !== tag) {
+          closeList();
+          openList(tag, ordered ? parseInt(ordered[1], 10) : 1);
+        }
+        out.push(`<li>${inline(bullet ? bullet[1] : ordered[2])}</li>`);
       } else {
         closeList();
-        if (line.trim()) out.push(`<p>${inline(line)}</p>`);
+        out.push(`<p>${inline(line)}</p>`);
       }
     }
     closeList();
