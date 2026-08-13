@@ -94,12 +94,33 @@ export function extractSection(noteText, section) {
   return noteText.slice(start, end).trim();
 }
 
+/** Parse citation markers in agent prose: ^[1], ^[1, 2], or ^[1-3].
+    Returns [{ full, numbers }] where full is the exact matched marker text
+    and numbers the expanded citation ids. */
+function citationMarkers(text) {
+  const out = [];
+  const re = /\^\[(\d+(?:\s*,\s*\d+)*|\d+\s*-\s*\d+)\]/g;
+  let m;
+  while ((m = re.exec(String(text || '')))) {
+    const inner = m[1];
+    const numbers = [];
+    if (inner.includes('-')) {
+      const [a, b] = inner.split('-').map((s) => Number(s.trim()));
+      for (let i = a; i <= b; i++) numbers.push(i);
+    } else {
+      for (const part of inner.split(',')) numbers.push(Number(part.trim()));
+    }
+    out.push({ full: m[0], numbers });
+  }
+  return out;
+}
+
 /** The set of citation numbers used in agent prose (from ^[n] markers). */
 export function citedNumbers(text) {
   const set = new Set();
-  const re = /\^\[(\d+)\]/g;
-  let m;
-  while ((m = re.exec(text))) set.add(Number(m[1]));
+  for (const mk of citationMarkers(text)) {
+    for (const n of mk.numbers) set.add(n);
+  }
   return set;
 }
 
@@ -400,31 +421,35 @@ export function createDemoFlow({ root, askUrl, renderCanvas, onCite }) {
     return out.join('');
   }
 
-  /** Turn ^[n] text markers in the rendered prose into clickable superscripts. */
+  /** Turn citation markers in the rendered prose (^[1], ^[1, 2], ^[1-3])
+      into clickable superscripts — one per cited passage. */
   function wireCitations(root, turnIndex, episode) {
+    const re = /(\^\[(?:\d+(?:\s*,\s*\d+)*|\d+\s*-\s*\d+)\])/g;
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
     const nodes = [];
     while (walker.nextNode()) {
       const n = walker.currentNode;
-      if (n.nodeValue && /\^\[\d+\]/.test(n.nodeValue)) nodes.push(n);
+      if (n.nodeValue && citationMarkers(n.nodeValue).length > 0) nodes.push(n);
     }
     for (const node of nodes) {
       const frag = document.createDocumentFragment();
-      for (const part of node.nodeValue.split(/(\^\[\d+\])/g)) {
-        const m = part.match(/^\^\[(\d+)\]$/);
-        if (m) {
-          const sup = document.createElement('sup');
-          sup.className = 'cite';
-          sup.textContent = m[1];
-          sup.title = 'Show the cited note passage';
-          sup.addEventListener('click', () => {
-            if (typeof onCite === 'function') {
-              onCite(episode, turnIndex, Number(m[1]), api);
-            } else {
-              paint(episodeFor(state.current.hadmId));
-            }
-          });
-          frag.appendChild(sup);
+      for (const part of node.nodeValue.split(re)) {
+        const mk = citationMarkers(part)[0];
+        if (mk && mk.full === part) {
+          for (const n of mk.numbers) {
+            const sup = document.createElement('sup');
+            sup.className = 'cite';
+            sup.textContent = String(n);
+            sup.title = 'Show the cited note passage';
+            sup.addEventListener('click', () => {
+              if (typeof onCite === 'function') {
+                onCite(episode, turnIndex, n, api);
+              } else {
+                paint(episodeFor(state.current.hadmId));
+              }
+            });
+            frag.appendChild(sup);
+          }
         } else if (part) {
           frag.appendChild(document.createTextNode(part));
         }
