@@ -337,7 +337,7 @@ class A2uiCanvasTests(TestCase):
         self.assertContains(response, 'id="trace-toggle"')
         # Cache-busted stylesheet + module links so the shell CSS and the A2UI
         # component module are never stale in the browser.
-        self.assertContains(response, 'demo_splitpane.css?v=4')
+        self.assertContains(response, 'demo_splitpane.css?v=5')
         self.assertContains(response, 'demo_a2ui.js?v=6')
 
 

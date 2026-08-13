@@ -136,7 +136,17 @@ def compose_risk_canvas(predict: dict | None, rag: dict | None) -> dict:
             f"probability ({probability:.4f}), {band} at a {threshold:.2f} threshold."
         )
 
+    model = estimate.get('model_version', 'unknown') if estimate else '—'
+    feature_source = estimate.get('feature_source', 'unknown') if estimate else '—'
+    children.append("prov")
+    components.append({"id": "prov", "component": "Text",
+                       "text": f"Model {model} · features from {feature_source} · "
+                               "A2UI canvas",
+                       "variant": "caption"})
+
     # Cited source (the first passage's section text — matches the custom demo).
+    # Kept as the LAST child so it can pin to the bottom of the canvas (sticky)
+    # and the discharge notes stay in view however long the session gets.
     passages = (rag or {}).get("passages") or []
     query = (rag or {}).get("query") or "discharge note"
     children.append("source")
@@ -155,14 +165,6 @@ def compose_risk_canvas(predict: dict | None, rag: dict | None) -> dict:
                                    "question. An empty result is a real answer — "
                                    "the agent does not fabricate passages.",
                            "query": query})
-
-    model = estimate.get('model_version', 'unknown') if estimate else '—'
-    feature_source = estimate.get('feature_source', 'unknown') if estimate else '—'
-    children.append("prov")
-    components.append({"id": "prov", "component": "Text",
-                       "text": f"Model {model} · features from {feature_source} · "
-                               "A2UI canvas",
-                       "variant": "caption"})
 
     return {
         "surface_id": SURFACE_ID,

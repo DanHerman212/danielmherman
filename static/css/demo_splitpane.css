@@ -439,3 +439,17 @@ body:has(#demo-root), body:has(#a2ui-root) { overflow-x: auto; }
   }
   .pane-thread.is-working { outline: 2px solid var(--accent); outline-offset: -2px; }
 }
+
+/* ------------------------------------------------------------------ */
+/* Pin the cited discharge notes to the bottom of the canvas so they    */
+/* stay in view however long the conversation gets (custom + A2UI).     */
+/* ------------------------------------------------------------------ */
+.widget-source {
+  position: sticky; bottom: 0;
+  background: var(--surface);
+  box-shadow: 0 -1px 0 var(--line);
+}
+#a2ui-host a2ui-source-card {
+  position: sticky; bottom: 0; z-index: 2;
+  background: var(--surface);
+}
