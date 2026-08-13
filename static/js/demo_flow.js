@@ -473,7 +473,8 @@ export function createDemoFlow({ root, askUrl, renderCanvas, onCite }) {
 
   function agentTurnFromResponse(question, data) {
     const toolCalls = data.tool_calls || [];
-    const rag = toolCalls.find((tc) => tc.name === 'rag_search');
+    const rag = toolCalls.find(
+      (tc) => tc.name === 'rag_search' || tc.name === 'rag_search_sections');
     const predict = toolCalls.find((tc) => tc.name === 'predict_readmission');
 
     const used = toolCalls.map((tc) => tc.name).join(', ') || 'none';

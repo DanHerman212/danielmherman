@@ -164,6 +164,17 @@ def _tool_response(result, name):
         None)
 
 
+def _rag_response(result):
+    """The rag passages from either retrieval tool — the free-text
+    `rag_search` or the deterministic `rag_search_sections` used for
+    summaries — so the canvas source card is drawn for both paths."""
+    for name in ('rag_search', 'rag_search_sections'):
+        rag = _tool_response(result, name)
+        if rag is not None:
+            return rag
+    return None
+
+
 @login_required
 @require_POST
 def a2ui_ask(request):
@@ -218,6 +229,6 @@ def a2ui_ask(request):
 
     result['a2ui'] = compose_risk_canvas(
         _tool_response(result, 'predict_readmission'),
-        _tool_response(result, 'rag_search'))
+        _rag_response(result))
     result['remaining'] = DemoQuota.remaining(request.user)
     return JsonResponse(result)
