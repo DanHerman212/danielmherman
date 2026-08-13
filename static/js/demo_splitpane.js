@@ -11,7 +11,7 @@
 import {
   createDemoFlow,
   esc, pct, bandOf, bandColor, extractSection,
-} from './demo_flow.js?v=7';
+} from './demo_flow.js?v=8';
 
 /* ---------- canvas widget builders (Screen 2, right) ---------- */
 

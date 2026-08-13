@@ -422,7 +422,9 @@ export function createDemoFlow({ root, askUrl, renderCanvas, onCite }) {
   }
 
   /** Turn citation markers in the rendered prose (^[1], ^[1, 2], ^[1-3])
-      into clickable superscripts — one per cited passage. */
+      into clickable superscripts — one per cited passage. Repeated citations
+      to the SAME passage collapse to the first occurrence (the agent sometimes
+      tags every sentence with the same ^[n]; that reads as noise). */
   function wireCitations(root, turnIndex, episode) {
     const re = /(\^\[(?:\d+(?:\s*,\s*\d+)*|\d+\s*-\s*\d+)\])/g;
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
@@ -431,12 +433,15 @@ export function createDemoFlow({ root, askUrl, renderCanvas, onCite }) {
       const n = walker.currentNode;
       if (n.nodeValue && citationMarkers(n.nodeValue).length > 0) nodes.push(n);
     }
+    const seen = new Set();  // each passage is footnoted once, at first use
     for (const node of nodes) {
       const frag = document.createDocumentFragment();
       for (const part of node.nodeValue.split(re)) {
         const mk = citationMarkers(part)[0];
         if (mk && mk.full === part) {
           for (const n of mk.numbers) {
+            if (seen.has(n)) continue;
+            seen.add(n);
             const sup = document.createElement('sup');
             sup.className = 'cite';
             sup.textContent = String(n);
