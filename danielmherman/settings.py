@@ -96,7 +96,11 @@ INSTALLED_APPS = [
 ]
 
 # CKEditor 5 Configuration
-CKEDITOR_5_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
+# Uploads use Django's default storage (STORAGES["default"]) — GCS in
+# production, local /media/ in development. Do NOT pin CKEDITOR_5_FILE_STORAGE
+# to FileSystemStorage here: in production that writes images to the ephemeral
+# container disk while MEDIA_URL points at the GCS bucket, so uploaded images
+# 404.
 CKEDITOR_5_UPLOAD_FILE_TYPES = ['jpeg', 'jpg', 'png', 'gif', 'webp']
 
 CKEDITOR_5_CONFIGS = {
