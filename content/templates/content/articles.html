@@ -1,12 +1,14 @@
-<!-- content/templates/content/category.html-->
+<!-- content/templates/content/articles.html
+     Consolidated Articles hub: every published article, newest first, with
+     filter chips that narrow to the per-category pages. -->
 {% extends 'content/base.html' %}
 
-{% block title %}{{ category.title }} - My Website{% endblock %}
+{% block title %}Articles{% endblock %}
 
 {% block content %}
 <div class="container">
-    <h1 class="mb-4">{{ category.title }}</h1>
-    <p class="lead">{{ category.description }}</p>
+    <h1 class="mb-2">Articles</h1>
+    <p class="lead mb-4">All writing, newest first.</p>
 
     {% include 'content/_article_filters.html' %}
 
@@ -15,7 +17,7 @@
         <div class="col-md-4 mb-4">
             <div class="card">
                 {% if article.featured_image %}
-                <img src="{{ article.featured_image.url }}" class="card-img-top" alt="{{ article.title}}">
+                <img src="{{ article.featured_image.url }}" class="card-img-top" alt="{{ article.title }}">
                 {% endif %}
                 <div class="card-body">
                     <h5 class="card-title">{{ article.title }}</h5>
@@ -28,12 +30,12 @@
             </div>
         </div>
         {% empty %}
-        <p>No articles in this category yet.</p>
+        <p>No articles yet.</p>
         {% endfor %}
     </div>
 
     <!-- pagination -->
-     {% if is_paginated %}
+    {% if is_paginated %}
     <nav>
         <ul class="pagination justify-content-center">
             {% if page_obj.has_previous %}
@@ -41,7 +43,7 @@
                 <a class="page-link" href="?page=1">First</a>
             </li>
             <li class="page-item">
-                <a class="page-link" href="?page={{ page_obj.previous_page_number}}">Previous</a>
+                <a class="page-link" href="?page={{ page_obj.previous_page_number }}">Previous</a>
             </li>
             {% endif %}
 

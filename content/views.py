@@ -9,6 +9,15 @@ from django.utils.decorators import method_decorator
 from .models import Category, Article, Project, ContactMessage
 from .sectioning import decorate_sections
 
+# The blog taxonomy shown as filter chips on the Articles hub. These are the
+# article categories; resume/projects/contact are separate site sections.
+ARTICLE_CATEGORY_NAMES = ["tech", "music", "enlightenment"]
+
+
+def _article_categories():
+    return Category.objects.filter(
+        name__in=ARTICLE_CATEGORY_NAMES, is_active=True).order_by("order")
+
 class HomeView(TemplateView):
     """Homepage View"""
     template_name = 'content/home.html'
@@ -39,8 +48,33 @@ class CategoryView(ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['category'] = self.category
+        context['article_categories'] = _article_categories()
+        context['active'] = self.category.name
         return context
-    
+
+
+class ArticleListView(ListView):
+    """All published articles — the consolidated Articles nav item.
+
+    Filter chips on the page narrow to the existing per-category URLs, so the
+    category pages stay the deep-link destination.
+    """
+    model = Article
+    template_name = 'content/articles.html'
+    context_object_name = 'articles'
+    paginate_by = 10
+
+    def get_queryset(self):
+        return Article.objects.filter(
+            is_published=True).order_by('-published_date')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['article_categories'] = _article_categories()
+        context['active'] = None
+        return context
+
+
 class ArticleDetailView(DetailView):
     """Individual article view"""
     model = Article

@@ -1,0 +1,8 @@
+<!-- Filter chips for the Articles hub / category pages. `active` is the
+     current category name, or empty for "All". -->
+<div class="mb-4">
+    <a href="{% url 'articles' %}" class="btn btn-sm {% if not active %}btn-primary{% else %}btn-outline-primary{% endif %}">All</a>
+    {% for cat in article_categories %}
+    <a href="{% url 'category' cat.name %}" class="btn btn-sm {% if active == cat.name %}btn-primary{% else %}btn-outline-primary{% endif %}">{{ cat.title }}</a>
+    {% endfor %}
+</div>
