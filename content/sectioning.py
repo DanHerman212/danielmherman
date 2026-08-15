@@ -119,8 +119,13 @@ def split_sections(content_html: str) -> list:
 
 
 def decorate_sections(content_html: str) -> list:
-    """sections + {icon} for card rendering (landing + sibling nav)."""
-    return [
-        {**sec, "icon": icon_for(sec["title"])}
-        for sec in split_sections(content_html)
-    ]
+    """sections + {icon, is_overview} for card rendering (landing + sibling nav).
+
+    is_overview lets the section template keep the sidebar rail on the
+    overview page while deep-dive sections expand to full width.
+    """
+    sections = split_sections(content_html)
+    for sec in sections:
+        sec["icon"] = icon_for(sec["title"])
+        sec["is_overview"] = "overview" in sec["title"].lower()
+    return sections

@@ -1,12 +1,18 @@
 <!--content/templates/content/project_section.html
     One section of a drill-down project: breadcrumb + back link + section body,
-    with the project sidebar (Technologies / CTAs) persisting on the right and
-    the other sections offered as cards below. -->
+    with the other sections offered as cards below.
+
+    Layout policy:
+      - Overview section -> two-column with the full sidebar rail (as-is).
+      - Deep-dive sections -> full-width single column for wide diagrams, with
+        the CTA buttons (Live Demo / View Code) on the breadcrumb row (right)
+        so the CTAs survive the sidebar removal. -->
 {% extends 'content/base.html' %}
 
 {% block content %}
 <div class="container">
-    <!-- Breadcrumb -->
+    {% if section.is_overview %}
+    <!-- Breadcrumb (standalone on the overview page) -->
     <nav class="project-breadcrumb" aria-label="Breadcrumb">
         <a href="{% url 'projects' %}">Projects</a>
         <span class="sep">›</span>
@@ -15,6 +21,7 @@
         <span class="current">{{ section.title }}</span>
     </nav>
 
+    <!-- Overview: keep the two-column layout with the sidebar rail. -->
     <div class="row">
         <!-- Main Content Column -->
         <div class="col-md-8">
@@ -27,23 +34,6 @@
             <div class="article-content project-content">
                 {{ section.body|safe }}
             </div>
-
-            <!-- Other sections in this project -->
-            {% if sections|length > 1 %}
-            <h4 class="toc-title mt-5">More in this project</h4>
-            <div class="toc-card-grid">
-                {% for s in sections %}
-                {% if s.slug != section.slug %}
-                <a class="toc-card" href="{% url 'project_section' project.slug s.slug %}">
-                    <span class="toc-card-icon"><i class="fas {{ s.icon }}"></i></span>
-                    <span class="toc-card-body">
-                        <span class="toc-card-title">{{ s.title }}</span>
-                    </span>
-                </a>
-                {% endif %}
-                {% endfor %}
-            </div>
-            {% endif %}
         </div>
 
         <!-- Sidebar -->
@@ -51,6 +41,55 @@
             {% include 'content/_project_sidebar.html' %}
         </div>
     </div>
+
+    {% else %}
+    <!-- Deep-dive: full-width layout for wide diagrams. Breadcrumb on the left
+         and CTA buttons on the right share one row (Option A). -->
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+        <nav class="project-breadcrumb" aria-label="Breadcrumb">
+            <a href="{% url 'projects' %}">Projects</a>
+            <span class="sep">›</span>
+            <a href="{% url 'project_detail' project.slug %}">{{ project.title }}</a>
+            <span class="sep">›</span>
+            <span class="current">{{ section.title }}</span>
+        </nav>
+        <span class="d-flex gap-2">
+            {% if project.demo_link %}
+            <a href="{{ project.demo_link }}" class="btn btn-primary btn-sm" target="_blank">
+                <i class="fas fa-external-link-alt"></i> Live Demo
+            </a>
+            {% endif %}
+            {% if project.github_link %}
+            <a href="{{ project.github_link }}" class="btn btn-dark btn-sm" target="_blank">
+                <i class="fab fa-github"></i> View Code
+            </a>
+            {% endif %}
+        </span>
+    </div>
+
+    <h1 class="mb-3">{{ section.title }}</h1>
+
+    <div class="article-content project-content">
+        {{ section.body|safe }}
+    </div>
+    {% endif %}
+
+    <!-- Other sections in this project -->
+    {% if sections|length > 1 %}
+    <h4 class="toc-title mt-5">More in this project</h4>
+    <div class="toc-card-grid">
+        {% for s in sections %}
+        {% if s.slug != section.slug %}
+        <a class="toc-card" href="{% url 'project_section' project.slug s.slug %}">
+            <span class="toc-card-icon"><i class="fas {{ s.icon }}"></i></span>
+            <span class="toc-card-body">
+                <span class="toc-card-title">{{ s.title }}</span>
+            </span>
+        </a>
+        {% endif %}
+        {% endfor %}
+    </div>
+    {% endif %}
 
     <hr class="my-4">
     <a href="{% url 'projects' %}" class="btn btn-secondary">
