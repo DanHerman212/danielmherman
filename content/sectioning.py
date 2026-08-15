@@ -14,7 +14,6 @@ _SLUG_STRIP = re.compile(r"[^a-z0-9\s-]")
 _SPACES = re.compile(r"\s+")
 _DASHES = re.compile(r"-+")
 _TAG = re.compile(r"<[^>]+>")
-_PARA = re.compile(r"<p[^>]*>(.*?)</p>", re.S | re.I)
 
 # Icon per section, matched against the heading text (fallback: arrow).
 SECTION_ICONS = {
@@ -47,15 +46,6 @@ def icon_for(title: str) -> str:
 
 def strip_tags(html: str) -> str:
     return _TAG.sub("", html or "")
-
-
-def first_paragraph(html: str) -> str:
-    """Text of the first non-empty <p> in a section body (card blurbs)."""
-    for match in _PARA.finditer(html or ""):
-        text = _SPACES.sub(" ", strip_tags(match.group(1))).replace("\xa0", " ").strip()
-        if text and text != "[TOC]":
-            return (text[:120].rstrip() + "…") if len(text) > 120 else text
-    return ""
 
 
 class _Splitter(HTMLParser):
@@ -129,8 +119,8 @@ def split_sections(content_html: str) -> list:
 
 
 def decorate_sections(content_html: str) -> list:
-    """sections + {icon, blurb} for card rendering (landing + sibling nav)."""
+    """sections + {icon} for card rendering (landing + sibling nav)."""
     return [
-        {**sec, "icon": icon_for(sec["title"]), "blurb": first_paragraph(sec["body"])}
+        {**sec, "icon": icon_for(sec["title"])}
         for sec in split_sections(content_html)
     ]

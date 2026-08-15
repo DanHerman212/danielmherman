@@ -356,7 +356,7 @@ footer {
 
 .toc-card {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     gap: 12px;
     padding: 14px 16px;
     border: 1px solid #e9ecef;
@@ -404,17 +404,6 @@ footer {
 
 .toc-card:hover .toc-card-title {
     color: var(--primary-color);
-}
-
-.toc-card-desc {
-    font-family: 'Inter', sans-serif;
-    font-size: 0.82rem;
-    color: #666;
-    line-height: 1.45;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
 }
 
 /* Drill-down project pages: breadcrumb + back link */
