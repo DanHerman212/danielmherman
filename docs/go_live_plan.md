@@ -202,11 +202,21 @@ agent; golden-set sample shows no ungrounded/invented claims.
 
 ## Phase 6 — Live E2E validation
 
+> **DECISION 2026-08-14 — Observability initiative.** Implement **Langfuse self-host
+> (OSS on GCP)** for Phase 6 as the live debugging surface, and use it as the chance to
+> *learn* the tool (traces, tool calls, scoring). Real MIMIC-derived payloads stay in
+> tenancy (self-host). Tear it down between phases. **Phase 5 runs on existing tooling +
+> the JSONL trace archive** — Langfuse is pulled forward to Phase 5 only if the
+> fix-and-retest loop needs the trace-scoring UI to move faster. See
+> /memories/repo/eval-observability.md.
+
 - [ ] Run the full screen guide against **live** endpoints: chips, free-text,
       footnotes→passages, trace, source cards, quota countdown.
 - [ ] Error/refund path: agent down → 502 + quota refund.
 - [ ] Spot-check groundedness: every claim traces to a passage or feature
       (Tier 2 rubric).
+- [ ] **Observability (Langfuse):** stand up self-host, wire the LangGraph
+      callback, attach rubric scores, learn the UI on live runs.
 
 **Exit criteria:** full journey works live; no unhandled errors.
 

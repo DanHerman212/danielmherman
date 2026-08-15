@@ -548,3 +548,13 @@ html {
     border-color: #b6d0ff;
     color: inherit;
 }
+
+/* CKEditor content: font-size presets.
+   CKEditor 5 emits these classes for the named fontSize options (tiny/small/
+   big/huge). The editor styles them via its own content CSS (admin only); the
+   public site renders content inside .article-content, so define them here.
+   Values match CKEditor's defaults (--ck-content-font-size-*). */
+.article-content .text-tiny { font-size: 0.7em; }
+.article-content .text-small { font-size: 0.85em; }
+.article-content .text-big { font-size: 1.4em; }
+.article-content .text-huge { font-size: 1.8em; }
