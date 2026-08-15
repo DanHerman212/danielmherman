@@ -55,7 +55,7 @@
 }
 
 .project-list-header .lead {
-    font-family: Georgia, serif;
+    font-family: 'Inter', sans-serif;
     color: #555;
 }
 
@@ -67,7 +67,7 @@
 }
 
 body {
-    font-family: Georgia, 'Times New Roman', serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     min-height: 100vh;
     display: flex;
     flex-direction: column;
@@ -112,7 +112,7 @@ main {
 }
 
 .card-text {
-    font-family: Georgia, serif;
+    font-family: 'Inter', sans-serif;
     font-size: 0.95rem;
     line-height: 1.6;
     color: #555;
@@ -547,3 +547,37 @@ html {
 .article-content .text-small { font-size: 0.85em; }
 .article-content .text-big { font-size: 1.4em; }
 .article-content .text-huge { font-size: 1.8em; }
+
+/* --- Typography: Inter for all UI; Source Serif 4 scoped strictly to the
+   long-form reading payload (article bodies and project prose). UI, headings,
+   and code-heavy project sections stay Inter. --- */
+
+/* Articles: serif reading text at a comfortable measure. */
+.article-content p,
+.article-content li {
+    font-family: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+    font-size: 1.125rem;
+    line-height: 1.7;
+    max-width: 70ch;
+}
+
+/* Project content: the container stays full-width so diagrams/plots breathe;
+   only the reading text is capped, and visuals break out to full width. */
+.project-content p,
+.project-content ul,
+.project-content ol {
+    font-family: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+    font-size: 1.125rem;
+    line-height: 1.7;
+    max-width: 65ch;
+}
+
+.project-content pre,
+.project-content figure {
+    max-width: 100%;
+    margin: 2rem 0;
+}
+
+.project-content img {
+    max-width: 100%;
+}
