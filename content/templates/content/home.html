@@ -1,5 +1,6 @@
 <!-- content/templates/content/home.html-->
  {% extends 'content/base.html' %}
+ {% load content_extras %}
 
  {% block content %}
  <div class="container">
@@ -20,7 +21,7 @@
                 {% endif %}
                 <div class="card-body">
                     <h5 class="card-title">{{ article.title }}</h5>
-                    <p class="card-text">{{ article.content|striptags|truncatechars:151|safe }}</p>
+                    <p class="card-text">{{ article.content|striptags|first_sentence }}</p>
                     <a href="{% url 'article_detail' article.slug %}" class="btn btn-primary">Read More</a>
                 </div>
                 <div class="card-footer text-muted">
