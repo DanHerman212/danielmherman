@@ -548,6 +548,104 @@ html {
 .article-content .text-big { font-size: 1.4em; }
 .article-content .text-huge { font-size: 1.8em; }
 
+/* CKEditor 5 image styles.
+   The editor stores image alignment/resize as classes on a
+   <figure class="image ..."> wrapper (image-style-block / side / align-* /
+   image_resized), which CKEditor styles only inside the admin editor. The
+   public site renders that HTML inside .article-content / .project-content,
+   so mirror the content rules here. Spacing mirrors django_ckeditor_5
+   dist/styles.css (--ck-content-image-style-spacing: 1.5em). */
+
+.article-content figure.image,
+.project-content figure.image {
+    clear: both;
+    display: table;
+    margin: 1.5rem auto;          /* centered by default = "block" style */
+    max-width: 100%;
+    min-width: 50px;
+    text-align: center;
+}
+
+.article-content figure.image img,
+.project-content figure.image img {
+    display: block;
+    height: auto;
+    margin: 0 auto;
+    max-width: 100%;
+}
+
+.article-content figure.image > figcaption,
+.project-content figure.image > figcaption {
+    background-color: #f7f7f7;
+    color: #333;
+    font-size: 0.75em;
+    padding: 0.6em;
+}
+
+/* Side style: floated right, ~50% width. */
+.article-content figure.image.image-style-side,
+.project-content figure.image.image-style-side {
+    float: right;
+    margin-left: 1.5em;
+    margin-top: 0.5rem;
+    max-width: 50%;
+}
+
+/* Align left / right: floated. */
+.article-content figure.image.image-style-align-left,
+.project-content figure.image.image-style-align-left {
+    clear: none;
+    float: left;
+    margin-right: 1.5em;
+}
+
+.article-content figure.image.image-style-align-right,
+.project-content figure.image.image-style-align-right {
+    clear: none;
+    float: right;
+    margin-left: 1.5em;
+}
+
+/* Block-align variants: block-level, pushed to one side. */
+.article-content figure.image.image-style-block-align-left,
+.project-content figure.image.image-style-block-align-left {
+    margin-left: 0;
+    margin-right: auto;
+}
+
+.article-content figure.image.image-style-block-align-right,
+.project-content figure.image.image-style-block-align-right {
+    margin-left: auto;
+    margin-right: 0;
+}
+
+/* Manually resized images: honor the editor's inline width. */
+.article-content figure.image.image_resized,
+.project-content figure.image.image_resized {
+    box-sizing: border-box;
+    display: block;
+    max-width: 100%;
+}
+
+.article-content figure.image.image_resized img,
+.project-content figure.image.image_resized img {
+    width: 100%;
+}
+
+/* Inline images (imageStyle:inline): keep in flow, capped. */
+.article-content span.image-inline img,
+.project-content span.image-inline img {
+    max-width: 100%;
+}
+
+/* Clear floats inside content (articles already clear; cover projects too). */
+.article-content::after,
+.project-content::after {
+    content: "";
+    display: table;
+    clear: both;
+}
+
 /* --- Typography: Inter for all UI; Source Serif 4 scoped strictly to the
    long-form reading payload (article bodies and project prose). UI, headings,
    and code-heavy project sections stay Inter. --- */
