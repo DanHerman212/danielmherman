@@ -346,6 +346,90 @@ footer {
     color: var(--primary-color);
 }
 
+/* Sticky "On this page" rail for long-form sections (Pattern 1, 2026-08-18).
+   Content sits left (col-lg-8); the rail is sticky right and follows the
+   reader. On small screens it simply flows above the content. */
+.toc-rail {
+    position: sticky;
+    top: 1.5rem;
+    max-height: calc(100vh - 3rem);
+    overflow-y: auto;
+    background: #fff;
+    border: 1px solid #e9ecef;
+    border-top: 3px solid var(--primary-color);  /* rail identity accent */
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+    padding: 1.25rem 1.5rem;
+}
+.toc-rail .toc-list a {
+    font-size: 0.85rem;
+    line-height: 1.35;
+    color: #444;                      /* neutral default */
+    border-left: 3px solid transparent;
+    padding-left: 0.6rem;
+    transition: color 0.15s ease, border-color 0.15s ease;
+}
+.toc-rail li {
+    padding: 0.2rem 0;
+    border-bottom: none;
+}
+.toc-rail .toc-title {
+    font-size: 0.78rem;
+    margin-bottom: 0.5rem;
+}
+
+/* All items neutral by default; blue is reserved for the ACTIVE section so it
+   reads as a precise "you are here" placeholder, not as blanket coloring. */
+.toc-rail > .toc-list > li > a {
+    font-weight: 600;
+}
+/* Active section (click or scrollspy): filled left rule + blue text. */
+.toc-rail .toc-list a.active {
+    border-left-color: var(--primary-color);
+    color: var(--primary-color);
+}
+.toc-rail .toc-list a:not(.active):hover {
+    border-left-color: #d0d5db;
+    color: var(--primary-color);
+}
+
+/* Nested TOC entries: h4+ indent under their h3 parent. */
+.toc-nested {
+    padding-left: 0.25rem;
+    margin-top: 0.1rem;
+}
+.toc-nested li {
+    padding: 0.15rem 0;
+    border-bottom: none;
+}
+.toc-nested a {
+    font-size: 0.8rem;
+    color: #555;
+    font-weight: 400;
+}
+.toc-nested a:hover {
+    color: var(--primary-color);
+}
+
+/* Keep the h3/h4 hierarchy visible in the body too: a stepped type ladder.
+   title 32px -> h3 21px -> h4 17.5px -> body 18px. h4 is subordinate (smaller,
+   weight 500) and indented, so the h3->h4 relationship reads via size + weight
+   + structure rather than a jarring jump. */
+.article-content h4 {
+    font-size: 1.1rem;   /* ~17.5px */
+    font-weight: 500;
+    color: #555;
+    padding-left: 0.75rem;
+    border-left: 3px solid #d0d5db;
+    margin-top: 1.5rem;
+    margin-bottom: 0.5rem;
+}
+.article-content h3 {
+    font-size: 1.3rem;   /* ~21px */
+    font-weight: 600;
+    margin-top: 2rem;
+}
+
 /* Project card-style table of contents */
 .toc-card-grid {
     display: grid;

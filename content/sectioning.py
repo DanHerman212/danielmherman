@@ -135,20 +135,34 @@ _SUB_HEADING_RE = re.compile(r"<h([3-6])([^>]*)>(.*?)</h\1>", re.S | re.I)
 
 
 def _add_subheading_toc(sec: dict) -> None:
-    """Inject id anchors on the section's h3+ headings and record a TOC.
+    """Inject id anchors on the section's h3+ headings and record a NESTED TOC.
 
-    Mutates sec['body'] (adds id attrs) and sec['toc'] (list of {slug, title}).
-    Anchors use the same section_slug scheme as section URLs, so deep links are
-    stable. A heading that already has an id is left untouched but still listed.
+    Mutates sec['body'] (adds id attrs) and sec['toc']. Structure:
+        [{"slug", "title", "children": [{"slug", "title"}, ...]}, ...]
+    An h3 starts a new top-level TOC entry; deeper headings (h4+) become its
+    children, so the rubric dimensions nest under "Scoring Rubric & Assessment
+    Criteria" instead of flattening into one long list. Anchors use the same
+    section_slug scheme as section URLs. A heading that already has an id is
+    left untouched but still listed under that id.
     """
-    toc = []
+    toc: list[dict] = []
+    parent: dict | None = None
 
     def _repl(m: re.Match) -> str:
+        nonlocal parent
         level, attrs, inner = m.group(1), m.group(2), m.group(3)
         title = strip_tags(inner).replace("\xa0", " ").strip() or "Section"
         existing = re.search(r'id="([^"]+)"', attrs, re.I)
         slug = existing.group(1) if existing else section_slug(title)
-        toc.append({"slug": slug, "title": title})
+        if int(level) <= 3:
+            parent = {"slug": slug, "title": title, "children": []}
+            toc.append(parent)
+        elif parent is not None:
+            parent["children"].append({"slug": slug, "title": title})
+        else:
+            # A stray deeper heading with no preceding h3 in this section:
+            # keep it as a standalone top-level entry rather than dropping it.
+            toc.append({"slug": slug, "title": title, "children": []})
         if existing:
             return m.group(0)  # already anchored; leave the heading untouched
         return f"<h{level} id=\"{slug}\"{attrs}>{inner}</h{level}>"

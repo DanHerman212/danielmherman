@@ -35,13 +35,18 @@ class SectioningTests(TestCase):
         self.assertEqual(titles, ["Project Overview", "Architecture",
                                   "Agent Evaluation"])
 
-    def test_subheadings_build_toc(self):
+    def test_subheadings_build_nested_toc(self):
         eval_sec = split_sections(LONGFORM_CONTENT)[2]
+        top = [t["title"] for t in eval_sec["toc"]]
+        self.assertEqual(top, ["Evaluation Methodology: LLM-as-a-Judge",
+                               "Scoring Rubric", "Results"])
+        rubric = eval_sec["toc"][1]
         self.assertEqual(
-            [t["title"] for t in eval_sec["toc"]],
-            ["Evaluation Methodology: LLM-as-a-Judge", "Scoring Rubric",
-             "Faithfulness", "Groundedness", "Results"],
+            [c["title"] for c in rubric["children"]],
+            ["Faithfulness", "Groundedness"],
         )
+        # a plain h3 has no children
+        self.assertEqual(eval_sec["toc"][0]["children"], [])
 
     def test_subheadings_injected_with_stable_ids(self):
         body = split_sections(LONGFORM_CONTENT)[2]["body"]
@@ -60,7 +65,7 @@ class SectioningTests(TestCase):
         eval_sec = dec[2]
         self.assertEqual(eval_sec["icon"], "fa-cogs")  # 'agent' in title
         self.assertFalse(eval_sec["is_overview"])
-        self.assertEqual(len(eval_sec["toc"]), 5)
+        self.assertEqual(len(eval_sec["toc"]), 3)
 
     def test_existing_heading_id_is_respected(self):
         content = ('<h2>Agent Evaluation</h2>\n'
@@ -68,7 +73,7 @@ class SectioningTests(TestCase):
         sec = split_sections(content)[0]
         self.assertEqual(sec["body"].count("id="), 1)
         self.assertEqual(sec["toc"], [{"slug": "my-custom-anchor",
-                                       "title": "Method"}])
+                                       "title": "Method", "children": []}])
 
     def test_shallow_content_has_no_toc(self):
         content = "<h2>Overview</h2><p>body</p>"

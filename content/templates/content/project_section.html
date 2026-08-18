@@ -82,20 +82,41 @@
     <h1 class="mb-3">{{ section.title }}</h1>
 
     {% if section.toc %}
-    <!-- In-page table of contents for long-form sections (h3+ sub-headings). -->
-    <nav class="toc toc-inline mb-4" aria-label="On this page">
-        <h4 class="toc-title">On this page</h4>
-        <ul class="toc-list">
-            {% for item in section.toc %}
-            <li><a href="#{{ item.slug }}">{{ item.title }}</a></li>
-            {% endfor %}
-        </ul>
-    </nav>
-    {% endif %}
-
+    <!-- Long-form section: content left, sticky "On this page" rail right.
+         The rail is sticky on lg+ screens; on smaller screens it becomes a
+         compact block above the content. -->
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="article-content project-content">
+                {{ section.body|safe }}
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <nav class="toc toc-rail" aria-label="On this page">
+                <h4 class="toc-title">On this page</h4>
+                <ul class="toc-list">
+                    {% for item in section.toc %}
+                    <li>
+                        <a href="#{{ item.slug }}">{{ item.title }}</a>
+                        {% if item.children %}
+                        <ul class="toc-list toc-nested">
+                            {% for child in item.children %}
+                            <li><a href="#{{ child.slug }}">{{ child.title }}</a></li>
+                            {% endfor %}
+                        </ul>
+                        {% endif %}
+                    </li>
+                    {% endfor %}
+                </ul>
+            </nav>
+        </div>
+    </div>
+    {% else %}
+    <!-- Short section: plain full-width body. -->
     <div class="article-content project-content">
         {{ section.body|safe }}
     </div>
+    {% endif %}
     {% endif %}
 
     <!-- Other sections in this project -->
@@ -120,4 +141,86 @@
         ← Back to Projects
     </a>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+{% if section.toc %}
+<script>
+// Scrollspy for the "On this page" rail: highlight the TOC link for the
+// section currently in view.
+//  - Clicking a link immediately marks THAT link active (pins it), and it
+//    stays active until the user scrolls past the clicked section — an anchor
+//    jump must not immediately re-highlight the next (empty) section.
+//  - While scrolling, the active link follows the section in view.
+(function () {
+    const links = document.querySelectorAll('.toc-rail a[href^="#"]');
+    if (!links.length) return;
+    const items = [];
+    links.forEach((a) => {
+        const id = a.getAttribute('href').slice(1);
+        const el = document.getElementById(id);
+        if (el) items.push({ link: a, el, id });
+    });
+    if (!items.length) return;
+
+    let pinned = null;  // id pinned by a click, until scrolled past
+
+    function setActive(id) {
+        items.forEach(({ link, id: iid }) => {
+            link.classList.toggle('active', iid === id);
+        });
+    }
+
+    // Probe just below the fixed navbar; small so we don't leap ahead into a
+    // following section that is only a heading (no body yet).
+    const PROBE = 72;
+
+    function currentFromScroll() {
+        const probeY = window.scrollY + PROBE;
+        let current = items[0].id;
+        for (const { el, id } of items) {
+            if (el.getBoundingClientRect().top + window.scrollY <= probeY) {
+                current = id;
+            } else {
+                break;
+            }
+        }
+        return current;
+    }
+
+    let ticking = false;
+    function update() {
+        ticking = false;
+        if (pinned) {
+            const el = document.getElementById(pinned);
+            // Keep the clicked section active until its heading scrolls past
+            // the TOP of the viewport (top < 0) — i.e. the user has actually
+            // moved past it. Before that, an anchor jump's own scroll event
+            // must not re-highlight the next (empty) section.
+            if (el && el.getBoundingClientRect().top >= 0) {
+                setActive(pinned);
+                return;
+            }
+            pinned = null;  // scrolled past the clicked section — follow normally
+        }
+        setActive(currentFromScroll());
+    }
+    function request() {
+        if (!ticking) { ticking = true; window.requestAnimationFrame(update); }
+    }
+
+    // Click: pin immediately (before the anchor jump's scroll event fires).
+    items.forEach(({ link, id }) => {
+        link.addEventListener('click', () => {
+            pinned = id;
+            setActive(id);
+        });
+    });
+
+    window.addEventListener('scroll', request, { passive: true });
+    window.addEventListener('resize', request, { passive: true });
+    update();
+})();
+</script>
+{% endif %}
 {% endblock %}
