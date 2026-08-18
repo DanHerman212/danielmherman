@@ -31,6 +31,18 @@
 
             <h1 class="mb-3">{{ section.title }}</h1>
 
+            {% if section.toc %}
+            <!-- In-page table of contents for long-form sections (h3+ sub-headings). -->
+            <nav class="toc toc-inline mb-4" aria-label="On this page">
+                <h4 class="toc-title">On this page</h4>
+                <ul class="toc-list">
+                    {% for item in section.toc %}
+                    <li><a href="#{{ item.slug }}">{{ item.title }}</a></li>
+                    {% endfor %}
+                </ul>
+            </nav>
+            {% endif %}
+
             <div class="article-content project-content">
                 {{ section.body|safe }}
             </div>
@@ -68,6 +80,18 @@
     </div>
 
     <h1 class="mb-3">{{ section.title }}</h1>
+
+    {% if section.toc %}
+    <!-- In-page table of contents for long-form sections (h3+ sub-headings). -->
+    <nav class="toc toc-inline mb-4" aria-label="On this page">
+        <h4 class="toc-title">On this page</h4>
+        <ul class="toc-list">
+            {% for item in section.toc %}
+            <li><a href="#{{ item.slug }}">{{ item.title }}</a></li>
+            {% endfor %}
+        </ul>
+    </nav>
+    {% endif %}
 
     <div class="article-content project-content">
         {{ section.body|safe }}

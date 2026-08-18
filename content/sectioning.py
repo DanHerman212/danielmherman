@@ -10,6 +10,11 @@ import re
 from html.parser import HTMLParser
 
 HEADING_TAGS = {"h1", "h2", "h3", "h4", "h5", "h6"}
+# Only this level creates a section card / section page. Deeper headings
+# (h3+) are kept INSIDE the section body, get auto-injected id anchors, and
+# drive an in-page table of contents. (Option 1 — 2026-08-18: the ECC project
+# pages are long-form, so sub-headings must not become sibling cards.)
+TOP_LEVEL = 2
 _SLUG_STRIP = re.compile(r"[^a-z0-9\s-]")
 _SPACES = re.compile(r"\s+")
 _DASHES = re.compile(r"-+")
@@ -66,9 +71,12 @@ class _Splitter(HTMLParser):
             self.parts.append({"kind": kind, "level": level, "html": html})
 
     def handle_starttag(self, tag, attrs):
-        if tag in HEADING_TAGS and self.in_heading is None:
+        # Only TOP_LEVEL headings split a new section. Sub-headings (h3+)
+        # are buffered as ordinary body content so they stay inside the
+        # current section and can carry in-page anchors.
+        if tag == f"h{TOP_LEVEL}" and self.in_heading is None:
             self._emit("body")
-            self.in_heading = int(tag[1])
+            self.in_heading = TOP_LEVEL
             return  # heading tag itself is dropped; inner content is buffered
         self.buf.append(self._render(tag, attrs))
 
@@ -76,7 +84,7 @@ class _Splitter(HTMLParser):
         self.buf.append(self._render(tag, attrs, selfclosing=True))
 
     def handle_endtag(self, tag):
-        if tag in HEADING_TAGS and self.in_heading == int(tag[1]):
+        if tag == f"h{TOP_LEVEL}" and self.in_heading == TOP_LEVEL:
             self._emit("heading", level=self.in_heading)
             self.in_heading = None
             return
@@ -115,7 +123,38 @@ def split_sections(content_html: str) -> list:
             pending["body"] += part["html"]
     if pending is not None:
         sections.append(pending)
+    for sec in sections:
+        _add_subheading_toc(sec)
     return sections
+
+
+# h3+ heading inside a section body: used to (a) inject an in-page id anchor
+# and (b) build the section's table of contents. Only matches headings that are
+# NOT already carrying an id (CKEditor may emit ids on its own).
+_SUB_HEADING_RE = re.compile(r"<h([3-6])([^>]*)>(.*?)</h\1>", re.S | re.I)
+
+
+def _add_subheading_toc(sec: dict) -> None:
+    """Inject id anchors on the section's h3+ headings and record a TOC.
+
+    Mutates sec['body'] (adds id attrs) and sec['toc'] (list of {slug, title}).
+    Anchors use the same section_slug scheme as section URLs, so deep links are
+    stable. A heading that already has an id is left untouched but still listed.
+    """
+    toc = []
+
+    def _repl(m: re.Match) -> str:
+        level, attrs, inner = m.group(1), m.group(2), m.group(3)
+        title = strip_tags(inner).replace("\xa0", " ").strip() or "Section"
+        existing = re.search(r'id="([^"]+)"', attrs, re.I)
+        slug = existing.group(1) if existing else section_slug(title)
+        toc.append({"slug": slug, "title": title})
+        if existing:
+            return m.group(0)  # already anchored; leave the heading untouched
+        return f"<h{level} id=\"{slug}\"{attrs}>{inner}</h{level}>"
+
+    sec["body"] = _SUB_HEADING_RE.sub(_repl, sec["body"])
+    sec["toc"] = toc
 
 
 def decorate_sections(content_html: str) -> list:
