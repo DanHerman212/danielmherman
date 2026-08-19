@@ -389,6 +389,16 @@ class A2uiAskLiveTests(TestCase):
         self.assertEqual(mocked.call_args.args[0], 'Why was this patient flagged?')
 
     @patch('demo.views.ask_agent', return_value=dict(A2UI_AGENT_REPLY))
+    def test_live_free_text_embeds_the_selected_admission(self, mocked):
+        """Free text sent alongside a selected patient must embed the admission
+        (like the chips), so the agent never has to ask for the hadm_id."""
+        response = self._post({'hadm_id': 20924467,
+                               'question': 'Why was this patient flagged?'})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(mocked.call_args.args[0],
+                         'Why was this patient flagged? For admission 20924467.')
+
+    @patch('demo.views.ask_agent', return_value=dict(A2UI_AGENT_REPLY))
     def test_chip_maps_to_chip_question(self, mocked):
         """The meds chip must send the medications question (not the risk
         question), so the live agent actually calls rag_search and cites ^[n]."""

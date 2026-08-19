@@ -12,7 +12,7 @@
  * comparison.
  */
 
-import { createDemoFlow, extractSection } from './demo_flow.js?v=11';
+import { createDemoFlow, extractSection } from './demo_flow.js?v=12';
 import { MessageProcessor } from '/static/vendor/a2ui/a2ui_web_core_0.10.5_v0_9_external_lit_zod.js';
 import { basicCatalog, Context } from '/static/vendor/a2ui/a2ui_lit_0.10.2_v0_9_external_lit_zod.js';
 import { ContextProvider } from '/static/vendor/a2ui/lit_context_1.1.6_external_lit.js';

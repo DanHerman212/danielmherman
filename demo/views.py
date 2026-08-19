@@ -69,6 +69,14 @@ def _question_for(payload):
             if not question:
                 return None, 'unknown chip.'
             return f'{question} For admission {hadm_id}.', None
+        # Free text sent alongside the selected patient: embed the admission so
+        # the live agent can ground the answer (same phrasing the chips use).
+        question = payload.get('question')
+        if isinstance(question, str) and question.strip():
+            q = question.strip()
+            if len(q) > MAX_QUESTION_CHARS:
+                return None, f'Question exceeds {MAX_QUESTION_CHARS} characters.'
+            return f'{q} For admission {hadm_id}.', None
         return f'Assess the 30-day readmission risk for admission {hadm_id}.', None
 
     question = payload.get('question')

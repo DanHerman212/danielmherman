@@ -658,7 +658,9 @@ export function createDemoFlow({ root, askUrl, renderCanvas, onCite }) {
     const text = els.input.value.trim();
     if (!text || !state.current) return;
     els.input.value = '';
-    post({ question: text }, text);
+    // Free text carries the selected patient so the live agent can ground the
+    // answer — the server appends "For admission {hadm_id}." like the chips.
+    post({ question: text, hadm_id: state.current.hadmId }, text);
   }
 
   els.askBtn.addEventListener('click', askFreeText);
