@@ -44,9 +44,14 @@ steps:
       - '--wait'
 
   # Seed the demo cohort. Runs after migrate (the table must exist) and before
-  # deploy (the page should never go live listing zero patients). The command is
-  # idempotent — it update_or_creates on hadm_id — so re-running it on every
+  # deploy (the page should never go live listing zero patients). The command
+  # is idempotent — it update_or_creates on hadm_id — so re-running it on every
   # build is harmless and keeps Cloud SQL in step with demo/data/demo_cohort.json.
+  #
+  # --prune is REQUIRED: without it a cohort shrink (e.g. the synthetic swap,
+  # 32 real -> 24 synthetic) would leave the retired patients in the table and
+  # the live site would list a stale mix. Seed artifacts are the single source
+  # of truth for the cohort; anything absent is intentionally retired.
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args:
@@ -60,6 +65,8 @@ steps:
       - 'us-east1'
       - '--service-account'
       - 'website-sa@$PROJECT_ID.iam.gserviceaccount.com'
+      - '--args'
+      - 'manage.py,seed_demo_patients,--prune'
 
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
