@@ -227,10 +227,10 @@ agent; golden-set sample shows no ungrounded/invented claims.
       `v2.95.11` on Cloud Run; callback wired; 6 scores/trace attached for the
       full 300-trace eval; observability.danielmherman.com mapped.)
 
-> **Remaining final confirmation (Block B):** live agent-down verify — log into
-> the demo (https://danielmherman.com/demo/a2ui/) and click a chip while the
-> endpoints are down; expect a clean 502 + quota refund instead of a spent
-> credit. Endpoints are currently down, so this exercises the exact refund path.
+- [x] **Block B — live agent-down verify** (08-20): logged into the demo with
+      endpoints down and ran the risk chip. Clean error surfaced + **quota
+      refund confirmed** (Requests left unchanged after the failed run) — no
+      spent credit on a failed call. Phase 6 exit criteria met.
 
 **Exit criteria:** full journey works live; no unhandled errors.
 
