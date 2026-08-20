@@ -1,0 +1,37 @@
+{
+  "hadm_id": 90000017,
+  "probability": 0.299359,
+  "threshold": 0.12,
+  "decision": 1,
+  "base_value": -1.33862,
+  "top_factors": [
+    {
+      "feature": "prior_inpatient_days",
+      "contribution": 0.2234,
+      "direction": "increases"
+    },
+    {
+      "feature": "rdw_max",
+      "contribution": 0.155,
+      "direction": "increases"
+    },
+    {
+      "feature": "recent_ed_visits",
+      "contribution": 0.116,
+      "direction": "increases"
+    },
+    {
+      "feature": "age",
+      "contribution": -0.0869,
+      "direction": "decreases"
+    },
+    {
+      "feature": "monocytes_min",
+      "contribution": -0.0855,
+      "direction": "decreases"
+    }
+  ],
+  "model_version": "readmission-final-20260723172647",
+  "feature_source": "synthetic",
+  "provenance": "SYNTHETIC \u2014 local run of the serving predictor on synthetic cohort features (2026-08-20)"
+}

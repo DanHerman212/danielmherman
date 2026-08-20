@@ -1,0 +1,37 @@
+{
+  "hadm_id": 90000001,
+  "probability": 0.071365,
+  "threshold": 0.12,
+  "decision": 0,
+  "base_value": -1.33862,
+  "top_factors": [
+    {
+      "feature": "race",
+      "contribution": -0.257,
+      "direction": "decreases"
+    },
+    {
+      "feature": "prior_inpatient_days",
+      "contribution": -0.239,
+      "direction": "decreases"
+    },
+    {
+      "feature": "rdw_max",
+      "contribution": -0.2153,
+      "direction": "decreases"
+    },
+    {
+      "feature": "prior_admission_count",
+      "contribution": -0.1369,
+      "direction": "decreases"
+    },
+    {
+      "feature": "oncology_flag",
+      "contribution": -0.1258,
+      "direction": "decreases"
+    }
+  ],
+  "model_version": "readmission-final-20260723172647",
+  "feature_source": "synthetic",
+  "provenance": "SYNTHETIC \u2014 local run of the serving predictor on synthetic cohort features (2026-08-20)"
+}

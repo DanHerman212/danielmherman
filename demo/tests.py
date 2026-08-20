@@ -21,30 +21,30 @@ from .a2ui_canvas import compose_risk_canvas
 from .models import DemoPatient, DemoQuota
 
 AGENT_REPLY = {
-    'question': 'Assess the 30-day readmission risk for admission 20924467.',
-    'answer': 'Probability 0.131398, above the 0.12 threshold.',
+    'question': 'Assess the 30-day readmission risk for admission 90000009.',
+    'answer': 'Probability 0.154016, above the 0.12 threshold.',
     'tool_calls': [{'name': 'predict_readmission'}],
 }
 
 # A live agent reply shaped like the real /ask response: tool_calls carry the
 # response payloads the A2UI canvas composer needs (predict + rag).
 A2UI_AGENT_REPLY = {
-    'question': 'Assess the 30-day readmission risk for admission 20924467.',
-    'answer': ('Estimated 30-day unplanned readmission risk is 0.1314 (13.1%), '
+    'question': 'Assess the 30-day readmission risk for admission 90000009.',
+    'answer': ('Estimated 30-day unplanned readmission risk is 0.1540 (15.4%), '
                'above the 0.12 operating threshold.^[1]'),
     'tool_calls': [
         {'name': 'predict_readmission',
-         'args': {'hadm_id': 20924467},
+         'args': {'hadm_id': 90000009},
          'response': {
-             'hadm_id': 20924467, 'probability': 0.131398, 'threshold': 0.12,
+             'hadm_id': 90000009, 'probability': 0.154016, 'threshold': 0.12,
              'decision': 1, 'model_version': 'readmission-final-x',
-             'feature_source': 'BigQuery',
+             'feature_source': 'synthetic',
              'top_factors': [
                  {'feature': 'oncology_flag', 'contribution': 0.2,
                   'direction': 'increases'}]}},
         {'name': 'rag_search',
-         'args': {'hadm_id': 20924467, 'query': 'medications', 'top_k': 5},
-         'response': {'hadm_id': 20924467, 'query': 'medications', 'returned': 1,
+         'args': {'hadm_id': 90000009, 'query': 'medications', 'top_k': 5},
+         'response': {'hadm_id': 90000009, 'query': 'medications', 'returned': 1,
                       'passages': [
                           {'id': 'x_1', 'section': 'discharge_medications',
                            'text': 'Discharge Medications:\nwarfarin 4 mg QD',
@@ -123,8 +123,8 @@ class AskEndpointTests(TestCase):
         self.user = User.objects.create_user('demo', password='x')
         self.client.force_login(self.user)
         DemoPatient.objects.create(
-            hadm_id=20924467, display_name='Test Patient', age=71,
-            sex='F', summary='71F · emergency admission', split_name='validation',
+            hadm_id=90000009, display_name='Test Patient', age=63,
+            sex='F', summary='63F · urgent admission', split_name='test',
         )
 
     def _post(self, payload):
@@ -136,14 +136,14 @@ class AskEndpointTests(TestCase):
 
     @patch('demo.views.ask_agent', return_value=dict(AGENT_REPLY))
     def test_happy_path(self, mocked):
-        response = self._post({'hadm_id': 20924467})
+        response = self._post({'hadm_id': 90000009})
         self.assertEqual(response.status_code, 200)
         body = response.json()
-        self.assertIn('0.131398', body['answer'])
+        self.assertIn('0.154016', body['answer'])
         self.assertEqual(body['remaining'], 9)
         # The question is composed server-side so phrasing cannot be edited
         # into something leading.
-        self.assertIn('20924467', mocked.call_args.args[0])
+        self.assertIn('90000009', mocked.call_args.args[0])
 
     @patch('demo.views.ask_agent', return_value=dict(AGENT_REPLY))
     def test_free_text_question_is_accepted(self, mocked):
@@ -154,14 +154,14 @@ class AskEndpointTests(TestCase):
     @patch('demo.views.ask_agent')
     def test_quota_exhaustion_returns_429_without_calling_the_agent(self, mocked):
         DemoQuota.objects.create(user=self.user, daily_limit=0)
-        response = self._post({'hadm_id': 20924467})
+        response = self._post({'hadm_id': 90000009})
         self.assertEqual(response.status_code, 429)
         mocked.assert_not_called()
 
     @patch('demo.views.ask_agent', side_effect=AgentError('boom'))
     def test_agent_failure_refunds_the_credit(self, mocked):
         DemoQuota.objects.create(user=self.user, daily_limit=5)
-        response = self._post({'hadm_id': 20924467})
+        response = self._post({'hadm_id': 90000009})
         self.assertEqual(response.status_code, 502)
         self.assertEqual(DemoQuota.remaining(self.user), 5)
 
@@ -185,7 +185,7 @@ class AskEndpointTests(TestCase):
 
     @patch('demo.views.ask_agent', side_effect=AgentError('https://agent-internal/ask 403'))
     def test_agent_internals_are_not_leaked_in_the_main_message(self, mocked):
-        response = self._post({'hadm_id': 20924467})
+        response = self._post({'hadm_id': 90000009})
         self.assertNotIn('agent-internal', response.json()['error'])
 
 
@@ -203,20 +203,27 @@ class FixtureModeTests(TestCase):
             content_type='application/json',
         )
 
-    def test_risk_chip_returns_real_predict_and_rag(self):
-        response = self._post({'hadm_id': 20724182, 'chip': 'risk'})
+    def test_risk_chip_returns_real_predict_and_honest_empty_rag(self):
+        """Risk comes from the synthetic predict fixture; RAG is the honest
+        empty until synthetic passages are captured from the deployed index
+        (then the ^[n] citation assertion returns)."""
+        response = self._post({'hadm_id': 90000017, 'chip': 'risk'})
         self.assertEqual(response.status_code, 200)
         body = response.json()
         self.assertEqual(body['source'], 'fixture')
         names = [tc['name'] for tc in body['tool_calls']]
         self.assertEqual(names, ['predict_readmission', 'rag_search'])
-        self.assertIn('19.5%', body['answer'])
-        self.assertIn('^[1]', body['answer'])
+        self.assertIn('29.9%', body['answer'])
+        rag = next(tc['response'] for tc in body['tool_calls']
+                   if tc['name'] == 'rag_search')
+        self.assertEqual(rag['returned'], 0)
+        self.assertIn('No supporting note passage', body['answer'])
 
     def test_meds_chip_without_captured_passages_is_honest_empty(self):
-        # Erica Abernathy has a real risk payload but no captured rag passages,
-        # so retrieval must be the honest empty (returned: 0), never fabricated.
-        response = self._post({'hadm_id': 22489815, 'chip': 'meds'})
+        # A synthetic patient with a real risk payload but no captured rag
+        # passages, so retrieval must be the honest empty (returned: 0), never
+        # fabricated.
+        response = self._post({'hadm_id': 90000001, 'chip': 'meds'})
         self.assertEqual(response.status_code, 200)
         body = response.json()
         rag = body['tool_calls'][0]['response']
@@ -243,9 +250,9 @@ class A2uiCanvasTests(TestCase):
 
     def test_compose_emits_custom_components(self):
         predict = {
-            'hadm_id': 20724182, 'probability': 0.194512, 'threshold': 0.12,
+            'hadm_id': 90000017, 'probability': 0.299359, 'threshold': 0.12,
             'decision': 1, 'base_value': -1.3, 'model_version': 'readmission-final-x',
-            'feature_source': 'BigQuery',
+            'feature_source': 'synthetic',
             'top_factors': [{'feature': 'oncology_flag', 'contribution': 0.2894,
                              'direction': 'increases'}],
         }
@@ -282,7 +289,7 @@ class A2uiCanvasTests(TestCase):
     def test_a2ui_ask_returns_messages_from_fixture(self):
         response = self.client.post(
             reverse('demo:a2ui_ask'),
-            data=json.dumps({'hadm_id': 20724182, 'chip': 'risk'}),
+            data=json.dumps({'hadm_id': 90000017, 'chip': 'risk'}),
             content_type='application/json',
         )
         self.assertEqual(response.status_code, 200)
@@ -321,8 +328,8 @@ class A2uiCanvasTests(TestCase):
     )
     def test_a2ui_console_renders_the_canvas_page(self):
         DemoPatient.objects.create(
-            hadm_id=20724182, display_name='Leonard Castellano', age=70,
-            sex='M', summary='70M', split_name='test',
+            hadm_id=90000017, display_name='Eugene Sokolov', age=83,
+            sex='M', summary='83M', split_name='test',
         )
         response = self.client.get(reverse('demo:a2ui_console'))
         self.assertEqual(response.status_code, 200)
@@ -354,8 +361,8 @@ class A2uiAskLiveTests(TestCase):
         self.user = User.objects.create_user('demo', password='x')
         self.client.force_login(self.user)
         DemoPatient.objects.create(
-            hadm_id=20924467, display_name='Test Patient', age=71,
-            sex='F', summary='71F · emergency admission', split_name='validation',
+            hadm_id=90000009, display_name='Test Patient', age=63,
+            sex='F', summary='63F · urgent admission', split_name='test',
         )
 
     def _post(self, payload):
@@ -367,13 +374,13 @@ class A2uiAskLiveTests(TestCase):
 
     @patch('demo.views.ask_agent', return_value=dict(A2UI_AGENT_REPLY))
     def test_live_branch_composes_canvas_and_consumes_quota(self, mocked):
-        response = self._post({'hadm_id': 20924467, 'chip': 'risk'})
+        response = self._post({'hadm_id': 90000009, 'chip': 'risk'})
         self.assertEqual(response.status_code, 200)
         body = response.json()
         self.assertEqual(body['remaining'], 9)
         # The question is composed server-side so phrasing cannot be edited
         # into something leading (same as `ask`).
-        self.assertIn('20924467', mocked.call_args.args[0])
+        self.assertIn('90000009', mocked.call_args.args[0])
         # The canvas is composed from the LIVE tool_calls.
         self.assertIn('a2ui', body)
         comps = body['a2ui']['messages'][1]['updateComponents']['components']
@@ -392,30 +399,30 @@ class A2uiAskLiveTests(TestCase):
     def test_live_free_text_embeds_the_selected_admission(self, mocked):
         """Free text sent alongside a selected patient must embed the admission
         (like the chips), so the agent never has to ask for the hadm_id."""
-        response = self._post({'hadm_id': 20924467,
+        response = self._post({'hadm_id': 90000009,
                                'question': 'Why was this patient flagged?'})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(mocked.call_args.args[0],
-                         'Why was this patient flagged? For admission 20924467.')
+                         'Why was this patient flagged? For admission 90000009.')
 
     @patch('demo.views.ask_agent', return_value=dict(A2UI_AGENT_REPLY))
     def test_chip_maps_to_chip_question(self, mocked):
         """The meds chip must send the medications question (not the risk
         question), so the live agent actually calls rag_search and cites ^[n]."""
-        self._post({'hadm_id': 20924467, 'chip': 'meds'})
+        self._post({'hadm_id': 90000009, 'chip': 'meds'})
         self.assertIn('medications', mocked.call_args.args[0])
-        self.assertIn('20924467', mocked.call_args.args[0])
+        self.assertIn('90000009', mocked.call_args.args[0])
 
     @patch('demo.views.ask_agent', return_value=dict(A2UI_AGENT_REPLY))
     def test_summarize_chip_maps_to_summarize_question(self, mocked):
-        self._post({'hadm_id': 20924467, 'chip': 'summarize'})
+        self._post({'hadm_id': 90000009, 'chip': 'summarize'})
         self.assertIn('Summarize', mocked.call_args.args[0])
-        self.assertIn('20924467', mocked.call_args.args[0])
+        self.assertIn('90000009', mocked.call_args.args[0])
 
     @patch('demo.views.ask_agent')
     def test_unknown_chip_rejected_before_quota(self, mocked):
         DemoQuota.objects.create(user=self.user, daily_limit=5)
-        response = self._post({'hadm_id': 20924467, 'chip': 'bogus'})
+        response = self._post({'hadm_id': 90000009, 'chip': 'bogus'})
         self.assertEqual(response.status_code, 400)
         self.assertEqual(DemoQuota.remaining(self.user), 5)
         mocked.assert_not_called()
@@ -423,14 +430,14 @@ class A2uiAskLiveTests(TestCase):
     @patch('demo.views.ask_agent')
     def test_quota_exhaustion_returns_429_without_calling_the_agent(self, mocked):
         DemoQuota.objects.create(user=self.user, daily_limit=0)
-        response = self._post({'hadm_id': 20924467, 'chip': 'risk'})
+        response = self._post({'hadm_id': 90000009, 'chip': 'risk'})
         self.assertEqual(response.status_code, 429)
         mocked.assert_not_called()
 
     @patch('demo.views.ask_agent', side_effect=AgentError('boom'))
     def test_agent_failure_refunds_the_credit(self, mocked):
         DemoQuota.objects.create(user=self.user, daily_limit=5)
-        response = self._post({'hadm_id': 20924467, 'chip': 'risk'})
+        response = self._post({'hadm_id': 90000009, 'chip': 'risk'})
         self.assertEqual(response.status_code, 502)
         self.assertEqual(DemoQuota.remaining(self.user), 5)
 
@@ -443,13 +450,13 @@ class A2uiAskLiveTests(TestCase):
         reply = dict(A2UI_AGENT_REPLY)
         reply['tool_calls'] = [
             {'name': 'predict_readmission',
-             'args': {'hadm_id': 20924467},
+             'args': {'hadm_id': 90000009},
              'response': {'error': 'upstream 503', 'status': 'failed'}},
             dict(A2UI_AGENT_REPLY['tool_calls'][1]),
         ]
         mocked.return_value = reply
         DemoQuota.objects.create(user=self.user, daily_limit=5)
-        response = self._post({'hadm_id': 20924467, 'chip': 'risk'})
+        response = self._post({'hadm_id': 90000009, 'chip': 'risk'})
         self.assertEqual(response.status_code, 502)
         self.assertEqual(DemoQuota.remaining(self.user), 5)
 
@@ -461,12 +468,12 @@ class A2uiAskLiveTests(TestCase):
         reply['tool_calls'] = [
             dict(A2UI_AGENT_REPLY['tool_calls'][0]),
             {'name': 'rag_search',
-             'args': {'hadm_id': 20924467, 'query': 'meds', 'top_k': 5},
+             'args': {'hadm_id': 90000009, 'query': 'meds', 'top_k': 5},
              'response': {'error': 'search_failed'}},
         ]
         mocked.return_value = reply
         DemoQuota.objects.create(user=self.user, daily_limit=5)
-        response = self._post({'hadm_id': 20924467, 'chip': 'risk'})
+        response = self._post({'hadm_id': 90000009, 'chip': 'risk'})
         self.assertEqual(response.status_code, 502)
         self.assertEqual(DemoQuota.remaining(self.user), 5)
 

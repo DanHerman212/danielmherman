@@ -1,10 +1,9 @@
 """The demo patient cohort and per-user usage quota.
 
-Only `display_name` is invented. Age, sex, and everything the model reads are
-real de-identified MIMIC-IV values, and any UI that shows a patient must say so
-— see BUILD_GUIDE section 14. Assigning fake names does not breach the
-PhysioNet DUA, but a demo that appears to show named patients invites exactly
-the wrong question.
+The cohort is FULLY SYNTHETIC — hadm_id, age, sex, and everything the model
+reads are generated values (synthetic_cohort.json), not real patient data.
+Assigning names is part of the same deterministic synthetic generation; a
+demo that appears to show real patients invites exactly the wrong question.
 
 The name mapping is stored rather than generated at request time. Generated
 names would change on every deploy, which breaks screenshots, a written demo
@@ -22,9 +21,9 @@ class DemoPatient(models.Model):
         MALE = 'M', 'Male'
         FEMALE = 'F', 'Female'
 
-    # The real MIMIC-IV admission id, and the key the MCP tool takes. It is the
-    # natural primary key: reseeding must update a patient in place rather than
-    # accumulate duplicates under new surrogate ids.
+    # The synthetic admission id (90000001+), and the key the MCP tool takes.
+    # It is the natural primary key: reseeding must update a patient in place
+    # rather than accumulate duplicates under new surrogate ids.
     hadm_id = models.BigIntegerField(primary_key=True)
 
     display_name = models.CharField(
@@ -50,7 +49,7 @@ class DemoPatient(models.Model):
         verbose_name_plural = 'demo patients'
 
     def __str__(self):
-        return f'{self.display_name} (synthetic name) — MIMIC-IV record {self.hadm_id}'
+        return f'{self.display_name} (synthetic patient) — synthetic record {self.hadm_id}'
 
 
 class DemoQuota(models.Model):

@@ -1,15 +1,15 @@
-"""Fixture mode — real payloads served while the endpoints are down.
+"""Fixture mode — synthetic payloads served while the endpoints are down.
 
-The serving endpoints are torn down for cost, but the demo UI needs real data
-to build against. When DEMO_FIXTURE_MODE is on, the ask view answers the
-starter chips from captured payloads in demo/data/demo_fixtures/:
+The serving endpoints may be torn down for cost, but the demo UI needs data to
+build against. When DEMO_FIXTURE_MODE is on, the ask view answers the starter
+chips from captured payloads in demo/data/demo_fixtures/:
 
-  - risk numbers: REAL — computed by running the actual serving predictor
-    locally (probability, threshold, decision, native-TreeSHAP top_factors),
-    one per demo-cohort patient (cohort_risk.json).
-  - rag passages: REAL — the passages returned by the live index on 2026-08-11
-    for the primary demo patient (Leonard Castellano, hadm 20724182); the full
-    note text is from BigQuery.
+  - risk numbers: SYNTHETIC — computed by running the actual serving predictor
+    locally on the synthetic cohort features (probability, threshold, decision,
+    native-TreeSHAP top_factors), one per demo-cohort patient (cohort_risk.json).
+  - rag passages: SYNTHETIC — passages from the synthetic notes corpus, captured
+    from the synthetic index once deployed. Until then, patients fall back to
+    the honest-empty path below.
 
 The response shape is identical to the live agent's /ask response
 ({question, answer, tool_calls, ...}), so the front-end cannot tell the
@@ -17,8 +17,8 @@ difference and the switch to live is zero-change.
 
 Honesty rule: patients without captured rag passages return an EMPTY result
 (returned: 0) — the same empty-is-a-real-answer contract as the live tool. The
-live index covers the full test split, so every demo patient has real passages
-once the endpoints are redeployed.
+live synthetic index covers the full synthetic cohort, so every demo patient
+has real passages once the endpoints are redeployed.
 """
 
 import json
