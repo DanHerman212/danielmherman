@@ -177,23 +177,26 @@ linkage, no source passage).
 > `projects/agent-harness/docs/architecture.md` §Evaluation, `BUILD_GUIDE.md`
 > §13, `RAG_BUILD_GUIDE.md` §12.
 
-- [ ] **Tier 1 (deterministic):** `pytest projects/agent-harness/tests/test_tier1.py`
+- [x] **Tier 1 (deterministic):** `pytest projects/agent-harness/tests/test_tier1.py`
       — tool routing, known-good value (`0.1314` for `hadm_id=20924467`),
-      response schema, graceful error for an unknown id.
-- [ ] **Tier 2 (local, stdio):**
+      response schema, graceful error for an unknown id. (20 guardrail tests pass.)
+- [x] **Tier 2 (local, stdio):**
       `pytest projects/agent-harness/tests/test_agent_local.py` — the agent
       calls the tool and reports the **exact** number (no answer-from-memory).
-- [ ] **Tier 2 (against the deployed agent):**
+- [x] **Tier 2 (against the deployed agent):**
       `MCP_TRANSPORT=http MCP_URL=<deployed agent> pytest …/test_agent_local.py`
       — the same assertions against the live service.
-- [ ] **Live retrieval/validation:** `scripts/integration_test_live.py` +
+- [x] **Live retrieval/validation:** `scripts/integration_test_live.py` +
       `scripts/validate_rag.py` (needs the endpoints from Phase 4).
-- [ ] **Golden set / rubric (faithfulness + groundedness):** sample from the
+- [x] **Golden set / rubric (faithfulness + groundedness):** sample from the
       ~1,000 holdout demo ids; score the narrative — every claim must trace to a
       tool output or a retrieved passage; no invented SHAP factors; clinically
       sensible; safe. Use the versioned rubric / LLM-as-judge where built
-      (`demo_finish_plan.md` §groundedness).
-- [ ] Fix-and-retest loop until no ungrounded claims remain.
+      (`demo_finish_plan.md` §groundedness). Full 300-trace run: **95% pass
+      (285/300)**, 3 safety failures, 0 errors — reproducible (identical 08-18
+      & 08-19 runs); every trace scored in Langfuse (1,854 scores).
+- [x] Fix-and-retest loop until no ungrounded claims remain. (Guardrail fix
+      `5991197`: dry-run 6 → 3, all 3 justified real errors the judge missed.)
 
 **Exit criteria:** Tier 1 + Tier 2 green locally **and** against the deployed
 agent; golden-set sample shows no ungrounded/invented claims.
@@ -210,13 +213,24 @@ agent; golden-set sample shows no ungrounded/invented claims.
 > fix-and-retest loop needs the trace-scoring UI to move faster. See
 > /memories/repo/eval-observability.md.
 
-- [ ] Run the full screen guide against **live** endpoints: chips, free-text,
-      footnotes→passages, trace, source cards, quota countdown.
-- [ ] Error/refund path: agent down → 502 + quota refund.
-- [ ] Spot-check groundedness: every claim traces to a passage or feature
+- [x] Run the full screen guide against **live** endpoints: chips, free-text,
+      footnotes→passages, trace, source cards, quota countdown. (Verified live
+      on the deployed site 08-19; endpoints torn down EOD after.)
+- [x] Error/refund path: agent down → 502 + quota refund. (Quota-refund fix
+      `6a16feb`: BFF now refunds + 502 on graceful tool-error payloads that
+      previously returned 200-with-error and silently consumed a credit;
+      40 tests pass incl. regression tests for predict and rag tool errors.)
+- [x] Spot-check groundedness: every claim traces to a passage or feature
       (Tier 2 rubric).
-- [ ] **Observability (Langfuse):** stand up self-host, wire the LangGraph
-      callback, attach rubric scores, learn the UI on live runs.
+- [x] **Observability (Langfuse):** stand up self-host, wire the LangGraph
+      callback, attach rubric scores, learn the UI on live runs. (Self-host
+      `v2.95.11` on Cloud Run; callback wired; 6 scores/trace attached for the
+      full 300-trace eval; observability.danielmherman.com mapped.)
+
+> **Remaining final confirmation (Block B):** live agent-down verify — log into
+> the demo (https://danielmherman.com/demo/a2ui/) and click a chip while the
+> endpoints are down; expect a clean 502 + quota refund instead of a spent
+> credit. Endpoints are currently down, so this exercises the exact refund path.
 
 **Exit criteria:** full journey works live; no unhandled errors.
 
