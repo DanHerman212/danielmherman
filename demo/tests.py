@@ -435,11 +435,11 @@ class A2uiAskLiveTests(TestCase):
         self.assertEqual(DemoQuota.remaining(self.user), 5)
 
     @patch('demo.views.ask_agent')
-    def test_failed_predict_tool_returns_honest_canvas_not_500(self, mocked):
-        """A predict tool that errored (e.g. the endpoint is down) must not
-        500 the canvas composer — it renders an honest 'no usable estimate'
-        note plus the cited source, so the front-end gets JSON, not an HTML
-        error page."""
+    def test_errored_predict_tool_refunds_and_returns_502(self, mocked):
+        """A predict tool that errored (e.g. the endpoint is down) must refund
+        the credit and return 502. The agent surfaced the failure as a graceful
+        tool error payload (HTTP 200), which must not silently eat a credit —
+        and it is a deliberate 502, not a server 500."""
         reply = dict(A2UI_AGENT_REPLY)
         reply['tool_calls'] = [
             {'name': 'predict_readmission',
@@ -448,18 +448,27 @@ class A2uiAskLiveTests(TestCase):
             dict(A2UI_AGENT_REPLY['tool_calls'][1]),
         ]
         mocked.return_value = reply
+        DemoQuota.objects.create(user=self.user, daily_limit=5)
         response = self._post({'hadm_id': 20924467, 'chip': 'risk'})
-        self.assertEqual(response.status_code, 200)
-        body = response.json()
-        comps = body['a2ui']['messages'][1]['updateComponents']['components']
-        types = {c['component'] for c in comps}
-        self.assertNotIn('RiskBar', types)
-        self.assertNotIn('FactorBars', types)
-        note = next(c for c in comps if c['component'] == 'Text'
-                    and c.get('variant') == 'h2')
-        self.assertIn('did not return a usable estimate', note['text'])
-        # the cited source (if any) still renders
-        self.assertIn('SourceCard', types)
+        self.assertEqual(response.status_code, 502)
+        self.assertEqual(DemoQuota.remaining(self.user), 5)
+
+    @patch('demo.views.ask_agent')
+    def test_errored_rag_tool_refunds_quota(self, mocked):
+        """Same for a rag tool error — any errored tool means the answer was
+        degraded, so the credit is refunded."""
+        reply = dict(A2UI_AGENT_REPLY)
+        reply['tool_calls'] = [
+            dict(A2UI_AGENT_REPLY['tool_calls'][0]),
+            {'name': 'rag_search',
+             'args': {'hadm_id': 20924467, 'query': 'meds', 'top_k': 5},
+             'response': {'error': 'search_failed'}},
+        ]
+        mocked.return_value = reply
+        DemoQuota.objects.create(user=self.user, daily_limit=5)
+        response = self._post({'hadm_id': 20924467, 'chip': 'risk'})
+        self.assertEqual(response.status_code, 502)
+        self.assertEqual(DemoQuota.remaining(self.user), 5)
 
     @patch('demo.views.ask_agent', return_value=dict(A2UI_AGENT_REPLY))
     def test_bad_input_is_rejected_before_the_quota_is_touched(self, mocked):

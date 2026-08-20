@@ -132,6 +132,17 @@ def ask(request):
             'remaining': DemoQuota.remaining(request.user),
         }, status=502)
 
+    # The agent surfaces downstream (endpoint) failures as graceful tool error
+    # payloads with HTTP 200 (e.g. predict_readmission -> {"error": ...} when
+    # the Vertex endpoint is down). That is a failure for quota purposes too:
+    # a credit was spent and no real answer came back, so refund + 502.
+    if _tools_errored(result):
+        DemoQuota.refund(request.user)
+        return JsonResponse({
+            'error': 'The clinical copilot is unavailable. Please try again.',
+            'remaining': DemoQuota.remaining(request.user),
+        }, status=502)
+
     result['remaining'] = DemoQuota.remaining(request.user)
     return JsonResponse(result)
 
@@ -183,6 +194,20 @@ def _rag_response(result):
     return None
 
 
+def _tools_errored(result) -> bool:
+    """True if any tool the agent called returned an error payload.
+
+    The MCP tools fail GRACEFULLY when a downstream (endpoint) dependency is
+    down — they return {"error": ...} instead of raising, so the agent replies
+    with HTTP 200. That is still a failure for quota purposes (a credit was
+    spent and no real answer came back), so the views refund + 502 on this.
+    """
+    return any(
+        (tc.get("response") or {}).get("error")
+        for tc in (result.get("tool_calls") or [])
+    )
+
+
 @login_required
 @require_POST
 def a2ui_ask(request):
@@ -232,6 +257,16 @@ def a2ui_ask(request):
             return JsonResponse({
                 'error': 'The clinical copilot is unavailable. Please try again.',
                 'detail': str(exc),
+                'remaining': DemoQuota.remaining(request.user),
+            }, status=502)
+
+        # Downstream (endpoint) failures surface as graceful tool error
+        # payloads with HTTP 200 — refund + 502 so a credit is never silently
+        # consumed for an answer that never materialized.
+        if _tools_errored(result):
+            DemoQuota.refund(request.user)
+            return JsonResponse({
+                'error': 'The clinical copilot is unavailable. Please try again.',
                 'remaining': DemoQuota.remaining(request.user),
             }, status=502)
 
