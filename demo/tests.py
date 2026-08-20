@@ -203,10 +203,9 @@ class FixtureModeTests(TestCase):
             content_type='application/json',
         )
 
-    def test_risk_chip_returns_real_predict_and_honest_empty_rag(self):
-        """Risk comes from the synthetic predict fixture; RAG is the honest
-        empty until synthetic passages are captured from the deployed index
-        (then the ^[n] citation assertion returns)."""
+    def test_risk_chip_returns_real_predict_and_rag(self):
+        """Risk + citations come from the synthetic predict and rag fixtures
+        captured from the live synthetic index for the primary patient."""
         response = self._post({'hadm_id': 90000017, 'chip': 'risk'})
         self.assertEqual(response.status_code, 200)
         body = response.json()
@@ -214,10 +213,10 @@ class FixtureModeTests(TestCase):
         names = [tc['name'] for tc in body['tool_calls']]
         self.assertEqual(names, ['predict_readmission', 'rag_search'])
         self.assertIn('29.9%', body['answer'])
+        self.assertIn('^[1]', body['answer'])
         rag = next(tc['response'] for tc in body['tool_calls']
                    if tc['name'] == 'rag_search')
-        self.assertEqual(rag['returned'], 0)
-        self.assertIn('No supporting note passage', body['answer'])
+        self.assertEqual(rag['returned'], 5)
 
     def test_meds_chip_without_captured_passages_is_honest_empty(self):
         # A synthetic patient with a real risk payload but no captured rag
