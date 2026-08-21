@@ -41,6 +41,44 @@ decide how to make the demo more compelling with real EHR notes._
 - [ ] Band fit: can we find ~24 notes that match our low/borderline/high
       archetypes (CHF, COPD, oncology, post-op, cellulitis, routine)?
 
+### 2.5 Step-2 detailed analysis plan (added 2026-08-21, in progress)
+
+**Data so far (measured):** 108 notes, median ~3,690 chars (300–7,771); 2 sparse
+(`1864`, `2024`); 96/108 have ≥1 whitelisted section, 12 have none. Section
+coverage: `brief_hospital_course` 71, `discharge_diagnosis` 62, `hpi` 38,
+`discharge_medications` 31, `discharge_instructions` 30, `physical_exam` 23,
+`discharge_condition` 14, `pmh` 12, `social_history` 7, `family_history` 6,
+`discharge_disposition` 1, `medications_on_admission` 0. Age/sex extractable in
+82/108 and 79/108.
+
+**Key structural findings:**
+1. MTSamples headings ≠ MIMIC headings. Our chunker's `KNOWN_HEADINGS`
+   allowlist is MIMIC-tuned; MTSamples uses `DISPOSITION`, `CONDITION ON
+   DISCHARGE`, `MEDICATIONS`, `ADMISSION/ADMITTING DIAGNOSIS`, `FOLLOWUP`, etc.
+   → this is why `discharge_disposition`=1 and `discharge_medications`=31.
+2. Nav boilerplate is leaking into ~70 notes (body-start anchor doesn't fire →
+   `Sample Name`, `Medical Specialty`, `Educational Disclaimer` kept).
+3. Meds are often in prose, not a clean block (first counter undercounted; fix
+   pending validation).
+
+**Step-by-step plan:**
+1. Fix + validate exploration tooling (accurate meds, body-cleanliness,
+   duplicates); re-run and lock numbers.
+2. Clean corpus: strip residual nav boilerplate, normalize endings, flag sparse/
+   near-duplicates.
+3. Section mapping: extend `KNOWN_HEADINGS` with MTSamples aliases (deliberate
+   per-heading decisions).
+4. Per-note capability score: which chips each note supports (meds / summarize /
+   citations / risk).
+5. Feature-extraction audit: which of the 49 features are in-text vs absent.
+6. Selection / band fit: pick ~24 notes spanning low/borderline/high maximizing
+   chip support + coherence.
+7. Fill strategy: how absent features get filled plausibly, anchored to each
+   note's story; note ↔ feature ↔ risk coherence gate.
+8. Prototype 1–3 patients end-to-end (real note → parsed/filled features →
+   live predict → RAG citation).
+9. Write up direction; update curation doc + agenda with locked decisions.
+
 ### 3. Decide the data direction (write up, don't build)
 - [ ] Lock the **hybrid** approach: notes = real MTSamples text; features = parsed
       where present + plausibly filled for the rest, anchored to each note.
