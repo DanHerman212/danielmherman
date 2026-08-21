@@ -138,3 +138,77 @@ skeleton into a defensible, finished product.
 4. **Scope of the med library:** reuse the current per-archetype drugs and just add
    more, or build a broader library (recommend: broader, so meds vary across patients
    of the same archetype).
+
+---
+
+# Hybrid Real-Note Direction (Step 3, 2026-08-21)
+
+_This is the **locked direction** for the v3 data pass, decided after the Step-2
+MTSamples analysis (`mtsamples_agenda_2026-08-21.md`). Supersedes the v2
+synthetic-notes-only plan in the sections above for the NOTES; the serving
+architecture and feature rows stay as they are._
+
+## 3.1 The decision
+
+**Notes = real MTSamples discharge-summary transcriptions.**
+**Feature rows = parsed-where-present + story-anchored fill for the rest.**
+**Risk scores = the real served model on those rows.**
+
+This is the hybrid that the Step-2 analysis supports:
+
+- MTSamples notes are genuinely richer than v1 synthetic (real polypharmacy:
+  19/108 notes with ≥5 discharge meds, max 23; coherent narratives; no template
+  repetition), which is exactly the "thin content" gap v2 was trying to patch.
+- The corpus is clean and parseable: **108/108 nav-free**, 96/108 with ≥1
+  recognised section after the shared parser's MTSamples aliases.
+- The model, threshold, serving path, ingest pipeline, fixtures, and site are
+  **unchanged** — only the note text and the fill logic change.
+
+## 3.2 Extractability table (measured, of 108 notes)
+
+In-text extractability of the 49 model features (loose presence signals):
+
+| Feature family       | In-text | Note                                      |
+|----------------------|---------|-------------------------------------------|
+| gender               | 100/108 | near-universal pronoun/noun signal         |
+| medication           | 96/108  | case-insensitive + fraction-dose counting  |
+| age                  | 77/108  | `NN-year-old` / `age of N`                 |
+| procedure            | 67/108  | surgery/operation/procedure mentions       |
+| labs                 | 56/108  | hgb/sodium most common; rbc/rdw/mono derived |
+| race                 | 48/108  | else filled race_unknown (see §3.4)        |
+| discharge_location   | 33/108  | else default home                          |
+| ed_visits            | 31/108  | ER/ED mentions                             |
+| admission_type       | 24/108  | else default emergency                     |
+| oncology             | 16/108  | cancer/onco/chemo/metastatic               |
+| insurance            |  1/108  | **always filled** (age-based: ≥65 medicare)|
+| LOS (index_los_days) |  1/108  | **filled** (chronicity/procedure/age inferred) |
+| prior_admission      |  0/108  | **filled** ("status post" prior procedures counted) |
+
+Fill strategy: `projects/agent-harness/scripts/fill_features.py`, which mirrors
+the deployed `ReadmissionPredictor` locally (model.bst + manifest + threshold,
+TreeSHAP top_factors aggregated to parent groups) so bands and drivers are
+exactly what the endpoint returns.
+
+## 3.3 Provenance / attribution
+
+- **Source:** MTSamples (mtsamples.com) discharge-summary transcriptions,
+  downloaded 2026-08-20. Raw text is **gitignored, local-only** (same posture as
+  MIMIC note text); only derived/processed artifacts ship.
+- **Public copy:** the demo will describe the notes as **"de-identified
+  transcription samples"** — never "synthetic". Add MTSamples attribution
+  (footer / README / about) with the download date.
+- **Feature rows are parsed-and-filled, not raw**: every feature carries a
+  provenance (parsed vs filled + basis). The site should expose this honestly
+  (e.g. feature tooltip "parsed from note" vs "derived from note story").
+
+## 3.4 Known artifacts / open decisions (carry to the build)
+
+1. **race_unknown fill** — when a note never mentions race, the fill sets
+   race_unknown and the model's race_unknown attribution can appear as a top
+   factor ("race → reduces risk") on cards. Decision: prefer race-parsed notes in
+   the final 24, and/or suppress filled-only race from displayed top_factors.
+2. **Story-blind lower-bound is fixed** — prior procedures ("status post …") are
+   counted as prior-admission signals, so complex notes (e.g. `1195`) now read
+   high-risk coherently.
+3. **Band spread after fill:** 43 low / 46 borderline / 19 high of 108. The
+   final 24 (8/8/8) are selected from `selection_24.json` by chip support.
