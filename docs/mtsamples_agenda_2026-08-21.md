@@ -29,17 +29,43 @@ decide how to make the demo more compelling with real EHR notes._
 - [ ] Record exact download date + source for provenance.
 
 ### 2. Explore the corpus (what can we actually use?)
-- [ ] Inventory: how many usable discharge summaries vs. poor/empty/duplicate?
-- [ ] Section coverage: do notes parse into our chunker's sections (chief
-      complaint, HPI, PMH, hospital course, discharge meds, discharge
-      instructions, disposition, diagnosis)?
-- [ ] Meds: extract discharge-med list + count per note; confirm real polypharmacy
-      range (how many notes have 5–8+ meds?).
-- [ ] Feature extraction coverage against the 49-feature schema (age, sex, LOS,
-      med count, procedure, discharge location = good; labs/admission type/
-      insurance = absent → confirm the fill strategy).
-- [ ] Band fit: can we find ~24 notes that match our low/borderline/high
-      archetypes (CHF, COPD, oncology, post-op, cellulitis, routine)?
+- [x] Inventory: 108 discharge summaries downloaded (crawler, `fb06a9e`); median
+      ~3,690 chars (300–7,771); 2 sparse (`1864`, `2024`). Raw corpus lives in
+      gitignored `projects/agent-harness/data/mtsamples/` (+ `data/mtsamples_raw_backup/`).
+- [x] **Clean corpus (2026-08-21):** nav chrome stripped from all 108 notes
+      (0/108 leaking; cleaner fix `f7b22f4`). Root cause of the 25 stubborn
+      leakers was `_BODY_START` requiring a colon after the heading — fixed by
+      anchoring on the per-note `Intended for:` metadata line, with `_BODY_START`
+      as a nav-guarded fallback.
+- [x] **Section coverage after mapping (`rag/sections.py` aliases, `f7b22f4`):**
+      of 108 — brief_hospital_course 79, discharge_diagnosis 74, discharge_medications 47,
+      hpi 46, discharge_instructions 38, discharge_condition 31, physical_exam 28,
+      pmh 14, discharge_disposition 14, social 7, family 6, meds_on_admission 0.
+      Zero-section notes 12 → 6 (1793, 1849, 2113, 2425, 2486, 2568 — colon-less
+      headings, kept as a documented outlier category; parser keeps its colon rule).
+      PE sub-regions (ABDOMEN/HEENT/…) + DIET/ACTIVITY deliberately left absorbed
+      so chunks stay meaningful-sized.
+- [x] Meds: discharge-med count per note (deduped capitalized drug + dose);
+      min 0, median 1, max 23; **19 notes ≥5 meds** (real polypharmacy) —
+      histogram 0:53, 1:13, 2:11, 3:6, 4:6, 6:6, 9:4, 5:2, 10:2, 23:1, 7:1, 8:1, 13:1, 14:1.
+- [x] **Feature extraction coverage vs. the 49-feature schema** (in-text, of 108):
+      gender 100, medication 96, age 77, procedure 67, labs 56, race 48,
+      discharge_location 33, ed_visits 31, admission_type 24, oncology 16,
+      insurance 1, LOS 1, prior_admission 0. → Only gender/medication/age/
+      procedure/labs are parse-anchored; insurance/prior-admissions/LOS must be
+      filled (Step 2.7).
+- [x] **Band fit (provisional, `band_fit.py`):** healthy-baseline fill + local
+      model.bst scoring gives **79 high / 24 borderline / 5 low** of 108. Two
+      honest caveats: (1) MTSamples teaching cases skew complex/high-risk under
+      the MIMIC-tuned 0.12 threshold; (2) the provisional fill is a *story-blind
+      lower bound* — it zeros prior admissions/LOS, so clinically complex notes
+      (e.g. `1195`, 89yo, 18 meds, SNF) score artificially low. Selection must
+      pair provisional band + chip support + story coherence.
+- [ ] (in progress) **Selection / band fit:** pick ~24 notes spanning
+      low/borderline/high maximizing chip support + coherence. Preliminary
+      best-chip candidates: low → 1568, 1493, 1564, 2788, 1195; borderline →
+      1566, 2789, 2791, 2792, 2760, 1148; high → 1351, 1657, 1254, 2771, 1106.
+      Per-note section + chip support in `data/mtsamples/coverage.json`.
 
 ### 2.5 Step-2 detailed analysis plan (added 2026-08-21, in progress)
 
@@ -104,6 +130,25 @@ coverage: `brief_hospital_course` 71, `discharge_diagnosis` 62, `hpi` 38,
       machine).
 - [ ] If not: fall back to the v2 curation pass (richer synthetic notes) with the
       polypharmacy + coherence fixes already scoped.
+
+## Locked findings so far (Step 2, 2026-08-21)
+
+- Corpus is clean and parseable: **108/108 nav-free**, median 3,690 chars,
+  96/108 with ≥1 recognised section after alias mapping.
+- MTSamples → MIMIC section aliases are **committed in the shared parser**
+  (`rag/sections.py`, `f7b22f4`): Disposition, Medications, Admission/Admitting/
+  Secondary/Final diagnoses, Condition*on discharge, Laboratory blocks,
+  procedures, bare History forms, followup forms. All 38 existing parser/chunk
+  tests still pass (additive, MIMIC notes unaffected).
+- **Real polypharmacy exists:** 19 notes with ≥5 discharge meds (max 23) — the
+  exact texture v1 synthetic notes lacked.
+- **Feature reality check:** only gender/medication/age/procedure/labs are
+  in-text reliably; insurance, prior admissions, LOS, ED visits are absent →
+  fill strategy is mandatory, and the fill must be coherent with each note's
+  story (coherence rule).
+- **Band reality check:** the corpus skews high under the MIMIC threshold
+  (79/24/5 provisional). Selection should deliberately seek out the low and
+  borderline story-compatible notes rather than assuming a natural 8/8/8.
 
 ## Constraints / rules (carry forward)
 
