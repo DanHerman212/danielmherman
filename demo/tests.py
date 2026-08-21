@@ -229,25 +229,25 @@ class FixtureModeTests(TestCase):
         )
 
     def test_risk_chip_returns_real_predict_and_rag(self):
-        """Risk + citations come from the synthetic predict and rag fixtures
-        captured from the live synthetic index for the primary patient."""
-        response = self._post({'hadm_id': 90000017, 'chip': 'risk'})
+        """Risk + citations come from the hybrid predict and rag fixtures
+        captured from the live hybrid index for the primary patient."""
+        response = self._post({'hadm_id': 90000009, 'chip': 'risk'})
         self.assertEqual(response.status_code, 200)
         body = response.json()
         self.assertEqual(body['source'], 'fixture')
         names = [tc['name'] for tc in body['tool_calls']]
         self.assertEqual(names, ['predict_readmission', 'rag_search'])
-        self.assertIn('29.9%', body['answer'])
+        self.assertIn('13.1%', body['answer'])
         self.assertIn('^[1]', body['answer'])
         rag = next(tc['response'] for tc in body['tool_calls']
                    if tc['name'] == 'rag_search')
         self.assertEqual(rag['returned'], 5)
 
     def test_meds_chip_without_captured_passages_is_honest_empty(self):
-        # A synthetic patient with a real risk payload but no captured rag
+        # A hybrid patient with a real risk payload but no captured rag
         # passages, so retrieval must be the honest empty (returned: 0), never
         # fabricated.
-        response = self._post({'hadm_id': 90000001, 'chip': 'meds'})
+        response = self._post({'hadm_id': 90000017, 'chip': 'meds'})
         self.assertEqual(response.status_code, 200)
         body = response.json()
         rag = body['tool_calls'][0]['response']
@@ -366,6 +366,9 @@ class A2uiCanvasTests(TestCase):
         # Screen 3: the trace toggle (top-right of the canvas pane) now drives
         # the whole trace journey in the A2UI demo.
         self.assertContains(response, 'id="trace-toggle"')
+        # The production demo (A2UI) header carries the Demo User Guide link.
+        self.assertContains(response, 'Demo User Guide')
+        self.assertContains(response, reverse('demo:guide'))
         # Cache-busted stylesheet + module links so the shell CSS and the A2UI
         # component module are never stale in the browser.
         self.assertContains(response, 'demo_splitpane.css?v=6')
