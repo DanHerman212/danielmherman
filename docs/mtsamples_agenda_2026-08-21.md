@@ -150,6 +150,40 @@ coverage: `brief_hospital_course` 71, `discharge_diagnosis` 62, `hpi` 38,
   (79/24/5 provisional). Selection should deliberately seek out the low and
   borderline story-compatible notes rather than assuming a natural 8/8/8.
 
+## Step 2.7–2.8: fill strategy + selection (2026-08-21, done)
+
+- **Story-anchored fill (script `fill_features.py`, mirrors the deployed
+  ReadmissionPredictor locally: model.bst + manifest + threshold, TreeSHAP
+  top_factors aggregated to parent groups).** Every feature family parses
+  from text when present, else fills from note signals with recorded
+  provenance (parsed vs filled + basis) in `data/mtsamples/fill.json`.
+- **Prior-procedure fix:** MTSamples records prior surgical history as
+  "status post [procedure]" — counting those as prior-admission signals was the
+  single biggest coherence fix (complex notes like `1195` were scoring low
+  with naive fill; now read high-risk with `prior_inpatient_days` as top
+  driver). Prior/admission/LOS/ED values are capped.
+- **Med-count fix:** the dose-anchored counter (uppercase drug + mg) missed
+  lowercase drugs ("ganciclovir 275 mg") and fraction doses ("Percocet 5/500"),
+  so 26 notes with a meds section counted 0 and produced incoherent
+  "medication_count increases risk" cards. Counter now case-insensitive +
+  fraction-dose aware.
+- **Band distribution after fill:** 43 low / 46 borderline / 19 high (healthy
+  baseline: 79/24/5; story-blind lower bound). The fill materially re-ranks
+  notes by their actual story.
+- **Selection (script `select_notes.py` → `data/mtsamples/selection_24.json`):**
+  24 notes, 8 per band, scored by chip support (meds/summarize/risk/citations)
+  + section count + race-parsed preference. Chosen notes span real clinical
+  archetypes (Kawasaki, tibial plateau fracture, respiratory failure → low;
+  chest pain/fever, bacteremia, GI bleed, migraine → borderline; cervical
+  carcinoma, cholelithiasis, BRCA-2, RSV bronchiolitis → high).
+- **Coherence gate (script `check_coherence.py`):** of the 24, 17 are fully
+  traceable (top factor's provenance appears in the note), 3 story-misses
+  (parsed-value text-match limitations, not story breaks), **4 race-fill
+  artifacts** — top factor is `race` but the note never mentions race (filled
+  `race_unknown`; the model's race_unknown attribution shows as a card factor).
+  → **Open decision for the build:** either prefer race-parsed notes in the
+  final 24, or suppress filled-only race from the displayed top_factors.
+
 ## Constraints / rules (carry forward)
 
 - **No raw MTSamples text in git** (gitignore; ship derived/processed only, with
