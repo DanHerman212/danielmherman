@@ -309,6 +309,15 @@ class A2uiCanvasTests(TestCase):
         self.assertIn('SourceCard', types)
         self.assertNotIn('RiskBar', types)
         self.assertTrue(env['fallback_text'])
+        # No bare-dash provenance: a non-risk question says plainly there is
+        # no estimate rather than rendering "Model — · features from —".
+        prov = next(c for c in comps if c.get('id') == 'prov')
+        self.assertNotIn('Model —', prov['text'])
+        self.assertIn('no readmission estimate was requested', prov['text'])
+        # The cited source card carries the actual section, not the query.
+        source = next(c for c in comps if c.get('component') == 'SourceCard')
+        self.assertEqual(source['section'], 'discharge_medications')
+        self.assertEqual(source['cite'], 1)
 
     def test_a2ui_ask_returns_messages_from_fixture(self):
         response = self.client.post(

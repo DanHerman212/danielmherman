@@ -17,7 +17,7 @@ import { MessageProcessor } from '/static/vendor/a2ui/a2ui_web_core_0.10.5_v0_9_
 import { basicCatalog, Context } from '/static/vendor/a2ui/a2ui_lit_0.10.2_v0_9_external_lit_zod.js';
 import { ContextProvider } from '/static/vendor/a2ui/lit_context_1.1.6_external_lit.js';
 import { renderMarkdown } from '/static/vendor/a2ui/a2ui_markdown-it_0.1.0.js';
-import { buildRiskCatalog } from '/static/vendor/a2ui/a2ui_risk_components.js?v=4';
+import { buildRiskCatalog } from '/static/vendor/a2ui/a2ui_risk_components.js?v=5';
 
 const root = document.getElementById('a2ui-root');
 

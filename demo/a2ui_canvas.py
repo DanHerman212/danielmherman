@@ -136,12 +136,19 @@ def compose_risk_canvas(predict: dict | None, rag: dict | None) -> dict:
             f"probability ({probability:.4f}), {band} at a {threshold:.2f} threshold."
         )
 
-    model = estimate.get('model_version', 'unknown') if estimate else '—'
-    feature_source = estimate.get('feature_source', 'unknown') if estimate else '—'
+    # Provenance caption. For a risk estimate it names the model + feature
+    # source (the two facts a reviewer checks). For a non-risk question there
+    # is no estimate, so we say so plainly instead of rendering bare dashes
+    # that read as a rendering bug.
+    if estimate:
+        model = estimate.get('model_version', 'unknown')
+        feature_source = estimate.get('feature_source', 'unknown')
+        prov_text = f"Model {model} · features from {feature_source} · A2UI canvas"
+    else:
+        prov_text = "No model — no readmission estimate was requested for this question."
     children.append("prov")
     components.append({"id": "prov", "component": "Text",
-                       "text": f"Model {model} · features from {feature_source} · "
-                               "A2UI canvas",
+                       "text": prov_text,
                        "variant": "caption"})
 
     # Cited source (the first passage's section text — matches the custom demo).

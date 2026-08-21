@@ -217,7 +217,7 @@ class SourceCardElement extends A2uiLitElement {
     const body = this._expanded ? full : preview;
     return html`
       <div class="widget widget-source">
-        <div class="widget-title">Source · ${props.query || 'discharge note'}</div>
+        <div class="widget-title">Source · ${String(props.section || props.query || 'discharge note').replace(/_/g, ' ')}</div>
         <div class="source-passage">
           <div class="source-head">
             <span class="source-cite">[${props.cite}]</span>
