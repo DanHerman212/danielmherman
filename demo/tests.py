@@ -59,6 +59,31 @@ class DemoAuthTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertIn('/accounts/login/', response['Location'])
 
+    def test_guide_requires_login(self):
+        response = self.client.get(reverse('demo:guide'))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/accounts/login/', response['Location'])
+
+    def test_guide_renders_journeys_for_logged_in_user(self):
+        user = User.objects.create_user(username='dr', password='x')
+        self.client.force_login(user)
+        # Plain storage: rendering console-derived templates needs no
+        # collected-manifest entry (the site uses CompressedManifest storage).
+        with override_settings(STORAGES={
+            **settings.STORAGES,
+            'staticfiles': {
+                'BACKEND': 'django.contrib.staticfiles.storage.'
+                           'StaticFilesStorage'},
+        }):
+            response = self.client.get(reverse('demo:guide'))
+        self.assertEqual(response.status_code, 200)
+        body = response.content.decode()
+        for anchor in (
+            'journey-risk', 'journey-ask', 'journey-verify', 'journey-compare',
+        ):
+            self.assertIn(f'id="{anchor}"', body)
+        self.assertIn('Demo User Guide', body)
+
     def test_ask_requires_login(self):
         response = self.client.post(
             reverse('demo:ask'), data='{}', content_type='application/json'

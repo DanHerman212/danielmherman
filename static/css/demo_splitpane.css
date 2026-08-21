@@ -62,6 +62,15 @@ body:has(#demo-root), body:has(#a2ui-root) { overflow-x: auto; }
   padding: 0 4px; border: 2px solid var(--surface);
 }
 .demo-user { display: flex; align-items: center; gap: 9px; margin-left: 4px; }
+.demo-guide-link {
+  display: inline-flex; align-items: center; gap: 7px;
+  height: 38px; padding: 0 14px; border-radius: 9px;
+  border: 1px solid var(--line); background: var(--surface); color: var(--text);
+  font-size: 0.82rem; font-weight: 600; text-decoration: none;
+  cursor: pointer; white-space: nowrap;
+}
+.demo-guide-link:hover { background: var(--surface-2); color: var(--accent); }
+.demo-guide-link i { font-size: 0.95rem; color: var(--accent); }
 .demo-user-avatar {
   width: 36px; height: 36px; border-radius: 50%; background: #1f2937; color: #fff;
   display: inline-flex; align-items: center; justify-content: center;

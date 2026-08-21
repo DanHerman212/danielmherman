@@ -1,0 +1,229 @@
+{% extends "demo/console.html" %}
+{% load static %}
+{% comment %}
+Demo User Guide — journey-structured walkthrough of the Enterprise Clinical
+Copilot demo.
+
+Extends console.html so the shell (header + sidebar + footer) is identical to
+the app the reviewer is being taught to use; only the main view is replaced.
+Sections are organised by user journey (assess → ask → verify → compare), each
+with a screenshot slot + short caption. Until live screenshots are captured,
+each slot renders an honest "screenshot pending" placeholder.
+
+Route: demo/guide  (login required, like the rest of the demo)
+{% endcomment %}
+
+{% block title %}Demo User Guide · Enterprise Clinical Copilot{% endblock %}
+
+{% block extra_css %}
+  {{ block.super }}
+  <link rel="stylesheet" href="{% static 'css/demo_guide.css' %}?v=1">
+{% endblock %}
+
+{% block content %}
+{% comment %}ECC-styled top bar (reuses console header classes) so the guide
+reads as part of the product and links back to the demo. guide-root
+re-declares the theme tokens console.html gets from #demo-root, so the
+header and colors match the console exactly.{% endcomment %}
+<div class="guide-root">
+<header class="demo-header">
+  <div class="demo-header-left">
+    <a class="demo-brand" href="{% url 'demo:console' %}"
+       aria-label="Enterprise Clinical Copilot — back to demo">
+      <svg class="ecc-logo" viewBox="0 0 48 48" role="img" aria-hidden="true">
+        <rect x="1" y="1" width="46" height="46" rx="11" fill="#1f2937"/>
+        <text x="24" y="31" text-anchor="middle"
+              font-family="Inter, system-ui, sans-serif"
+              font-size="17" font-weight="700" letter-spacing="1"
+              fill="#ffffff">ECC</text>
+      </svg>
+      <span class="demo-brand-name">Enterprise Clinical<br/>Copilot</span>
+    </a>
+  </div>
+  <div class="demo-header-right">
+    <a class="demo-guide-link" href="{% url 'demo:console' %}">
+      <i class="fa-solid fa-arrow-left"></i>
+      <span>Back to demo</span>
+    </a>
+  </div>
+</header>
+
+<div class="guide-shell">
+
+  <header class="guide-hero">
+    <p class="guide-eyebrow">Enterprise Clinical Copilot</p>
+    <h1 class="guide-title">Demo User Guide</h1>
+    <p class="guide-lede">
+      This demo runs the <strong>live system</strong> — a real agent, a real
+      retrieval index, and a real readmission-risk model — on
+      <strong>de-identified transcription samples</strong> whose feature rows
+      are parsed from the note and plausibly filled where the note is silent.
+      Nothing here is stubbed.
+    </p>
+    <p class="guide-notes">
+      Four ways to explore, in the order a reviewer naturally goes.
+    </p>
+  </header>
+
+  <nav class="guide-toc" aria-label="Guide sections">
+    <ol>
+      <li><a href="#journey-risk">Assess a patient's readmission risk</a></li>
+      <li><a href="#journey-ask">Ask the agent about a patient</a></li>
+      <li><a href="#journey-verify">Verify the evidence</a></li>
+      <li><a href="#journey-compare">See the cohort spread</a></li>
+    </ol>
+  </nav>
+
+  {# ---------------- Journey 1: assess risk ---------------- #}
+  <section id="journey-risk" class="guide-journey">
+    <div class="guide-journey-head">
+      <span class="guide-step">1</span>
+      <div>
+        <h2>Assess a patient's readmission risk</h2>
+        <p class="guide-sub">
+          Open <strong>Readmission Risk</strong> in the left nav, pick a patient
+          from the rail, and read the assessment card.
+        </p>
+      </div>
+    </div>
+    <div class="guide-body">
+      <figure class="guide-shot">
+        <div class="shot-frame shot-pending" data-slot="risk-card" aria-hidden="true">
+          <span>Screenshot: risk card (pending)</span>
+        </div>
+        <figcaption>
+          The card shows the 30-day readmission <strong>probability</strong>, the
+          band it falls in (low / borderline / high), and the model's
+          <strong>top contributing factors</strong> — the story behind the number.
+        </figcaption>
+      </figure>
+      <ol class="guide-points">
+        <li>Note the <strong>band</strong>: each patient is low (&lt; 12%), borderline
+          (12–20%), or high (&gt; 20%).</li>
+        <li>Read the <strong>top factors</strong> — they explain <em>why</em> the
+          model says what it says, not just a number.</li>
+        <li>Every factor is traceable: it comes from the note's own text where
+          present, or from a feature filled consistently with the note's story.</li>
+      </ol>
+    </div>
+  </section>
+
+  {# ---------------- Journey 2: ask the agent ---------------- #}
+  <section id="journey-ask" class="guide-journey">
+    <div class="guide-journey-head">
+      <span class="guide-step">2</span>
+      <div>
+        <h2>Ask the agent about a patient</h2>
+        <p class="guide-sub">
+          Use the starter chips or type a question. The agent answers from the
+          patient's real note — with citations, not free prose.
+        </p>
+      </div>
+    </div>
+    <div class="guide-body">
+      <figure class="guide-shot">
+        <div class="shot-frame shot-pending" data-slot="agent-chat" aria-hidden="true">
+          <span>Screenshot: agent chat + citations (pending)</span>
+        </div>
+        <figcaption>
+          Ask <em>"what is this patient at risk for?"</em>, <em>"list the discharge
+          medications"</em>, or <em>"summarize the hospital course"</em>. The answer
+          cites the section it drew from.
+        </figcaption>
+      </figure>
+      <ol class="guide-points">
+        <li><strong>Chips</strong> (risk / meds / summarize) send a fixed intent so
+          the live agent answers the question you meant to ask.</li>
+        <li><strong>Medications</strong> shows the real discharge list from the
+          note — including genuine polypharmacy where the note has it.</li>
+        <li><strong>Summarize</strong> condenses the hospital course, again from
+          the note's own sections.</li>
+      </ol>
+    </div>
+  </section>
+
+  {# ---------------- Journey 3: verify the evidence ---------------- #}
+  <section id="journey-verify" class="guide-journey">
+    <div class="guide-journey-head">
+      <span class="guide-step">3</span>
+      <div>
+        <h2>Verify the evidence</h2>
+        <p class="guide-sub">
+          This is the part that matters. Click a citation and read the exact
+          note text behind it.
+        </p>
+      </div>
+    </div>
+    <div class="guide-body">
+      <figure class="guide-shot">
+        <div class="shot-frame shot-pending" data-slot="source-panel" aria-hidden="true">
+          <span>Screenshot: cited note section (pending)</span>
+        </div>
+        <figcaption>
+          Every claim opens the <strong>source panel</strong>: the note section
+          (e.g. "Discharge Medications", "Brief Hospital Course") the agent drew
+          from. Nothing is paraphrased into a fact the note doesn't contain.
+        </figcaption>
+      </figure>
+      <ol class="guide-points">
+        <li>Citations point at <strong>real sections of a real transcription</strong>,
+          not fabricated passages.</li>
+        <li>Cross-check the agent's answer against the source text — they will
+          agree, because the answer is grounded in it.</li>
+        <li>Ask a follow-up that challenges a claim; the agent re-grounds on the
+          same note.</li>
+      </ol>
+    </div>
+  </section>
+
+  {# ---------------- Journey 4: compare the cohort ---------------- #}
+  <section id="journey-compare" class="guide-journey">
+    <div class="guide-journey-head">
+      <span class="guide-step">4</span>
+      <div>
+        <h2>See the cohort spread</h2>
+        <p class="guide-sub">
+          The rail spans all three bands, so you can compare a low-risk and a
+          high-risk patient side by side.
+        </p>
+      </div>
+    </div>
+    <div class="guide-body">
+      <figure class="guide-shot">
+        <div class="shot-frame shot-pending" data-slot="cohort-rail" aria-hidden="true">
+          <span>Screenshot: patient rail with band dots (pending)</span>
+        </div>
+        <figcaption>
+          Each patient's dot is colored by band. Pick one from each band and the
+          difference in story, factors, and meds should be obvious.
+        </figcaption>
+      </figure>
+      <ol class="guide-points">
+        <li>A <strong>low</strong>-risk patient has few drivers and a light meds
+          list.</li>
+        <li>A <strong>high</strong>-risk patient's card is dominated by real
+          drivers (age, prior admissions, procedures, polypharmacy).</li>
+        <li>The same note ↔ feature ↔ risk coherence rule holds for every patient
+          in the rail.</li>
+      </ol>
+    </div>
+  </section>
+
+  <footer class="guide-footer">
+    <h3>About the data</h3>
+    <p>
+      Notes are de-identified medical transcription samples (source: MTSamples),
+      selected to span low / borderline / high risk. Feature rows are parsed from
+      each note where the value appears in text, and filled consistently with the
+      note's story elsewhere. The risk score is produced by the real served model
+      — the same one the deployed endpoint answers with.
+    </p>
+    <p class="guide-muted">
+      For a deeper look at the analysis and the hybrid data decision, see the
+      project's curation notes.
+    </p>
+  </footer>
+
+</div>
+</div>
+{% endblock %}
