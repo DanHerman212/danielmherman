@@ -1,37 +1,37 @@
 {
   "hadm_id": 90000009,
-  "probability": 0.154016,
+  "probability": 0.13124,
   "threshold": 0.12,
   "decision": 1,
   "base_value": -1.33862,
   "top_factors": [
     {
-      "feature": "discharge_location",
-      "contribution": -1.1372,
+      "feature": "prior_inpatient_days",
+      "contribution": -0.2393,
       "direction": "decreases"
     },
     {
-      "feature": "prior_inpatient_days",
-      "contribution": 0.3137,
-      "direction": "increases"
-    },
-    {
-      "feature": "sodium_last",
-      "contribution": 0.2089,
-      "direction": "increases"
-    },
-    {
       "feature": "oncology_flag",
-      "contribution": 0.0979,
+      "contribution": -0.1209,
+      "direction": "decreases"
+    },
+    {
+      "feature": "index_los_days",
+      "contribution": 0.1128,
       "direction": "increases"
     },
     {
-      "feature": "race",
-      "contribution": 0.0643,
-      "direction": "increases"
+      "feature": "prior_admission_count",
+      "contribution": -0.0893,
+      "direction": "decreases"
+    },
+    {
+      "feature": "rdw_max",
+      "contribution": -0.0837,
+      "direction": "decreases"
     }
   ],
   "model_version": "readmission-final-20260723172647",
-  "feature_source": "synthetic",
-  "provenance": "SYNTHETIC \u2014 local run of the serving predictor on synthetic cohort features (2026-08-20)"
+  "feature_source": "hybrid",
+  "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
 }
