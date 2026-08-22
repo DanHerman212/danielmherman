@@ -1,7 +1,7 @@
 # Hybrid Demo — Comprehensive Test-Suite Agenda
 
-Status: SPRINT HANDOFF · end of 2026-08-21 — see §0 for where we are; next
-session starts at §6 "Tomorrow's sprint".
+Status: SPRINT A COMPLETE · 2026-08-22 — demo working in production with all
+fixes verified. Next: §6 Sprint B (Demo User Guide screenshots).
 Scope: the production A2UI demo at `www.danielmherman.com/demo/a2ui/` (the real,
 live system — real MTSamples notes, real served model, real RAG index). This
 agenda drives a top-to-bottom pass so every capability is verified and any
@@ -12,7 +12,41 @@ unverified, needs a test · `[~]` = works but has a caveat.
 
 ---
 
-## 0. Current state (end of 2026-08-21 — pause, resume here)
+## 0. Sprint A result (2026-08-22)
+
+### Done + verified in production
+- `[x]` **Citation links fixed** — SourceCard now shows the cited section body
+  (alias-aware extraction mirroring harness `KNOWN_HEADINGS`); clicking `^[n]`
+  re-renders the SourceCard to the correct extracted section. Verified live on
+  risk + meds turns, no console errors.
+- `[x]` **Meds citation semantics** — canvas composes SourceCard from the
+  answer's first citation (`first_citation` + `cite=` param); agent prompt
+  strengthened (cite the `discharge_medications` passage, not `^[1]`).
+- `[x]` **Gender/sex coherence — full cohort corrected** — root cause was a
+  feature-encoding inversion (fill set F→1.0 but model encodes 1=male). Fixed
+  `fill_features.py`, rebuilt cohort (re-scored: 7 low / 14 borderline / 3
+  high), reloaded BigQuery hybrid_*, re-seeded site. 0 gender mismatches now.
+  90000015 → Cynthia Petrov 61F (0.1515), 90000009 → Linda Okafor 48F (0.1254),
+  90000017 → Deborah Sokolov 47F (0.1572, now borderline).
+- `[x]` **Blank provenance fixed** — non-risk canvas shows "No model — no
+  readmission estimate was requested" (no dashes).
+- `[x]` **Endpoints redeployed + live** — predict (readmission-endpoint) + RAG
+  (readmission-rag-index → rag_tree_ah). Live predict + RAG verified.
+- `[x]` **Site deployed** (build ae005219) + production pass green (43 tests).
+- `[x]` Commits pushed: ECC `787b930`, site `2ceb7b7`.
+
+### Remaining notes
+- `[~]` RAG fixtures (`rag_*_90000009.json`) are still the prior captures —
+  valid content (index text unchanged), but provenance can be refreshed by
+  re-running `build_hybrid_fixtures.py` now that the endpoint is up.
+- `[?]` `PREDICT_PATIENTS` is [90000001, 90000009, 90000017] but 90000017 is
+  now borderline (was high). The true high patient is now 90000024 (0.2104).
+  Consider updating PREDICT_PATIENTS → [90000001, 90000009, 90000024] for a
+  real low/borderline/high trio used by the guide screenshots.
+
+---
+
+## 0a. Session goals (from the user)
 
 ### Repos / branches
 - `danielmherman` (site) — branch `main`, HEAD `4f8f2e8` (on origin/main).
