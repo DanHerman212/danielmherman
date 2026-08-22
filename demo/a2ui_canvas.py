@@ -22,14 +22,91 @@ SURFACE_ID = "risk-canvas"
 A2UI_VERSION = "v0.9"
 AUDIENCE = ["user"]
 
-# The note section headers the chunker used (mirrors the client-side list).
-_SECTION_HEADERS = [
-    "History of Present Illness", "Past Medical History", "Family History",
-    "Social History", "Physical Exam", "Brief Hospital Course",
-    "Discharge Condition", "Discharge Diagnosis", "Discharge Medications",
-    "Medications on Admission", "Discharge Disposition", "Discharge Instructions",
-    "Chief Complaint", "Major Surgical or Invasive Procedure",
-]
+# Section header aliases per canonical section — mirrors the harness
+# `rag/sections.py KNOWN_HEADINGS` (MTSamples discharge summaries use these
+# variants, e.g. "Hospital Course:", "Discharge Diagnoses:", "Medications:").
+# Extraction uses these BOTH to locate a section's start and to bound its end
+# (the next known header), so a citation click shows the cited section's body
+# instead of the whole note.
+_SECTION_ALIASES: dict[str, tuple[str, ...]] = {
+    "chief_complaint": ("Chief Complaint", "Reason for Admission"),
+    "major_procedure": (
+        "Major Surgical or Invasive Procedure",
+        "Major Surgical or Invasive Procedures",
+        "Procedure", "Procedures", "Procedures Performed",
+        "Operations Performed", "Principal Procedure", "Principal Procedures",
+        "Procedure Performed During This Hospitalization",
+        "Procedures During This Hospitalization",
+        "Procedures During Hospitalization", "Operations and Procedures",
+    ),
+    "history_of_present_illness": (
+        "History of Present Illness", "HPI", "History", "History of Illness",
+        "Brief History", "Brief History of Present Illness", "Current History",
+    ),
+    "review_of_systems": ("Review of Systems", "ROS"),
+    "past_medical_history": (
+        "Past Medical History", "PMH", "Past History",
+        "Past Medical/Family/Social History", "Past Medical, Family, Social History",
+    ),
+    "past_surgical_history": ("Past Surgical History", "Surgical History"),
+    "social_history": ("Social History",),
+    "family_history": ("Family History",),
+    "physical_exam": (
+        "Physical Exam", "Physical Examination", "Admission Exam",
+        "Admission Physical Exam", "Discharge Exam", "Discharge Physical Exam",
+        "Discharge Physical Examination",
+        "Physical Examination at the Time of Discharge",
+        "Physical Examination on Discharge",
+    ),
+    "pertinent_results": (
+        "Pertinent Results", "Pertinent Labs", "Laboratory Data",
+        "Laboratory Studies", "Laboratory", "Pertinent Laboratories",
+        "Discharge Labs", "Laboratories on Admission",
+        "Significant Labs and X-Rays", "Additional Laboratory Studies",
+    ),
+    "brief_hospital_course": (
+        "Brief Hospital Course", "Hospital Course", "Course in the Hospital",
+        "History and Hospital Course", "Brief Hospital Course Summary",
+        "Brief Summary of Hospital Course",
+    ),
+    "medications_on_admission": ("Medications on Admission",),
+    "discharge_medications": (
+        "Discharge Medications", "Medications", "Medications on Discharge",
+        "Home Medications", "New Medications", "Current Medications",
+        "Medications and Advice on Discharge", "Discharge Medications/Instructions",
+    ),
+    "discharge_disposition": ("Discharge Disposition", "Disposition"),
+    "discharge_diagnosis": (
+        "Discharge Diagnosis", "Discharge Diagnoses",
+        "Admission Diagnosis", "Admission Diagnoses", "Admitting Diagnosis",
+        "Admitting Diagnoses", "Secondary Diagnosis", "Secondary Diagnoses",
+        "Diagnoses on Admission", "Diagnoses on Discharge", "Primary Diagnoses",
+        "Final Diagnosis", "Final Diagnoses",
+    ),
+    "discharge_condition": (
+        "Discharge Condition", "Condition", "Condition on Discharge",
+        "Conditions on Discharge", "Condition Upon Discharge", "Condition at Discharge",
+        "Condition of Patient on Discharge", "Condition of the Patient at Discharge",
+    ),
+    "discharge_instructions": (
+        "Discharge Instructions", "Discharge Plan", "Additional Instructions",
+        "Special Instructions", "Instructions to Patient", "Discharge Diet",
+        "Discharge Activities", "Physical Activity",
+        # MTSamples 2788-style long-form instructions header (the demo
+        # extracts it directly; the harness alias list is the source of truth
+        # for chunking and may adopt it too).
+        "Instructions Given to the Patient at the Time of Discharge",
+    ),
+    "followup_instructions": (
+        "Followup Instructions", "Follow-up Instructions", "Followup",
+        "Follow Up", "Follow-Up", "Followup Appointments",
+        "Instructions for Followup",
+    ),
+    "facility": ("Facility",),
+}
+
+# Every known header, flattened — bounds the end of an extracted section.
+_ALL_HEADERS = tuple(h for aliases in _SECTION_ALIASES.values() for h in aliases)
 
 
 def _band(probability: float, threshold: float) -> str:
@@ -42,23 +119,38 @@ def _band(probability: float, threshold: float) -> str:
 
 
 def _extract_section(note_text: str, section: str) -> str | None:
-    """Extract a named section's text from a full note (mirrors the client)."""
-    title = str(section or "").replace("_", " ")
-    if not title:
+    """Extract a named section's body from a full note (mirrors the client).
+
+    Alias-aware: matches the section's MTSamples header variants (e.g.
+    "Hospital Course:" for brief_hospital_course), then bounds the body at the
+    next known header. Returns None only when the section is genuinely absent.
+    """
+    if not note_text:
         return None
-    m = re.search(rf"\b{re.escape(title)}\b\s*:", note_text, re.IGNORECASE)
-    if not m:
+    aliases = _SECTION_ALIASES.get(section) or (str(section or "").replace("_", " "),)
+    if not aliases[0]:
         return None
-    start = m.start()
+    # Locate the section start via the first alias that appears in the note.
+    start = None
+    matched = None
+    for alias in aliases:
+        m = re.search(rf"\b{re.escape(alias)}\b\s*:", note_text, re.IGNORECASE)
+        if m:
+            start = m.start()
+            matched = m.group(0)
+            break
+    if start is None or matched is None:
+        return None
+    # Bound the end at the next known header after the section title.
     end = len(note_text)
-    for header in _SECTION_HEADERS:
+    for header in _ALL_HEADERS:
         hm = re.search(
             rf"\n\s*{re.escape(header)}\s*:",
-            note_text[start + len(m.group(0)):],
+            note_text[start + len(matched):],
             re.IGNORECASE,
         )
         if hm:
-            candidate = start + len(m.group(0)) + hm.start()
+            candidate = start + len(matched) + hm.start()
             if candidate < end:
                 end = candidate
     return note_text[start:end].strip()
@@ -81,7 +173,22 @@ def _usable_estimate(predict) -> dict | None:
     return predict
 
 
-def compose_risk_canvas(predict: dict | None, rag: dict | None) -> dict:
+def first_citation(answer: str) -> int:
+    """The first citation number in the answer prose (^[n]), or 1 if none.
+
+    The canvas's SourceCard mirrors the agent's own citation: whichever passage
+    the answer cites first is the one the canvas shows. The agent numbers
+    passages in the order the tool returned them, so this keeps the composed
+    canvas aligned with the prose even when the first cited section isn't the
+    first passage (e.g. a meds answer that cites the discharge_medications
+    passage, which is ^[3] in rag_search_sections order).
+    """
+    m = re.search(r"\^\[(\d+)", answer or "")
+    return int(m.group(1)) if m else 1
+
+
+def compose_risk_canvas(predict: dict | None, rag: dict | None,
+                        cite: int = 1) -> dict:
     """Turn one predict (+ rag) payload into the A2UI risk-canvas envelope.
 
     predict is None when the question did not request a readmission estimate
@@ -151,19 +258,22 @@ def compose_risk_canvas(predict: dict | None, rag: dict | None) -> dict:
                        "text": prov_text,
                        "variant": "caption"})
 
-    # Cited source (the first passage's section text — matches the custom demo).
-    # Kept as the LAST child so it can pin to the bottom of the canvas (sticky)
-    # and the discharge notes stay in view however long the session gets.
+    # Cited source — the passage the answer cites first (mirrors the custom
+    # demo). Kept as the LAST child so it can pin to the bottom of the canvas
+    # (sticky) and the discharge notes stay in view however long the session
+    # gets.
     passages = (rag or {}).get("passages") or []
     query = (rag or {}).get("query") or "discharge note"
     children.append("source")
     if passages:
-        first = passages[0]
-        section_text = _extract_section(first.get("text", ""), first.get("section", ""))
+        # cite is 1-based from the answer prose; clamp to a real passage.
+        idx = min(max(cite, 1), len(passages)) - 1
+        cited = passages[idx]
+        section_text = _extract_section(cited.get("text", ""), cited.get("section", ""))
         components.append({"id": "source", "component": "SourceCard",
-                           "cite": 1,
-                           "section": first.get("section", "discharge note"),
-                           "text": section_text or first.get("text", ""),
+                           "cite": idx + 1,
+                           "section": cited.get("section", "discharge note"),
+                           "text": section_text or cited.get("text", ""),
                            "query": query})
     else:
         components.append({"id": "source", "component": "SourceCard",

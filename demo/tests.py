@@ -237,7 +237,9 @@ class FixtureModeTests(TestCase):
         self.assertEqual(body['source'], 'fixture')
         names = [tc['name'] for tc in body['tool_calls']]
         self.assertEqual(names, ['predict_readmission', 'rag_search'])
-        self.assertIn('13.1%', body['answer'])
+        # 90000009's hybrid probability after the gender-encoding correction
+        # (female note 1568 scored as female, 0.125356).
+        self.assertIn('12.5%', body['answer'])
         self.assertIn('^[1]', body['answer'])
         rag = next(tc['response'] for tc in body['tool_calls']
                    if tc['name'] == 'rag_search')
@@ -318,6 +320,42 @@ class A2uiCanvasTests(TestCase):
         source = next(c for c in comps if c.get('component') == 'SourceCard')
         self.assertEqual(source['section'], 'discharge_medications')
         self.assertEqual(source['cite'], 1)
+
+    def test_extract_section_handles_mtsamples_headers(self):
+        """Alias-aware extraction: MTSamples notes use different headers than
+        MIMIC canon ("HOSPITAL COURSE:", "DISCHARGE DIAGNOSES:"), and the
+        SourceCard body must come from the cited section — not the whole note.
+        This is the citation-links fix."""
+        from demo.a2ui_canvas import _extract_section
+        note = (
+            "CHIEF COMPLAINT: Knee pain.\n\n"
+            "HISTORY OF PRESENT ILLNESS: The patient is a 61-year-old female.\n\n"
+            "HOSPITAL COURSE: She underwent a right total knee replacement and "
+            "recovered well.\n\n"
+            "DISCHARGE DIAGNOSES: 1. S/p right TKA.\n\n"
+            "MEDICATIONS: Celebrex 200 mg daily.\n\n"
+            "INSTRUCTIONS GIVEN TO THE PATIENT AT THE TIME OF DISCHARGE: "
+            "Continue Celebrex for one month."
+        )
+        course = _extract_section(note, 'brief_hospital_course')
+        self.assertIsNotNone(course)
+        self.assertIn('right total knee replacement', course)
+        self.assertNotIn('CHIEF COMPLAINT', course)
+        self.assertNotIn('DISCHARGE DIAGNOSES', course)
+
+        dx = _extract_section(note, 'discharge_diagnosis')
+        self.assertIsNotNone(dx)
+        self.assertIn('S/p right TKA', dx)
+        self.assertNotIn('HOSPITAL COURSE', dx)
+
+        meds = _extract_section(note, 'discharge_medications')
+        self.assertIsNotNone(meds)
+        self.assertIn('Celebrex', meds)
+
+        instr = _extract_section(note, 'discharge_instructions')
+        self.assertIsNotNone(instr)
+        self.assertIn('for one month', instr)
+        self.assertNotIn('Celebrex 200 mg daily.', instr[:len('MEDICATIONS: Celebrex 200 mg daily.')])
 
     def test_a2ui_ask_returns_messages_from_fixture(self):
         response = self.client.post(

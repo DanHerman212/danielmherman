@@ -13,7 +13,7 @@ from django.shortcuts import render
 from django.views.decorators.http import require_POST
 
 from .agent_client import AgentError, ask as ask_agent
-from .a2ui_canvas import compose_risk_canvas
+from .a2ui_canvas import compose_risk_canvas, first_citation
 from .fixtures import CHIPS, band_for, fixture_ask, risk_for
 from .models import DemoPatient, DemoQuota
 
@@ -270,8 +270,13 @@ def a2ui_ask(request):
                 'remaining': DemoQuota.remaining(request.user),
             }, status=502)
 
+    # The SourceCard mirrors the answer's own citation: whichever passage the
+    # agent cited first is the one the canvas shows, so a meds answer that
+    # cites the discharge_medications passage (^[3] in rag_search_sections
+    # order) is composed against that passage, not always the first one.
     result['a2ui'] = compose_risk_canvas(
         _tool_response(result, 'predict_readmission'),
-        _rag_response(result))
+        _rag_response(result),
+        cite=first_citation(result.get('answer') or ''))
     result['remaining'] = DemoQuota.remaining(request.user)
     return JsonResponse(result)

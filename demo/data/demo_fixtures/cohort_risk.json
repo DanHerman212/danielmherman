@@ -38,35 +38,35 @@
   },
   "90000002": {
     "hadm_id": 90000002,
-    "probability": 0.086004,
+    "probability": 0.098937,
     "threshold": 0.12,
     "decision": 0,
     "base_value": -1.33862,
     "top_factors": [
       {
         "feature": "race",
-        "contribution": -0.2962,
+        "contribution": -0.3337,
         "direction": "decreases"
       },
       {
         "feature": "prior_inpatient_days",
-        "contribution": -0.2655,
+        "contribution": -0.2746,
         "direction": "decreases"
       },
       {
         "feature": "oncology_flag",
-        "contribution": -0.1205,
+        "contribution": -0.1207,
         "direction": "decreases"
       },
       {
         "feature": "prior_admission_count",
-        "contribution": -0.1085,
+        "contribution": -0.1207,
         "direction": "decreases"
       },
       {
-        "feature": "discharge_location",
-        "contribution": -0.0841,
-        "direction": "decreases"
+        "feature": "medication_count",
+        "contribution": 0.1157,
+        "direction": "increases"
       }
     ],
     "model_version": "readmission-final-20260723172647",
@@ -75,34 +75,34 @@
   },
   "90000003": {
     "hadm_id": 90000003,
-    "probability": 0.088189,
+    "probability": 0.082062,
     "threshold": 0.12,
     "decision": 0,
     "base_value": -1.33862,
     "top_factors": [
       {
         "feature": "race",
-        "contribution": -0.3204,
+        "contribution": -0.3007,
         "direction": "decreases"
       },
       {
         "feature": "prior_inpatient_days",
-        "contribution": -0.2846,
+        "contribution": -0.2791,
         "direction": "decreases"
       },
       {
         "feature": "recent_ed_visits",
-        "contribution": 0.1762,
+        "contribution": 0.1796,
         "direction": "increases"
       },
       {
         "feature": "prior_admission_count",
-        "contribution": -0.1054,
+        "contribution": -0.0938,
         "direction": "decreases"
       },
       {
         "feature": "oncology_flag",
-        "contribution": -0.0854,
+        "contribution": -0.0831,
         "direction": "decreases"
       }
     ],
@@ -112,34 +112,34 @@
   },
   "90000004": {
     "hadm_id": 90000004,
-    "probability": 0.08928,
+    "probability": 0.106617,
     "threshold": 0.12,
     "decision": 0,
     "base_value": -1.33862,
     "top_factors": [
       {
         "feature": "race",
-        "contribution": -0.2313,
-        "direction": "decreases"
-      },
-      {
-        "feature": "discharge_location",
-        "contribution": -0.1928,
+        "contribution": -0.2392,
         "direction": "decreases"
       },
       {
         "feature": "prior_inpatient_days",
-        "contribution": 0.1926,
+        "contribution": 0.2095,
         "direction": "increases"
       },
       {
-        "feature": "medication_order_count",
-        "contribution": -0.1324,
+        "feature": "discharge_location",
+        "contribution": -0.1782,
         "direction": "decreases"
       },
       {
         "feature": "rdw_max",
-        "contribution": -0.1305,
+        "contribution": -0.1207,
+        "direction": "decreases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.1116,
         "direction": "decreases"
       }
     ],
@@ -149,35 +149,35 @@
   },
   "90000005": {
     "hadm_id": 90000005,
-    "probability": 0.091431,
+    "probability": 0.121444,
     "threshold": 0.12,
-    "decision": 0,
+    "decision": 1,
     "base_value": -1.33862,
     "top_factors": [
       {
         "feature": "prior_inpatient_days",
-        "contribution": -0.2511,
+        "contribution": -0.2544,
         "direction": "decreases"
       },
       {
         "feature": "oncology_flag",
-        "contribution": -0.1017,
+        "contribution": -0.1026,
         "direction": "decreases"
       },
       {
         "feature": "prior_admission_count",
-        "contribution": -0.0865,
+        "contribution": -0.098,
         "direction": "decreases"
       },
       {
         "feature": "gender",
-        "contribution": -0.0809,
-        "direction": "decreases"
+        "contribution": 0.0852,
+        "direction": "increases"
       },
       {
-        "feature": "medication_order_count",
-        "contribution": -0.0763,
-        "direction": "decreases"
+        "feature": "medication_count",
+        "contribution": 0.066,
+        "direction": "increases"
       }
     ],
     "model_version": "readmission-final-20260723172647",
@@ -186,34 +186,34 @@
   },
   "90000006": {
     "hadm_id": 90000006,
-    "probability": 0.09444,
+    "probability": 0.125961,
     "threshold": 0.12,
-    "decision": 0,
+    "decision": 1,
     "base_value": -1.33862,
     "top_factors": [
       {
         "feature": "prior_inpatient_days",
-        "contribution": -0.2549,
+        "contribution": -0.2589,
         "direction": "decreases"
       },
       {
         "feature": "oncology_flag",
-        "contribution": -0.1012,
+        "contribution": -0.1022,
         "direction": "decreases"
       },
       {
         "feature": "prior_admission_count",
-        "contribution": -0.0863,
+        "contribution": -0.0987,
         "direction": "decreases"
       },
       {
         "feature": "gender",
-        "contribution": -0.0836,
-        "direction": "decreases"
+        "contribution": 0.0881,
+        "direction": "increases"
       },
       {
-        "feature": "discharge_location",
-        "contribution": -0.0751,
+        "feature": "rdw_max",
+        "contribution": -0.0668,
         "direction": "decreases"
       }
     ],
@@ -223,35 +223,35 @@
   },
   "90000007": {
     "hadm_id": 90000007,
-    "probability": 0.101079,
+    "probability": 0.134487,
     "threshold": 0.12,
-    "decision": 0,
+    "decision": 1,
     "base_value": -1.33862,
     "top_factors": [
       {
         "feature": "prior_inpatient_days",
-        "contribution": -0.2548,
+        "contribution": -0.2588,
+        "direction": "decreases"
+      },
+      {
+        "feature": "medication_count",
+        "contribution": 0.1019,
+        "direction": "increases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.0987,
         "direction": "decreases"
       },
       {
         "feature": "oncology_flag",
-        "contribution": -0.0954,
-        "direction": "decreases"
-      },
-      {
-        "feature": "prior_admission_count",
-        "contribution": -0.0863,
+        "contribution": -0.0964,
         "direction": "decreases"
       },
       {
         "feature": "gender",
-        "contribution": -0.0836,
-        "direction": "decreases"
-      },
-      {
-        "feature": "discharge_location",
-        "contribution": -0.0744,
-        "direction": "decreases"
+        "contribution": 0.0881,
+        "direction": "increases"
       }
     ],
     "model_version": "readmission-final-20260723172647",
@@ -260,35 +260,35 @@
   },
   "90000008": {
     "hadm_id": 90000008,
-    "probability": 0.107714,
+    "probability": 0.113709,
     "threshold": 0.12,
     "decision": 0,
     "base_value": -1.33862,
     "top_factors": [
       {
         "feature": "prior_inpatient_days",
-        "contribution": -0.2305,
+        "contribution": -0.2322,
         "direction": "decreases"
       },
       {
         "feature": "discharge_location",
-        "contribution": -0.2174,
+        "contribution": -0.2134,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.0902,
         "direction": "decreases"
       },
       {
         "feature": "medication_order_count",
-        "contribution": -0.0977,
+        "contribution": -0.0844,
         "direction": "decreases"
       },
       {
         "feature": "recent_ed_visits",
-        "contribution": 0.0819,
+        "contribution": 0.0828,
         "direction": "increases"
-      },
-      {
-        "feature": "prior_admission_count",
-        "contribution": -0.0763,
-        "direction": "decreases"
       }
     ],
     "model_version": "readmission-final-20260723172647",
@@ -297,34 +297,34 @@
   },
   "90000009": {
     "hadm_id": 90000009,
-    "probability": 0.13124,
+    "probability": 0.125356,
     "threshold": 0.12,
     "decision": 1,
     "base_value": -1.33862,
     "top_factors": [
       {
         "feature": "prior_inpatient_days",
-        "contribution": -0.2393,
+        "contribution": -0.2294,
         "direction": "decreases"
       },
       {
         "feature": "oncology_flag",
-        "contribution": -0.1209,
+        "contribution": -0.1187,
         "direction": "decreases"
       },
       {
         "feature": "index_los_days",
-        "contribution": 0.1128,
+        "contribution": 0.1086,
         "direction": "increases"
       },
       {
-        "feature": "prior_admission_count",
-        "contribution": -0.0893,
+        "feature": "medication_order_count",
+        "contribution": -0.0825,
         "direction": "decreases"
       },
       {
         "feature": "rdw_max",
-        "contribution": -0.0837,
+        "contribution": -0.0814,
         "direction": "decreases"
       }
     ],
@@ -334,34 +334,34 @@
   },
   "90000010": {
     "hadm_id": 90000010,
-    "probability": 0.132293,
+    "probability": 0.144349,
     "threshold": 0.12,
     "decision": 1,
     "base_value": -1.33862,
     "top_factors": [
       {
         "feature": "prior_inpatient_days",
-        "contribution": 0.1235,
+        "contribution": 0.1327,
         "direction": "increases"
       },
       {
         "feature": "rdw_max",
-        "contribution": -0.1016,
+        "contribution": -0.0975,
         "direction": "decreases"
       },
       {
         "feature": "oncology_flag",
-        "contribution": -0.0912,
+        "contribution": -0.0938,
         "direction": "decreases"
       },
       {
-        "feature": "discharge_location",
-        "contribution": -0.061,
+        "feature": "prior_admission_count",
+        "contribution": -0.0687,
         "direction": "decreases"
       },
       {
         "feature": "hemoglobin_min",
-        "contribution": -0.0596,
+        "contribution": -0.0624,
         "direction": "decreases"
       }
     ],
@@ -371,34 +371,34 @@
   },
   "90000011": {
     "hadm_id": 90000011,
-    "probability": 0.132597,
+    "probability": 0.101725,
     "threshold": 0.12,
-    "decision": 1,
+    "decision": 0,
     "base_value": -1.33862,
     "top_factors": [
       {
         "feature": "prior_inpatient_days",
-        "contribution": -0.3059,
-        "direction": "decreases"
-      },
-      {
-        "feature": "prior_admission_count",
-        "contribution": -0.1173,
+        "contribution": -0.2933,
         "direction": "decreases"
       },
       {
         "feature": "oncology_flag",
-        "contribution": -0.1026,
+        "contribution": -0.1025,
         "direction": "decreases"
       },
       {
-        "feature": "medication_count",
-        "contribution": 0.0977,
-        "direction": "increases"
+        "feature": "prior_admission_count",
+        "contribution": -0.1017,
+        "direction": "decreases"
+      },
+      {
+        "feature": "discharge_location",
+        "contribution": -0.1011,
+        "direction": "decreases"
       },
       {
         "feature": "age",
-        "contribution": 0.09,
+        "contribution": 0.0923,
         "direction": "increases"
       }
     ],
@@ -408,34 +408,34 @@
   },
   "90000012": {
     "hadm_id": 90000012,
-    "probability": 0.141601,
+    "probability": 0.129303,
     "threshold": 0.12,
     "decision": 1,
     "base_value": -1.33862,
     "top_factors": [
       {
         "feature": "prior_inpatient_days",
-        "contribution": -0.2433,
+        "contribution": -0.2389,
         "direction": "decreases"
       },
       {
         "feature": "index_los_days",
-        "contribution": 0.1333,
+        "contribution": 0.1363,
         "direction": "increases"
       },
       {
-        "feature": "oncology_flag",
-        "contribution": -0.0958,
-        "direction": "decreases"
-      },
-      {
-        "feature": "prior_admission_count",
-        "contribution": -0.0804,
-        "direction": "decreases"
-      },
-      {
         "feature": "medication_order_count",
-        "contribution": -0.0759,
+        "contribution": -0.0977,
+        "direction": "decreases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.0957,
+        "direction": "decreases"
+      },
+      {
+        "feature": "discharge_location",
+        "contribution": -0.0766,
         "direction": "decreases"
       }
     ],
@@ -445,24 +445,14 @@
   },
   "90000013": {
     "hadm_id": 90000013,
-    "probability": 0.142276,
+    "probability": 0.139268,
     "threshold": 0.12,
     "decision": 1,
     "base_value": -1.33862,
     "top_factors": [
       {
         "feature": "prior_inpatient_days",
-        "contribution": -0.2579,
-        "direction": "decreases"
-      },
-      {
-        "feature": "index_los_days",
-        "contribution": 0.0991,
-        "direction": "increases"
-      },
-      {
-        "feature": "prior_admission_count",
-        "contribution": -0.0979,
+        "contribution": -0.2477,
         "direction": "decreases"
       },
       {
@@ -471,9 +461,19 @@
         "direction": "decreases"
       },
       {
-        "feature": "monocytes_min",
-        "contribution": -0.0768,
+        "feature": "index_los_days",
+        "contribution": 0.0934,
+        "direction": "increases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.0844,
         "direction": "decreases"
+      },
+      {
+        "feature": "discharge_location",
+        "contribution": 0.0807,
+        "direction": "increases"
       }
     ],
     "model_version": "readmission-final-20260723172647",
@@ -482,34 +482,34 @@
   },
   "90000014": {
     "hadm_id": 90000014,
-    "probability": 0.154765,
+    "probability": 0.118875,
     "threshold": 0.12,
-    "decision": 1,
+    "decision": 0,
     "base_value": -1.33862,
     "top_factors": [
       {
         "feature": "prior_inpatient_days",
-        "contribution": -0.2459,
+        "contribution": -0.2391,
         "direction": "decreases"
       },
       {
         "feature": "medication_count",
-        "contribution": 0.1962,
+        "contribution": 0.1366,
         "direction": "increases"
       },
       {
         "feature": "oncology_flag",
-        "contribution": -0.1055,
-        "direction": "decreases"
-      },
-      {
-        "feature": "prior_admission_count",
-        "contribution": -0.0946,
+        "contribution": -0.1062,
         "direction": "decreases"
       },
       {
         "feature": "discharge_location",
-        "contribution": -0.0884,
+        "contribution": -0.105,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.0824,
         "direction": "decreases"
       }
     ],
@@ -519,34 +519,34 @@
   },
   "90000015": {
     "hadm_id": 90000015,
-    "probability": 0.160659,
+    "probability": 0.151509,
     "threshold": 0.12,
     "decision": 1,
     "base_value": -1.33862,
     "top_factors": [
       {
         "feature": "discharge_location",
-        "contribution": -0.1302,
+        "contribution": -0.1356,
         "direction": "decreases"
       },
       {
         "feature": "prior_inpatient_days",
-        "contribution": 0.1293,
+        "contribution": 0.1229,
         "direction": "increases"
       },
       {
         "feature": "rdw_max",
-        "contribution": -0.1123,
+        "contribution": -0.1159,
         "direction": "decreases"
       },
       {
         "feature": "oncology_flag",
-        "contribution": -0.0929,
+        "contribution": -0.0928,
         "direction": "decreases"
       },
       {
         "feature": "monocytes_min",
-        "contribution": -0.0839,
+        "contribution": -0.0793,
         "direction": "decreases"
       }
     ],
@@ -556,35 +556,35 @@
   },
   "90000016": {
     "hadm_id": 90000016,
-    "probability": 0.164568,
+    "probability": 0.136803,
     "threshold": 0.12,
     "decision": 1,
     "base_value": -1.33862,
     "top_factors": [
       {
         "feature": "recent_ed_visits",
-        "contribution": 0.3923,
+        "contribution": 0.3659,
         "direction": "increases"
       },
       {
         "feature": "prior_inpatient_days",
-        "contribution": -0.29,
+        "contribution": -0.3135,
         "direction": "decreases"
       },
       {
         "feature": "oncology_flag",
-        "contribution": -0.1267,
+        "contribution": -0.1242,
+        "direction": "decreases"
+      },
+      {
+        "feature": "medication_order_count",
+        "contribution": -0.108,
         "direction": "decreases"
       },
       {
         "feature": "prior_admission_count",
-        "contribution": -0.1164,
+        "contribution": -0.1036,
         "direction": "decreases"
-      },
-      {
-        "feature": "age",
-        "contribution": 0.091,
-        "direction": "increases"
       }
     ],
     "model_version": "readmission-final-20260723172647",
@@ -593,34 +593,34 @@
   },
   "90000017": {
     "hadm_id": 90000017,
-    "probability": 0.200057,
+    "probability": 0.157151,
     "threshold": 0.12,
     "decision": 1,
     "base_value": -1.33862,
     "top_factors": [
       {
         "feature": "medication_count",
-        "contribution": 0.4284,
+        "contribution": 0.3714,
         "direction": "increases"
       },
       {
         "feature": "prior_inpatient_days",
-        "contribution": -0.2821,
+        "contribution": -0.2699,
         "direction": "decreases"
       },
       {
         "feature": "discharge_location",
-        "contribution": -0.1009,
+        "contribution": -0.116,
         "direction": "decreases"
       },
       {
         "feature": "oncology_flag",
-        "contribution": -0.0995,
+        "contribution": -0.1004,
         "direction": "decreases"
       },
       {
-        "feature": "prior_admission_count",
-        "contribution": -0.0934,
+        "feature": "rdw_max",
+        "contribution": -0.0898,
         "direction": "decreases"
       }
     ],
@@ -630,34 +630,34 @@
   },
   "90000018": {
     "hadm_id": 90000018,
-    "probability": 0.202195,
+    "probability": 0.163404,
     "threshold": 0.12,
     "decision": 1,
     "base_value": -1.33862,
     "top_factors": [
       {
         "feature": "medication_count",
-        "contribution": 0.615,
+        "contribution": 0.5476,
         "direction": "increases"
       },
       {
         "feature": "race",
-        "contribution": -0.2866,
+        "contribution": -0.2537,
         "direction": "decreases"
       },
       {
         "feature": "prior_inpatient_days",
-        "contribution": -0.2154,
-        "direction": "decreases"
-      },
-      {
-        "feature": "prior_admission_count",
-        "contribution": -0.1243,
+        "contribution": -0.2059,
         "direction": "decreases"
       },
       {
         "feature": "discharge_location",
-        "contribution": -0.1083,
+        "contribution": -0.1295,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.1111,
         "direction": "decreases"
       }
     ],
@@ -667,34 +667,34 @@
   },
   "90000019": {
     "hadm_id": 90000019,
-    "probability": 0.223122,
+    "probability": 0.196836,
     "threshold": 0.12,
     "decision": 1,
     "base_value": -1.33862,
     "top_factors": [
       {
         "feature": "prior_inpatient_days",
-        "contribution": 0.3252,
+        "contribution": 0.3193,
         "direction": "increases"
       },
       {
         "feature": "rdw_max",
-        "contribution": -0.133,
+        "contribution": -0.141,
         "direction": "decreases"
       },
       {
         "feature": "oncology_flag",
-        "contribution": -0.108,
+        "contribution": -0.1076,
         "direction": "decreases"
       },
       {
         "feature": "monocytes_min",
-        "contribution": -0.0982,
+        "contribution": -0.0904,
         "direction": "decreases"
       },
       {
         "feature": "prior_admission_count",
-        "contribution": -0.0684,
+        "contribution": -0.061,
         "direction": "decreases"
       }
     ],
@@ -704,34 +704,34 @@
   },
   "90000020": {
     "hadm_id": 90000020,
-    "probability": 0.246512,
+    "probability": 0.188213,
     "threshold": 0.12,
     "decision": 1,
     "base_value": -1.33862,
     "top_factors": [
       {
         "feature": "prior_inpatient_days",
-        "contribution": 0.3242,
-        "direction": "increases"
-      },
-      {
-        "feature": "age",
-        "contribution": 0.1167,
-        "direction": "increases"
-      },
-      {
-        "feature": "medication_count",
-        "contribution": 0.116,
+        "contribution": 0.3161,
         "direction": "increases"
       },
       {
         "feature": "rdw_max",
-        "contribution": -0.1032,
+        "contribution": -0.1154,
         "direction": "decreases"
+      },
+      {
+        "feature": "age",
+        "contribution": 0.1044,
+        "direction": "increases"
       },
       {
         "feature": "oncology_flag",
         "contribution": -0.0994,
+        "direction": "decreases"
+      },
+      {
+        "feature": "gender",
+        "contribution": -0.0874,
         "direction": "decreases"
       }
     ],
@@ -741,34 +741,34 @@
   },
   "90000021": {
     "hadm_id": 90000021,
-    "probability": 0.257158,
+    "probability": 0.195222,
     "threshold": 0.12,
     "decision": 1,
     "base_value": -1.33862,
     "top_factors": [
       {
         "feature": "medication_count",
-        "contribution": 0.6777,
+        "contribution": 0.6053,
         "direction": "increases"
       },
       {
         "feature": "prior_inpatient_days",
-        "contribution": -0.1958,
+        "contribution": -0.1927,
         "direction": "decreases"
       },
       {
         "feature": "discharge_location",
-        "contribution": -0.1154,
+        "contribution": -0.1385,
         "direction": "decreases"
       },
       {
         "feature": "gender",
-        "contribution": 0.0916,
-        "direction": "increases"
+        "contribution": -0.0881,
+        "direction": "decreases"
       },
       {
         "feature": "prior_admission_count",
-        "contribution": -0.0902,
+        "contribution": -0.079,
         "direction": "decreases"
       }
     ],
@@ -778,34 +778,34 @@
   },
   "90000022": {
     "hadm_id": 90000022,
-    "probability": 0.258053,
+    "probability": 0.214601,
     "threshold": 0.12,
     "decision": 1,
     "base_value": -1.33862,
     "top_factors": [
       {
-        "feature": "medication_count",
-        "contribution": 0.4464,
+        "feature": "oncology_flag",
+        "contribution": 0.421,
         "direction": "increases"
       },
       {
-        "feature": "oncology_flag",
-        "contribution": 0.4199,
+        "feature": "medication_count",
+        "contribution": 0.3803,
         "direction": "increases"
       },
       {
         "feature": "prior_inpatient_days",
-        "contribution": -0.2304,
+        "contribution": -0.2213,
         "direction": "decreases"
       },
       {
         "feature": "race",
-        "contribution": -0.2271,
+        "contribution": -0.197,
         "direction": "decreases"
       },
       {
         "feature": "prior_admission_count",
-        "contribution": -0.0967,
+        "contribution": -0.0839,
         "direction": "decreases"
       }
     ],
@@ -815,34 +815,34 @@
   },
   "90000023": {
     "hadm_id": 90000023,
-    "probability": 0.261786,
+    "probability": 0.326222,
     "threshold": 0.12,
     "decision": 1,
     "base_value": -1.33862,
     "top_factors": [
       {
         "feature": "oncology_flag",
-        "contribution": 0.3502,
+        "contribution": 0.3436,
         "direction": "increases"
       },
       {
         "feature": "prior_inpatient_days",
-        "contribution": 0.2282,
+        "contribution": 0.2311,
+        "direction": "increases"
+      },
+      {
+        "feature": "medication_count",
+        "contribution": 0.1506,
         "direction": "increases"
       },
       {
         "feature": "rdw_max",
-        "contribution": -0.111,
+        "contribution": -0.106,
         "direction": "decreases"
       },
       {
         "feature": "gender",
-        "contribution": -0.0835,
-        "direction": "decreases"
-      },
-      {
-        "feature": "medication_count",
-        "contribution": 0.08,
+        "contribution": 0.0878,
         "direction": "increases"
       }
     ],
@@ -852,34 +852,34 @@
   },
   "90000024": {
     "hadm_id": 90000024,
-    "probability": 0.268712,
+    "probability": 0.21041,
     "threshold": 0.12,
     "decision": 1,
     "base_value": -1.33862,
     "top_factors": [
       {
         "feature": "medication_count",
-        "contribution": 0.6431,
+        "contribution": 0.5791,
         "direction": "increases"
       },
       {
         "feature": "prior_inpatient_days",
-        "contribution": -0.2494,
+        "contribution": -0.2351,
         "direction": "decreases"
       },
       {
         "feature": "discharge_location",
-        "contribution": -0.1543,
+        "contribution": -0.1765,
         "direction": "decreases"
       },
       {
         "feature": "age",
-        "contribution": 0.1147,
+        "contribution": 0.1166,
         "direction": "increases"
       },
       {
-        "feature": "prior_admission_count",
-        "contribution": -0.095,
+        "feature": "oncology_flag",
+        "contribution": -0.0879,
         "direction": "decreases"
       }
     ],

@@ -1,33 +1,33 @@
 {
   "hadm_id": 90000009,
-  "probability": 0.13124,
+  "probability": 0.125356,
   "threshold": 0.12,
   "decision": 1,
   "base_value": -1.33862,
   "top_factors": [
     {
       "feature": "prior_inpatient_days",
-      "contribution": -0.2393,
+      "contribution": -0.2294,
       "direction": "decreases"
     },
     {
       "feature": "oncology_flag",
-      "contribution": -0.1209,
+      "contribution": -0.1187,
       "direction": "decreases"
     },
     {
       "feature": "index_los_days",
-      "contribution": 0.1128,
+      "contribution": 0.1086,
       "direction": "increases"
     },
     {
-      "feature": "prior_admission_count",
-      "contribution": -0.0893,
+      "feature": "medication_order_count",
+      "contribution": -0.0825,
       "direction": "decreases"
     },
     {
       "feature": "rdw_max",
-      "contribution": -0.0837,
+      "contribution": -0.0814,
       "direction": "decreases"
     }
   ],

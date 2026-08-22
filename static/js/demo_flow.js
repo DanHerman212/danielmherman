@@ -33,13 +33,84 @@ const CHIPS = [
 
 const PAGE_SIZE = 10;
 
-const SECTION_HEADERS = [
-  'History of Present Illness', 'Past Medical History', 'Family History',
-  'Social History', 'Physical Exam', 'Brief Hospital Course',
-  'Discharge Condition', 'Discharge Diagnosis', 'Discharge Medications',
-  'Medications on Admission', 'Discharge Disposition', 'Discharge Instructions',
-  'Chief Complaint', 'Major Surgical or Invasive Procedure',
-];
+/* Section header aliases per canonical section — mirrors the harness
+   rag/sections.py KNOWN_HEADINGS (MTSamples discharge summaries use these
+   variants, e.g. "Hospital Course:", "Discharge Diagnoses:", "Medications:").
+   Extraction uses these BOTH to locate a section's start and to bound its end
+   (the next known header), so a citation click shows the cited section's body
+   instead of the whole note. */
+const SECTION_ALIASES = {
+  chief_complaint: ['Chief Complaint', 'Reason for Admission'],
+  major_procedure: [
+    'Major Surgical or Invasive Procedure', 'Major Surgical or Invasive Procedures',
+    'Procedure', 'Procedures', 'Procedures Performed', 'Operations Performed',
+    'Principal Procedure', 'Principal Procedures',
+    'Procedure Performed During This Hospitalization',
+    'Procedures During This Hospitalization', 'Procedures During Hospitalization',
+    'Operations and Procedures',
+  ],
+  history_of_present_illness: [
+    'History of Present Illness', 'HPI', 'History', 'History of Illness',
+    'Brief History', 'Brief History of Present Illness', 'Current History',
+  ],
+  review_of_systems: ['Review of Systems', 'ROS'],
+  past_medical_history: [
+    'Past Medical History', 'PMH', 'Past History',
+    'Past Medical/Family/Social History', 'Past Medical, Family, Social History',
+  ],
+  past_surgical_history: ['Past Surgical History', 'Surgical History'],
+  social_history: ['Social History'],
+  family_history: ['Family History'],
+  physical_exam: [
+    'Physical Exam', 'Physical Examination', 'Admission Exam',
+    'Admission Physical Exam', 'Discharge Exam', 'Discharge Physical Exam',
+    'Discharge Physical Examination', 'Physical Examination at the Time of Discharge',
+    'Physical Examination on Discharge',
+  ],
+  pertinent_results: [
+    'Pertinent Results', 'Pertinent Labs', 'Laboratory Data', 'Laboratory Studies',
+    'Laboratory', 'Pertinent Laboratories', 'Discharge Labs',
+    'Laboratories on Admission', 'Significant Labs and X-Rays',
+    'Additional Laboratory Studies',
+  ],
+  brief_hospital_course: [
+    'Brief Hospital Course', 'Hospital Course', 'Course in the Hospital',
+    'History and Hospital Course', 'Brief Hospital Course Summary',
+    'Brief Summary of Hospital Course',
+  ],
+  medications_on_admission: ['Medications on Admission'],
+  discharge_medications: [
+    'Discharge Medications', 'Medications', 'Medications on Discharge',
+    'Home Medications', 'New Medications', 'Current Medications',
+    'Medications and Advice on Discharge', 'Discharge Medications/Instructions',
+  ],
+  discharge_disposition: ['Discharge Disposition', 'Disposition'],
+  discharge_diagnosis: [
+    'Discharge Diagnosis', 'Discharge Diagnoses', 'Admission Diagnosis',
+    'Admission Diagnoses', 'Admitting Diagnosis', 'Admitting Diagnoses',
+    'Secondary Diagnosis', 'Secondary Diagnoses', 'Diagnoses on Admission',
+    'Diagnoses on Discharge', 'Primary Diagnoses', 'Final Diagnosis', 'Final Diagnoses',
+  ],
+  discharge_condition: [
+    'Discharge Condition', 'Condition', 'Condition on Discharge',
+    'Conditions on Discharge', 'Condition Upon Discharge', 'Condition at Discharge',
+    'Condition of Patient on Discharge', 'Condition of the Patient at Discharge',
+  ],
+  discharge_instructions: [
+    'Discharge Instructions', 'Discharge Plan', 'Additional Instructions',
+    'Special Instructions', 'Instructions to Patient', 'Discharge Diet',
+    'Discharge Activities', 'Physical Activity',
+    'Instructions Given to the Patient at the Time of Discharge',
+  ],
+  followup_instructions: [
+    'Followup Instructions', 'Follow-up Instructions', 'Followup', 'Follow Up',
+    'Follow-Up', 'Followup Appointments', 'Instructions for Followup',
+  ],
+  facility: ['Facility'],
+};
+
+/* Every known header, flattened — bounds the end of an extracted section. */
+const SECTION_HEADERS = Object.values(SECTION_ALIASES).flat();
 
 /* ------------------------------------------------------------------ */
 /* shared helpers (also used by the per-demo canvas renderers)         */
@@ -74,20 +145,27 @@ export function escapeRegex(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-/** Extract a named section's text from a full note, or null if not found. */
+/** Extract a named section's body from a full note, or null if not found.
+    Alias-aware: matches MTSamples header variants (e.g. "Hospital Course:"
+    for brief_hospital_course), then bounds the body at the next known header. */
 export function extractSection(noteText, section) {
-  const title = String(section || '').replace(/_/g, ' ');
-  if (!title) return null;
-  const header = new RegExp(`\\b${escapeRegex(title)}\\b\\s*:`, 'i');
-  const m = header.exec(noteText);
-  if (!m) return null;
-  const start = m.index;
+  if (!noteText) return null;
+  const aliases = SECTION_ALIASES[section] || [String(section || '').replace(/_/g, ' ')];
+  if (!aliases[0]) return null;
+  let start = -1;
+  let matched = '';
+  for (const alias of aliases) {
+    const re = new RegExp(`\\b${escapeRegex(alias)}\\b\\s*:`, 'i');
+    const m = re.exec(noteText);
+    if (m) { start = m.index; matched = m[0]; break; }
+  }
+  if (start < 0 || !matched) return null;
   let end = noteText.length;
   for (const h of SECTION_HEADERS) {
     const re = new RegExp(`\\n\\s*${escapeRegex(h)}\\s*:`, 'i');
-    const hm = re.exec(noteText.slice(start + m[0].length));
+    const hm = re.exec(noteText.slice(start + matched.length));
     if (hm) {
-      const candidate = start + m[0].length + hm.index;
+      const candidate = start + matched.length + hm.index;
       if (candidate < end) end = candidate;
     }
   }
