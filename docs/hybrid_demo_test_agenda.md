@@ -36,13 +36,13 @@ unverified, needs a test · `[~]` = works but has a caveat.
 - `[x]` Commits pushed: ECC `787b930`, site `2ceb7b7`.
 
 ### Remaining notes
-- `[~]` RAG fixtures (`rag_*_90000009.json`) are still the prior captures —
-  valid content (index text unchanged), but provenance can be refreshed by
-  re-running `build_hybrid_fixtures.py` now that the endpoint is up.
-- `[?]` `PREDICT_PATIENTS` is [90000001, 90000009, 90000017] but 90000017 is
-  now borderline (was high). The true high patient is now 90000024 (0.2104).
-  Consider updating PREDICT_PATIENTS → [90000001, 90000009, 90000024] for a
-  real low/borderline/high trio used by the guide screenshots.
+- `[x]` RAG fixtures refreshed from the live endpoint (all 3 chips, 5 passages
+  each) — provenance now current.
+- `[x]` `PREDICT_PATIENTS` updated to the corrected low/borderline/high trio
+  `[90000001, 90000009, 90000023]` (90000023 is the true high at 0.3262;
+  90000017 moved to borderline after the gender re-score). Orphaned
+  `predict_90000017.json` removed; `predict_90000023.json` added. 43 tests
+  green. Commits: site `1ac5a10`, ECC `985bcf5`.
 
 ---
 
