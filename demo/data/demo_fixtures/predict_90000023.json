@@ -1,34 +1,34 @@
 {
-  "hadm_id": 90000017,
-  "probability": 0.157151,
+  "hadm_id": 90000023,
+  "probability": 0.326222,
   "threshold": 0.12,
   "decision": 1,
   "base_value": -1.33862,
   "top_factors": [
     {
-      "feature": "medication_count",
-      "contribution": 0.3714,
+      "feature": "oncology_flag",
+      "contribution": 0.3436,
       "direction": "increases"
     },
     {
       "feature": "prior_inpatient_days",
-      "contribution": -0.2699,
-      "direction": "decreases"
+      "contribution": 0.2311,
+      "direction": "increases"
     },
     {
-      "feature": "discharge_location",
-      "contribution": -0.116,
-      "direction": "decreases"
-    },
-    {
-      "feature": "oncology_flag",
-      "contribution": -0.1004,
-      "direction": "decreases"
+      "feature": "medication_count",
+      "contribution": 0.1506,
+      "direction": "increases"
     },
     {
       "feature": "rdw_max",
-      "contribution": -0.0898,
+      "contribution": -0.106,
       "direction": "decreases"
+    },
+    {
+      "feature": "gender",
+      "contribution": 0.0878,
+      "direction": "increases"
     }
   ],
   "model_version": "readmission-final-20260723172647",
