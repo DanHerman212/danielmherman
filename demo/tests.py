@@ -83,6 +83,14 @@ class DemoAuthTests(TestCase):
         ):
             self.assertIn(f'id="{anchor}"', body)
         self.assertIn('Demo User Guide', body)
+        # Every journey has a real live screenshot wired in (no "pending"
+        # placeholder), so the guide shows the actual demo, not a stub.
+        for img in ('images/guide/risk-card.png', 'images/guide/agent-chat.png',
+                    'images/guide/source-panel.png', 'images/guide/cohort-rail.png'):
+            self.assertIn(f'images/guide/', body)
+            self.assertIn(img, body)
+        self.assertNotIn('Screenshot: ', body)
+        self.assertNotIn('(pending)', body)
 
     def test_ask_requires_login(self):
         response = self.client.post(

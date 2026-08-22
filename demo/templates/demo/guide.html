@@ -7,8 +7,8 @@ Copilot demo.
 Extends console.html so the shell (header + sidebar + footer) is identical to
 the app the reviewer is being taught to use; only the main view is replaced.
 Sections are organised by user journey (assess → ask → verify → compare), each
-with a screenshot slot + short caption. Until live screenshots are captured,
-each slot renders an honest "screenshot pending" placeholder.
+with a screenshot + short caption. Screenshots are live captures of the
+production demo (real agent, real notes, real model).
 
 Route: demo/guide  (login required, like the rest of the demo)
 {% endcomment %}
@@ -88,9 +88,8 @@ header and colors match the console exactly.{% endcomment %}
     </div>
     <div class="guide-body">
       <figure class="guide-shot">
-        <div class="shot-frame shot-pending" data-slot="risk-card" aria-hidden="true">
-          <span>Screenshot: risk card (pending)</span>
-        </div>
+        <img class="shot-img" src="{% static 'images/guide/risk-card.png' %}"
+             alt="The risk assessment card for Linda Okafor: 12.5% probability, borderline band, and the top contributing factors.">
         <figcaption>
           The card shows the 30-day readmission <strong>probability</strong>, the
           band it falls in (low / borderline / high), and the model's
@@ -122,9 +121,8 @@ header and colors match the console exactly.{% endcomment %}
     </div>
     <div class="guide-body">
       <figure class="guide-shot">
-        <div class="shot-frame shot-pending" data-slot="agent-chat" aria-hidden="true">
-          <span>Screenshot: agent chat + citations (pending)</span>
-        </div>
+        <img class="shot-img" src="{% static 'images/guide/agent-chat.png' %}"
+             alt="The agent's answer listing Linda Okafor's discharge medications with a citation marker.">
         <figcaption>
           Ask <em>"what is this patient at risk for?"</em>, <em>"list the discharge
           medications"</em>, or <em>"summarize the hospital course"</em>. The answer
@@ -156,9 +154,8 @@ header and colors match the console exactly.{% endcomment %}
     </div>
     <div class="guide-body">
       <figure class="guide-shot">
-        <div class="shot-frame shot-pending" data-slot="source-panel" aria-hidden="true">
-          <span>Screenshot: cited note section (pending)</span>
-        </div>
+        <img class="shot-img" src="{% static 'images/guide/source-panel.png' %}"
+             alt="The source panel showing the discharge medications section text the agent cited.">
         <figcaption>
           Every claim opens the <strong>source panel</strong>: the note section
           (e.g. "Discharge Medications", "Brief Hospital Course") the agent drew
@@ -190,9 +187,8 @@ header and colors match the console exactly.{% endcomment %}
     </div>
     <div class="guide-body">
       <figure class="guide-shot">
-        <div class="shot-frame shot-pending" data-slot="cohort-rail" aria-hidden="true">
-          <span>Screenshot: patient rail with band dots (pending)</span>
-        </div>
+        <img class="shot-img" src="{% static 'images/guide/cohort-rail.png' %}"
+             alt="The patient rail with color-coded risk dots for low, borderline, and high bands.">
         <figcaption>
           Each patient's dot is colored by band. Pick one from each band and the
           difference in story, factors, and meds should be obvious.
