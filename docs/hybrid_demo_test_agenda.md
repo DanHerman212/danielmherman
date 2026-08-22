@@ -1,7 +1,8 @@
 # Hybrid Demo — Comprehensive Test-Suite Agenda
 
-Status: SPRINT A COMPLETE · 2026-08-22 — demo working in production with all
-fixes verified. Next: §6 Sprint B (Demo User Guide screenshots).
+Status: SPRINT A + B COMPLETE · 2026-08-22 — demo working in production with
+all fixes + guide screenshots verified. Next: Sprint C (Langfuse v4 migration)
+then Sprint D (adversarial code review) — see §6.
 Scope: the production A2UI demo at `www.danielmherman.com/demo/a2ui/` (the real,
 live system — real MTSamples notes, real served model, real RAG index). This
 agenda drives a top-to-bottom pass so every capability is verified and any
@@ -272,7 +273,31 @@ confirm whether the live agent issues it more than once per turn.
 
 ---
 
-## 6. Tomorrow's sprint (next session)
+## 6. Upcoming sprints (2026-08-23+)
+
+### First, redeploy the endpoints (torn down end of 2026-08-22)
+- Predict: `.venv/bin/python projects/mlops/scripts/deploy_cpr.py`
+- RAG: `INDEX_ID=8112544235405705216 INDEX_MACHINE_TYPE=e2-standard-2
+  .venv/bin/python projects/agent-harness/scripts/deploy_rag_endpoint.py`
+- (Endpoint redeploy ~30 min; can run in parallel in the background.)
+
+### Sprint C — Langfuse v4 migration
+Plan: `enterprise_clinical_copilot/projects/agent-harness/docs/langfuse_v4_migration_plan.md`
+(commit `956b2d9`). Migrate to langfuse v4 OTel-native + langgraph 1.2.11 +
+langchain 1.x, official LangGraph callback, upgrade self-hosted Langfuse
+(observability.danielmherman.com), re-validate eval gate. Deploy via CI/CD push
+(do NOT `gcloud builds submit` manually — the `deploy-on-push` trigger owns
+deploys). Rollback = previous images.
+
+### Sprint D — Adversarial code review
+Plan: `enterprise_clinical_copilot/docs/code_review_plan.md` (Phases 0–3:
+map + crown jewels → risk-ordered section review → independent adversarial pass
++ scanners (CVE/CWE/bandit/`manage.py check --deploy`) → triage backlog → fix
+→ re-scan → guardrails: Dependabot + CI lint/security).
+
+### (Completed) Sprint A — demo working + Sprint B — guide screenshots
+Historical; see §0. The old per-step Sprint A list below this line is
+superseded.
 
 ### Sprint A — get the demo working (today's work, resumed)
 1. Commit the uncommitted local work first (or fold into the fix pass):
