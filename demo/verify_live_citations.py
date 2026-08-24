@@ -42,10 +42,13 @@ settings.ALLOWED_HOSTS = [*settings.ALLOWED_HOSTS, "testserver"]
 
 # (hadm_id, display name, expected card kind, why this case matters)
 # card kinds:
-#   meds_section     -> section == discharge_medications AND answer meds in card
-#   instructions     -> section == discharge_instructions AND answer meds in card
-#   unavailable      -> section == 'not available' (note lacks the sections)
-#   empty_passages   -> section == 'not found' (no passages returned at all)
+#   meds_section          -> section == discharge_medications AND answer meds in card
+#   instructions          -> section == discharge_instructions AND answer meds in card
+#   instructions_no_meds  -> section == discharge_instructions AND answer lists NO meds
+#                            (honest: no meds section and no named meds — the
+#                            card is still the instructions section that exists)
+#   unavailable           -> section == 'not available' (note lacks the sections)
+#   empty_passages        -> section == 'not found' (no passages returned at all)
 CASES = [
     (90000015, "Cynthia Petrov", "meds_section",
      "meds section exists (discharge_medications)"),
@@ -57,8 +60,8 @@ CASES = [
      "NO meds/instructions section — meds mentioned only in hospital course"),
     (90000053, "Alan Ellison", "instructions",
      "breadth: meds in instructions"),
-    (90000091, "Jordan Sokolov", "instructions",
-     "no meds section, no NAMED meds — must not stack citations on one claim"),
+    (90000091, "Jordan Sokolov", "instructions_no_meds",
+     "no meds section, no NAMED meds — honest no-meds answer, no stacked citations"),
     (90000054, "Clarence Whitfield", "empty_passages",
      "breadth: outpatient therapy note, no discharge content"),
     (90000095, "Curtis Whitfield", "empty_passages",
@@ -136,6 +139,8 @@ def main():
                       f"answer once the agent redeploys")
         elif expected == "empty_passages":
             ok = section == "not found"
+        elif expected == "instructions_no_meds":
+            ok = section == "discharge_instructions" and not meds
         else:
             want_section = {
                 "meds_section": "discharge_medications",
