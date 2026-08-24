@@ -187,8 +187,39 @@ def first_citation(answer: str) -> int:
     return int(m.group(1)) if m else 1
 
 
+# Discharge-note sections a question can clearly target, with the words that
+# reveal the intent. Used to resolve the cited passage DETERMINISTICALLY by
+# section instead of trusting the model's ^[n] numbers: the model mis-numbers
+# citations (observed live — a meds answer cites ^[1] while the meds passage
+# sits at ^[3] in rag_search_sections order), so mapping the citation number
+# straight into the passages array shows the wrong section.
+_INTENT_SECTIONS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("discharge_medications", ("medication", "medications", "meds", "discharged on")),
+    ("discharge_instructions", ("instruction", "instructions")),
+    ("discharge_diagnosis", ("diagnosis", "diagnoses")),
+    ("brief_hospital_course", ("hospital course", "admission course")),
+)
+
+
+def intent_section(question: str | None) -> str | None:
+    """The discharge-note section a question clearly targets, or None.
+
+    Mirrors the harness `_section_for_query` keyword map so the demo's fixed
+    chips and section-targeted free text resolve to the right passage even
+    when the agent's own citation numbers are wrong. Summarize/risk questions
+    map to None — their citation-by-number behavior is left untouched.
+    """
+    if not question:
+        return None
+    q = question.lower()
+    for section, needles in _INTENT_SECTIONS:
+        if any(n in q for n in needles):
+            return section
+    return None
+
+
 def compose_risk_canvas(predict: dict | None, rag: dict | None,
-                        cite: int = 1) -> dict:
+                        cite: int = 1, section: str | None = None) -> dict:
     """Turn one predict (+ rag) payload into the A2UI risk-canvas envelope.
 
     predict is None when the question did not request a readmission estimate
@@ -266,12 +297,28 @@ def compose_risk_canvas(predict: dict | None, rag: dict | None,
     query = (rag or {}).get("query") or "discharge note"
     children.append("source")
     if passages:
-        # cite is 1-based from the answer prose; clamp to a real passage.
-        idx = min(max(cite, 1), len(passages)) - 1
-        cited = passages[idx]
+        # Deterministic resolution: when the question clearly targets one note
+        # section (meds / instructions / diagnoses / hospital course), show
+        # THAT passage regardless of the number the model attached to it. The
+        # model mis-numbers citations (a meds answer cites ^[1] while the meds
+        # passage is ^[3] in rag_search_sections order), so a pure
+        # cite -> passages[cite-1] mapping shows the wrong section.
+        cited = None
+        if section:
+            cited = next((p for p in passages
+                          if p.get("section") == section), None)
+        if cited is None:
+            # cite is 1-based from the answer prose; clamp to a real passage.
+            idx = min(max(cite, 1), len(passages)) - 1
+            cited = passages[idx]
+            badge = idx + 1
+        else:
+            # Badge mirrors the thread's citation number (the answer's ^[n]),
+            # not the passage's array position.
+            badge = max(cite, 1)
         section_text = _extract_section(cited.get("text", ""), cited.get("section", ""))
         components.append({"id": "source", "component": "SourceCard",
-                           "cite": idx + 1,
+                           "cite": badge,
                            "section": cited.get("section", "discharge note"),
                            "text": section_text or cited.get("text", ""),
                            "query": query})

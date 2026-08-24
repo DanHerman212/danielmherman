@@ -329,6 +329,63 @@ class A2uiCanvasTests(TestCase):
         self.assertEqual(source['section'], 'discharge_medications')
         self.assertEqual(source['cite'], 1)
 
+    def test_intent_section_maps_chips_and_free_text(self):
+        from demo.a2ui_canvas import intent_section
+        self.assertEqual(
+            intent_section('What medications was this patient discharged on?'),
+            'discharge_medications')
+        self.assertEqual(
+            intent_section('What were her discharge instructions? '
+                           'For admission 90000015.'),
+            'discharge_instructions')
+        self.assertEqual(
+            intent_section('list her diagnoses'), 'discharge_diagnosis')
+        self.assertEqual(
+            intent_section('summarize the hospital course'),
+            'brief_hospital_course')
+        # Summarize/risk questions have no single-section intent: their
+        # citation-by-number behavior stays as-is.
+        self.assertIsNone(intent_section(
+            'Summarize the recent discharge notes for this patient.'))
+        self.assertIsNone(intent_section(
+            'Assess the 30-day readmission risk for this patient.'))
+
+    def test_compose_resolves_cited_passage_by_section(self):
+        """The citation-links fix: the SourceCard resolves the passage by the
+        question's target section, not by the (unreliable) citation number.
+        A meds answer cites ^[1] while the meds passage sits at index 2 —
+        the canvas must still show discharge_medications."""
+        rag = {'passages': [
+            {'id': 'n_bhc_1', 'section': 'brief_hospital_course',
+             'text': 'Hospital Course: recovered.', 'score': 0.3},
+            {'id': 'n_dx_1', 'section': 'discharge_diagnosis',
+             'text': 'Discharge Diagnoses: TKA.', 'score': 0.2},
+            {'id': 'n_meds_1', 'section': 'discharge_medications',
+             'text': 'Discharge Medications: Celebrex 200 mg daily.',
+             'score': 0.1},
+        ], 'query': 'discharge notes'}
+        env = compose_risk_canvas(
+            None, rag, cite=1, section='discharge_medications')
+        comps = env['messages'][1]['updateComponents']['components']
+        source = next(c for c in comps if c.get('component') == 'SourceCard')
+        self.assertEqual(source['section'], 'discharge_medications')
+        self.assertIn('Celebrex', source['text'])
+        # Badge mirrors the thread's citation number, not the array position.
+        self.assertEqual(source['cite'], 1)
+
+        # Without a section hint the number mapping is unchanged.
+        env = compose_risk_canvas(None, rag, cite=1)
+        comps = env['messages'][1]['updateComponents']['components']
+        source = next(c for c in comps if c.get('component') == 'SourceCard')
+        self.assertEqual(source['section'], 'brief_hospital_course')
+
+        # A section hint with no matching passage falls back to the number.
+        env = compose_risk_canvas(
+            None, rag, cite=2, section='discharge_instructions')
+        comps = env['messages'][1]['updateComponents']['components']
+        source = next(c for c in comps if c.get('component') == 'SourceCard')
+        self.assertEqual(source['section'], 'discharge_diagnosis')
+
     def test_extract_section_handles_mtsamples_headers(self):
         """Alias-aware extraction: MTSamples notes use different headers than
         MIMIC canon ("HOSPITAL COURSE:", "DISCHARGE DIAGNOSES:"), and the
@@ -427,7 +484,7 @@ class A2uiCanvasTests(TestCase):
         # Cache-busted stylesheet + module links so the shell CSS and the A2UI
         # component module are never stale in the browser.
         self.assertContains(response, 'demo_splitpane.css?v=6')
-        self.assertContains(response, 'demo_a2ui.js?v=6')
+        self.assertContains(response, 'demo_a2ui.js?v=7')
 
 
 @override_settings(DEMO_FIXTURE_MODE=False)

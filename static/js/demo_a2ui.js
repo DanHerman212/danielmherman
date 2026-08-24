@@ -12,7 +12,7 @@
  * comparison.
  */
 
-import { createDemoFlow, extractSection } from './demo_flow.js?v=12';
+import { createDemoFlow, extractSection } from './demo_flow.js?v=13';
 import { MessageProcessor } from '/static/vendor/a2ui/a2ui_web_core_0.10.5_v0_9_external_lit_zod.js';
 import { basicCatalog, Context } from '/static/vendor/a2ui/a2ui_lit_0.10.2_v0_9_external_lit_zod.js';
 import { ContextProvider } from '/static/vendor/a2ui/lit_context_1.1.6_external_lit.js';
@@ -106,10 +106,23 @@ function renderA2uiCanvas(episode, api, envelope) {
   renderEnvelope(target);
 }
 
-/** Point the turn's envelope SourceCard at the cited passage (n is 1-based). */
+/** Point the turn's envelope SourceCard at the cited passage (n is 1-based).
+
+    When the turn's question targeted one note section (intentSection), resolve
+    the citation to THAT passage regardless of n — the model mis-numbers
+    citations (a meds answer cites ^[1] while the meds passage is ^[3] in
+    rag_search_sections order), so mapping n straight into the passages array
+    shows the wrong section. */
 function envelopeForCite(turn, n) {
-  if (!turn.a2ui || !turn.passages || !turn.passages[n - 1]) return turn.a2ui;
-  const passage = turn.passages[n - 1];
+  if (!turn.a2ui) return null;
+  let passage = null;
+  if (turn.intentSection) {
+    passage = (turn.passages || []).find((p) => p.section === turn.intentSection) || null;
+  }
+  if (!passage && turn.passages && turn.passages[n - 1]) {
+    passage = turn.passages[n - 1];
+  }
+  if (!passage) return turn.a2ui;
   const env = JSON.parse(JSON.stringify(turn.a2ui));
   const update = env.messages.find((m) => m.updateComponents);
   const source = update && update.updateComponents.components

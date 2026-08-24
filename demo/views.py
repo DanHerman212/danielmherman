@@ -13,7 +13,7 @@ from django.shortcuts import render
 from django.views.decorators.http import require_POST
 
 from .agent_client import AgentError, ask as ask_agent
-from .a2ui_canvas import compose_risk_canvas, first_citation
+from .a2ui_canvas import compose_risk_canvas, first_citation, intent_section
 from .fixtures import CHIPS, band_for, fixture_ask, risk_for
 from .models import DemoPatient, DemoQuota
 
@@ -270,13 +270,21 @@ def a2ui_ask(request):
                 'remaining': DemoQuota.remaining(request.user),
             }, status=502)
 
-    # The SourceCard mirrors the answer's own citation: whichever passage the
-    # agent cited first is the one the canvas shows, so a meds answer that
-    # cites the discharge_medications passage (^[3] in rag_search_sections
-    # order) is composed against that passage, not always the first one.
+    # Deterministic citation resolution: the canvas SourceCard is resolved by
+    # the SECTION the question targets, not by the model's ^[n] numbers. The
+    # model mis-numbers citations (a meds answer cites ^[1] while the meds
+    # passage is ^[3] in rag_search_sections order), so the canvas must not
+    # trust them. The citation number stays as the fallback for questions
+    # without a clear section intent (summarize, risk).
+    if settings.DEMO_FIXTURE_MODE:
+        intent = intent_section(CHIPS.get(payload.get('chip')))
+    else:
+        intent = intent_section(question)
     result['a2ui'] = compose_risk_canvas(
         _tool_response(result, 'predict_readmission'),
         _rag_response(result),
-        cite=first_citation(result.get('answer') or ''))
+        cite=first_citation(result.get('answer') or ''),
+        section=intent)
+    result['intent_section'] = intent
     result['remaining'] = DemoQuota.remaining(request.user)
     return JsonResponse(result)
