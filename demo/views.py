@@ -13,7 +13,7 @@ from django.shortcuts import render
 from django.views.decorators.http import require_POST
 
 from .agent_client import AgentError, ask as ask_agent
-from .a2ui_canvas import compose_risk_canvas, first_citation, intent_section
+from .a2ui_canvas import compose_risk_canvas, first_citation, intent_sections
 from .fixtures import CHIPS, band_for, fixture_ask, risk_for
 from .models import DemoPatient, DemoQuota
 
@@ -271,20 +271,20 @@ def a2ui_ask(request):
             }, status=502)
 
     # Deterministic citation resolution: the canvas SourceCard is resolved by
-    # the SECTION the question targets, not by the model's ^[n] numbers. The
-    # model mis-numbers citations (a meds answer cites ^[1] while the meds
-    # passage is ^[3] in rag_search_sections order), so the canvas must not
+    # the SECTION(s) the question targets, not by the model's ^[n] numbers.
+    # The model mis-numbers citations (a meds answer cites ^[1] while its
+    # supporting passage sits elsewhere in the array), so the canvas must not
     # trust them. The citation number stays as the fallback for questions
     # without a clear section intent (summarize, risk).
     if settings.DEMO_FIXTURE_MODE:
-        intent = intent_section(CHIPS.get(payload.get('chip')))
+        intent = intent_sections(CHIPS.get(payload.get('chip')))
     else:
-        intent = intent_section(question)
+        intent = intent_sections(question)
     result['a2ui'] = compose_risk_canvas(
         _tool_response(result, 'predict_readmission'),
         _rag_response(result),
         cite=first_citation(result.get('answer') or ''),
-        section=intent)
-    result['intent_section'] = intent
+        sections=intent)
+    result['intent_sections'] = list(intent)
     result['remaining'] = DemoQuota.remaining(request.user)
     return JsonResponse(result)

@@ -330,25 +330,25 @@ class A2uiCanvasTests(TestCase):
         self.assertEqual(source['cite'], 1)
 
     def test_intent_section_maps_chips_and_free_text(self):
-        from demo.a2ui_canvas import intent_section
+        from demo.a2ui_canvas import intent_sections
         self.assertEqual(
-            intent_section('What medications was this patient discharged on?'),
-            'discharge_medications')
+            intent_sections('What medications was this patient discharged on?'),
+            ('discharge_medications', 'discharge_instructions'))
         self.assertEqual(
-            intent_section('What were her discharge instructions? '
+            intent_sections('What were her discharge instructions? '
                            'For admission 90000015.'),
-            'discharge_instructions')
+            ('discharge_instructions',))
         self.assertEqual(
-            intent_section('list her diagnoses'), 'discharge_diagnosis')
+            intent_sections('list her diagnoses'), ('discharge_diagnosis',))
         self.assertEqual(
-            intent_section('summarize the hospital course'),
-            'brief_hospital_course')
+            intent_sections('summarize the hospital course'),
+            ('brief_hospital_course',))
         # Summarize/risk questions have no single-section intent: their
         # citation-by-number behavior stays as-is.
-        self.assertIsNone(intent_section(
-            'Summarize the recent discharge notes for this patient.'))
-        self.assertIsNone(intent_section(
-            'Assess the 30-day readmission risk for this patient.'))
+        self.assertEqual(intent_sections(
+            'Summarize the recent discharge notes for this patient.'), ())
+        self.assertEqual(intent_sections(
+            'Assess the 30-day readmission risk for this patient.'), ())
 
     def test_compose_resolves_cited_passage_by_section(self):
         """The citation-links fix: the SourceCard resolves the passage by the
@@ -365,7 +365,7 @@ class A2uiCanvasTests(TestCase):
              'score': 0.1},
         ], 'query': 'discharge notes'}
         env = compose_risk_canvas(
-            None, rag, cite=1, section='discharge_medications')
+            None, rag, cite=1, sections=('discharge_medications',))
         comps = env['messages'][1]['updateComponents']['components']
         source = next(c for c in comps if c.get('component') == 'SourceCard')
         self.assertEqual(source['section'], 'discharge_medications')
@@ -381,7 +381,7 @@ class A2uiCanvasTests(TestCase):
 
         # A section hint with no matching passage falls back to the number.
         env = compose_risk_canvas(
-            None, rag, cite=2, section='discharge_instructions')
+            None, rag, cite=2, sections=('discharge_instructions',))
         comps = env['messages'][1]['updateComponents']['components']
         source = next(c for c in comps if c.get('component') == 'SourceCard')
         self.assertEqual(source['section'], 'discharge_diagnosis')
@@ -404,11 +404,42 @@ class A2uiCanvasTests(TestCase):
              'text': whole_note, 'score': 0.2},
         ], 'query': 'discharge notes'}
         env = compose_risk_canvas(
-            None, rag, cite=1, section='discharge_medications')
+            None, rag, cite=1, sections=('discharge_medications',))
         comps = env['messages'][1]['updateComponents']['components']
         source = next(c for c in comps if c.get('component') == 'SourceCard')
         self.assertEqual(source['section'], 'discharge_medications')
         self.assertIn('Celebrex', source['text'])
+        self.assertNotIn('HOSPITAL COURSE', source['text'])
+        self.assertEqual(source['cite'], 1)
+
+    def test_compose_resolves_meds_to_instructions_when_no_meds_section(self):
+        """Alan Marchetti (90000005): the note has NO medications section —
+        the meds claim's supporting text is in DISCHARGE INSTRUCTIONS. The
+        meds intent set must resolve there, never to brief_hospital_course."""
+        note = (
+            'DISCHARGE DIAGNOSES: Cellulitis.\n\n'
+            'DISCHARGE INSTRUCTIONS: The patient would be discharged on his '
+            'usual Valium 10-20 mg at bedtime for spasticity, Flomax 0.4 mg '
+            'daily, cefazolin 500 mg q.i.d., and Lotrimin cream between toes.\n\n'
+            'HOSPITAL COURSE: The patient was admitted to the General Medical '
+            'floor and treated with intravenous ceftriaxone and topical '
+            'Lotrimin.'
+        )
+        rag = {'passages': [
+            {'id': 'n_bhc_1', 'section': 'brief_hospital_course',
+             'text': note, 'score': 0.3},
+            {'id': 'n_dx_1', 'section': 'discharge_diagnosis',
+             'text': note, 'score': 0.2},
+            {'id': 'n_ins_1', 'section': 'discharge_instructions',
+             'text': note, 'score': 0.1},
+        ], 'query': 'discharge notes'}
+        env = compose_risk_canvas(
+            None, rag, cite=1,
+            sections=('discharge_medications', 'discharge_instructions'))
+        comps = env['messages'][1]['updateComponents']['components']
+        source = next(c for c in comps if c.get('component') == 'SourceCard')
+        self.assertEqual(source['section'], 'discharge_instructions')
+        self.assertIn('Valium', source['text'])
         self.assertNotIn('HOSPITAL COURSE', source['text'])
         self.assertEqual(source['cite'], 1)
 
@@ -510,7 +541,7 @@ class A2uiCanvasTests(TestCase):
         # Cache-busted stylesheet + module links so the shell CSS and the A2UI
         # component module are never stale in the browser.
         self.assertContains(response, 'demo_splitpane.css?v=6')
-        self.assertContains(response, 'demo_a2ui.js?v=8')
+        self.assertContains(response, 'demo_a2ui.js?v=9')
 
 
 @override_settings(DEMO_FIXTURE_MODE=False)

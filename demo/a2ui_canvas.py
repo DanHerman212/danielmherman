@@ -187,39 +187,46 @@ def first_citation(answer: str) -> int:
     return int(m.group(1)) if m else 1
 
 
-# Discharge-note sections a question can clearly target, with the words that
-# reveal the intent. Used to resolve the cited passage DETERMINISTICALLY by
-# section instead of trusting the model's ^[n] numbers: the model mis-numbers
-# citations (observed live — a meds answer cites ^[1] while the meds passage
-# sits at ^[3] in rag_search_sections order), so mapping the citation number
-# straight into the passages array shows the wrong section.
-_INTENT_SECTIONS: tuple[tuple[str, tuple[str, ...]], ...] = (
-    ("discharge_medications", ("medication", "medications", "meds", "discharged on")),
-    ("discharge_instructions", ("instruction", "instructions")),
-    ("discharge_diagnosis", ("diagnosis", "diagnoses")),
-    ("brief_hospital_course", ("hospital course", "admission course")),
+# Discharge-note sections a question can target, in preference order, with the
+# words that reveal the intent. A question maps to a SECTION SET because the
+# content can live in different sections across MTSamples notes: the meds
+# claim's supporting text is usually discharge_medications, but many notes
+# carry it in discharge_instructions instead (verified: hadm 90000005 has no
+# medications section — "discharged on his usual Valium 10-20 mg..." is in
+# DISCHARGE INSTRUCTIONS). Resolving by section (not the model's ^[n]
+# numbers) is what keeps the canvas honest.
+_INTENT_SECTIONS: tuple[tuple[tuple[str, ...], tuple[str, ...]], ...] = (
+    (("discharge_medications", "discharge_instructions"),
+     ("medication", "medications", "meds", "discharged on")),
+    (("discharge_instructions",),
+     ("instruction", "instructions")),
+    (("discharge_diagnosis",),
+     ("diagnosis", "diagnoses")),
+    (("brief_hospital_course",),
+     ("hospital course", "admission course")),
 )
 
 
-def intent_section(question: str | None) -> str | None:
-    """The discharge-note section a question clearly targets, or None.
+def intent_sections(question: str | None) -> tuple[str, ...]:
+    """The discharge-note sections a question clearly targets, in preference
+    order — or an empty tuple when the question has no single-section intent.
 
     Mirrors the harness `_section_for_query` keyword map so the demo's fixed
     chips and section-targeted free text resolve to the right passage even
     when the agent's own citation numbers are wrong. Summarize/risk questions
-    map to None — their citation-by-number behavior is left untouched.
+    map to () — their citation-by-number behavior is left untouched.
     """
     if not question:
-        return None
+        return ()
     q = question.lower()
-    for section, needles in _INTENT_SECTIONS:
+    for sections, needles in _INTENT_SECTIONS:
         if any(n in q for n in needles):
-            return section
-    return None
+            return sections
+    return ()
 
 
 def compose_risk_canvas(predict: dict | None, rag: dict | None,
-                        cite: int = 1, section: str | None = None) -> dict:
+                        cite: int = 1, sections: tuple[str, ...] = ()) -> dict:
     """Turn one predict (+ rag) payload into the A2UI risk-canvas envelope.
 
     predict is None when the question did not request a readmission estimate
@@ -297,30 +304,36 @@ def compose_risk_canvas(predict: dict | None, rag: dict | None,
     query = (rag or {}).get("query") or "discharge note"
     children.append("source")
     if passages:
-        # Deterministic resolution: when the question clearly targets one note
-        # section (meds / instructions / diagnoses / hospital course), show
+        # Deterministic resolution: when the question clearly targets note
+        # section(s) (meds / instructions / diagnoses / hospital course), show
         # THAT section regardless of the number the model attached to it. The
-        # model mis-numbers citations (a meds answer cites ^[1] while the meds
-        # passage is ^[3] in rag_search_sections order), so a pure
+        # model mis-numbers citations (a meds answer cites ^[1] while its
+        # supporting passage sits elsewhere in the array), so a pure
         # cite -> passages[cite-1] mapping shows the wrong section.
         cited = None
         intent_body = None
-        if section:
+        matched_section = None
+        for sec in sections:
             cited = next((p for p in passages
-                          if p.get("section") == section), None)
-            if cited is None:
-                # The index stores whole-note chunks: a passage labeled with a
-                # different section still CONTAINS the target section, and the
-                # intent-labeled chunk can miss the top-k (near-tied whole-note
-                # embeddings). Pull the section body out of the passage text
-                # instead of showing the wrong section — deterministic for
-                # every patient.
-                for p in passages:
-                    body = _extract_section(p.get("text", ""), section)
-                    if body:
-                        cited = p
-                        intent_body = body
-                        break
+                          if p.get("section") == sec), None)
+            if cited is not None:
+                matched_section = sec
+                break
+            # The index stores whole-note chunks: a passage labeled with a
+            # different section still CONTAINS the target section, and the
+            # labeled chunk can miss the top-k (near-tied whole-note
+            # embeddings). Pull the section body out of the passage text
+            # instead of showing the wrong section — deterministic for every
+            # patient.
+            for p in passages:
+                body = _extract_section(p.get("text", ""), sec)
+                if body:
+                    cited = p
+                    intent_body = body
+                    matched_section = sec
+                    break
+            if cited is not None:
+                break
         if cited is None:
             # cite is 1-based from the answer prose; clamp to a real passage.
             idx = min(max(cite, 1), len(passages)) - 1
@@ -332,7 +345,10 @@ def compose_risk_canvas(predict: dict | None, rag: dict | None,
             badge = max(cite, 1)
         if intent_body is not None:
             section_text = intent_body
-            shown_section = section
+            shown_section = matched_section
+        elif matched_section is not None:
+            section_text = _extract_section(cited.get("text", ""), matched_section)
+            shown_section = matched_section
         else:
             section_text = _extract_section(cited.get("text", ""), cited.get("section", ""))
             shown_section = cited.get("section", "discharge note")
