@@ -12,7 +12,7 @@
  * comparison.
  */
 
-import { createDemoFlow, extractSection } from './demo_flow.js?v=13';
+import { createDemoFlow, extractSection } from './demo_flow.js?v=14';
 import { MessageProcessor } from '/static/vendor/a2ui/a2ui_web_core_0.10.5_v0_9_external_lit_zod.js';
 import { basicCatalog, Context } from '/static/vendor/a2ui/a2ui_lit_0.10.2_v0_9_external_lit_zod.js';
 import { ContextProvider } from '/static/vendor/a2ui/lit_context_1.1.6_external_lit.js';
@@ -116,8 +116,18 @@ function renderA2uiCanvas(episode, api, envelope) {
 function envelopeForCite(turn, n) {
   if (!turn.a2ui) return null;
   let passage = null;
+  let intentBody = null;
   if (turn.intentSection) {
     passage = (turn.passages || []).find((p) => p.section === turn.intentSection) || null;
+    if (!passage) {
+      // The index stores whole-note chunks, so a passage labeled with a
+      // different section still CONTAINS the target section. Extract it from
+      // the passage text instead of showing the wrong section.
+      for (const p of (turn.passages || [])) {
+        const body = extractSection(p.text, turn.intentSection);
+        if (body) { passage = p; intentBody = body; break; }
+      }
+    }
   }
   if (!passage && turn.passages && turn.passages[n - 1]) {
     passage = turn.passages[n - 1];
@@ -129,8 +139,8 @@ function envelopeForCite(turn, n) {
     .find((c) => c.component === 'SourceCard');
   if (!source) return env;
   source.cite = n;
-  source.section = passage.section;
-  source.text = extractSection(passage.text, passage.section) || passage.text;
+  source.section = intentBody ? turn.intentSection : passage.section;
+  source.text = intentBody || extractSection(passage.text, passage.section) || passage.text;
   source.query = turn.query || 'discharge note';
   return env;
 }

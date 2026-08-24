@@ -299,14 +299,28 @@ def compose_risk_canvas(predict: dict | None, rag: dict | None,
     if passages:
         # Deterministic resolution: when the question clearly targets one note
         # section (meds / instructions / diagnoses / hospital course), show
-        # THAT passage regardless of the number the model attached to it. The
+        # THAT section regardless of the number the model attached to it. The
         # model mis-numbers citations (a meds answer cites ^[1] while the meds
         # passage is ^[3] in rag_search_sections order), so a pure
         # cite -> passages[cite-1] mapping shows the wrong section.
         cited = None
+        intent_body = None
         if section:
             cited = next((p for p in passages
                           if p.get("section") == section), None)
+            if cited is None:
+                # The index stores whole-note chunks: a passage labeled with a
+                # different section still CONTAINS the target section, and the
+                # intent-labeled chunk can miss the top-k (near-tied whole-note
+                # embeddings). Pull the section body out of the passage text
+                # instead of showing the wrong section — deterministic for
+                # every patient.
+                for p in passages:
+                    body = _extract_section(p.get("text", ""), section)
+                    if body:
+                        cited = p
+                        intent_body = body
+                        break
         if cited is None:
             # cite is 1-based from the answer prose; clamp to a real passage.
             idx = min(max(cite, 1), len(passages)) - 1
@@ -316,10 +330,15 @@ def compose_risk_canvas(predict: dict | None, rag: dict | None,
             # Badge mirrors the thread's citation number (the answer's ^[n]),
             # not the passage's array position.
             badge = max(cite, 1)
-        section_text = _extract_section(cited.get("text", ""), cited.get("section", ""))
+        if intent_body is not None:
+            section_text = intent_body
+            shown_section = section
+        else:
+            section_text = _extract_section(cited.get("text", ""), cited.get("section", ""))
+            shown_section = cited.get("section", "discharge note")
         components.append({"id": "source", "component": "SourceCard",
                            "cite": badge,
-                           "section": cited.get("section", "discharge note"),
+                           "section": shown_section,
                            "text": section_text or cited.get("text", ""),
                            "query": query})
     else:

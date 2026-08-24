@@ -386,6 +386,32 @@ class A2uiCanvasTests(TestCase):
         source = next(c for c in comps if c.get('component') == 'SourceCard')
         self.assertEqual(source['section'], 'discharge_diagnosis')
 
+    def test_compose_extracts_intent_section_from_whole_note_chunks(self):
+        """The index stores whole-note chunks, so the intent-labeled passage
+        can miss the returned list entirely. The canvas must then pull the
+        intent section's body OUT of any returned chunk's text — never show
+        the wrong section (the live meds-chip failure)."""
+        whole_note = (
+            'CHIEF COMPLAINT: Knee pain.\n\n'
+            'HOSPITAL COURSE: She underwent a right TKA and recovered.\n\n'
+            'DISCHARGE DIAGNOSES: 1. S/p right TKA.\n\n'
+            'MEDICATIONS: Celebrex 200 mg daily.'
+        )
+        rag = {'passages': [
+            {'id': 'n_bhc_1', 'section': 'brief_hospital_course',
+             'text': whole_note, 'score': 0.3},
+            {'id': 'n_dx_1', 'section': 'discharge_diagnosis',
+             'text': whole_note, 'score': 0.2},
+        ], 'query': 'discharge notes'}
+        env = compose_risk_canvas(
+            None, rag, cite=1, section='discharge_medications')
+        comps = env['messages'][1]['updateComponents']['components']
+        source = next(c for c in comps if c.get('component') == 'SourceCard')
+        self.assertEqual(source['section'], 'discharge_medications')
+        self.assertIn('Celebrex', source['text'])
+        self.assertNotIn('HOSPITAL COURSE', source['text'])
+        self.assertEqual(source['cite'], 1)
+
     def test_extract_section_handles_mtsamples_headers(self):
         """Alias-aware extraction: MTSamples notes use different headers than
         MIMIC canon ("HOSPITAL COURSE:", "DISCHARGE DIAGNOSES:"), and the
@@ -484,7 +510,7 @@ class A2uiCanvasTests(TestCase):
         # Cache-busted stylesheet + module links so the shell CSS and the A2UI
         # component module are never stale in the browser.
         self.assertContains(response, 'demo_splitpane.css?v=6')
-        self.assertContains(response, 'demo_a2ui.js?v=7')
+        self.assertContains(response, 'demo_a2ui.js?v=8')
 
 
 @override_settings(DEMO_FIXTURE_MODE=False)
