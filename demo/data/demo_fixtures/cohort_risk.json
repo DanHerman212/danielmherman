@@ -886,5 +886,3113 @@
     "model_version": "readmission-final-20260723172647",
     "feature_source": "hybrid",
     "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000025": {
+    "hadm_id": 90000025,
+    "probability": 0.067658,
+    "threshold": 0.12,
+    "decision": 0,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "race",
+        "contribution": -0.3431,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2925,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.1118,
+        "direction": "decreases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.1097,
+        "direction": "decreases"
+      },
+      {
+        "feature": "rdw_max",
+        "contribution": -0.0853,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000026": {
+    "hadm_id": 90000026,
+    "probability": 0.071558,
+    "threshold": 0.12,
+    "decision": 0,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "race",
+        "contribution": -0.2976,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2851,
+        "direction": "decreases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.1275,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.1103,
+        "direction": "decreases"
+      },
+      {
+        "feature": "discharge_location",
+        "contribution": -0.0841,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000027": {
+    "hadm_id": 90000027,
+    "probability": 0.074614,
+    "threshold": 0.12,
+    "decision": 0,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.257,
+        "direction": "decreases"
+      },
+      {
+        "feature": "race",
+        "contribution": -0.2501,
+        "direction": "decreases"
+      },
+      {
+        "feature": "recent_ed_visits",
+        "contribution": -0.1245,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.1035,
+        "direction": "decreases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.1003,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000028": {
+    "hadm_id": 90000028,
+    "probability": 0.07521,
+    "threshold": 0.12,
+    "decision": 0,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2603,
+        "direction": "decreases"
+      },
+      {
+        "feature": "race",
+        "contribution": -0.2508,
+        "direction": "decreases"
+      },
+      {
+        "feature": "discharge_location",
+        "contribution": -0.1828,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.1013,
+        "direction": "decreases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.0925,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000029": {
+    "hadm_id": 90000029,
+    "probability": 0.076,
+    "threshold": 0.12,
+    "decision": 0,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2684,
+        "direction": "decreases"
+      },
+      {
+        "feature": "race",
+        "contribution": -0.2363,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.1084,
+        "direction": "decreases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.1012,
+        "direction": "decreases"
+      },
+      {
+        "feature": "discharge_location",
+        "contribution": -0.0869,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000030": {
+    "hadm_id": 90000030,
+    "probability": 0.077607,
+    "threshold": 0.12,
+    "decision": 0,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2782,
+        "direction": "decreases"
+      },
+      {
+        "feature": "race",
+        "contribution": -0.2284,
+        "direction": "decreases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.1174,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.1127,
+        "direction": "decreases"
+      },
+      {
+        "feature": "discharge_location",
+        "contribution": -0.0863,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000031": {
+    "hadm_id": 90000031,
+    "probability": 0.078428,
+    "threshold": 0.12,
+    "decision": 0,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2804,
+        "direction": "decreases"
+      },
+      {
+        "feature": "race",
+        "contribution": -0.259,
+        "direction": "decreases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.1367,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.1125,
+        "direction": "decreases"
+      },
+      {
+        "feature": "discharge_location",
+        "contribution": -0.0852,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000032": {
+    "hadm_id": 90000032,
+    "probability": 0.08308,
+    "threshold": 0.12,
+    "decision": 0,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2964,
+        "direction": "decreases"
+      },
+      {
+        "feature": "recent_ed_visits",
+        "contribution": -0.1512,
+        "direction": "decreases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.1122,
+        "direction": "decreases"
+      },
+      {
+        "feature": "discharge_location",
+        "contribution": -0.0927,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.0894,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000033": {
+    "hadm_id": 90000033,
+    "probability": 0.083943,
+    "threshold": 0.12,
+    "decision": 0,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.3124,
+        "direction": "decreases"
+      },
+      {
+        "feature": "race",
+        "contribution": -0.2325,
+        "direction": "decreases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.1304,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.1286,
+        "direction": "decreases"
+      },
+      {
+        "feature": "discharge_location",
+        "contribution": -0.12,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000034": {
+    "hadm_id": 90000034,
+    "probability": 0.085056,
+    "threshold": 0.12,
+    "decision": 0,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2856,
+        "direction": "decreases"
+      },
+      {
+        "feature": "race",
+        "contribution": -0.2655,
+        "direction": "decreases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.1238,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.1157,
+        "direction": "decreases"
+      },
+      {
+        "feature": "discharge_location",
+        "contribution": -0.0885,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000035": {
+    "hadm_id": 90000035,
+    "probability": 0.085056,
+    "threshold": 0.12,
+    "decision": 0,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2721,
+        "direction": "decreases"
+      },
+      {
+        "feature": "race",
+        "contribution": -0.2655,
+        "direction": "decreases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.1191,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.11,
+        "direction": "decreases"
+      },
+      {
+        "feature": "discharge_location",
+        "contribution": -0.0883,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000036": {
+    "hadm_id": 90000036,
+    "probability": 0.087118,
+    "threshold": 0.12,
+    "decision": 0,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2972,
+        "direction": "decreases"
+      },
+      {
+        "feature": "race",
+        "contribution": -0.1918,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.1148,
+        "direction": "decreases"
+      },
+      {
+        "feature": "recent_ed_visits",
+        "contribution": -0.1143,
+        "direction": "decreases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.1132,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000037": {
+    "hadm_id": 90000037,
+    "probability": 0.087974,
+    "threshold": 0.12,
+    "decision": 0,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "race",
+        "contribution": -0.3085,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2817,
+        "direction": "decreases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.133,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.1161,
+        "direction": "decreases"
+      },
+      {
+        "feature": "index_los_days",
+        "contribution": 0.0868,
+        "direction": "increases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000038": {
+    "hadm_id": 90000038,
+    "probability": 0.089125,
+    "threshold": 0.12,
+    "decision": 0,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2751,
+        "direction": "decreases"
+      },
+      {
+        "feature": "race",
+        "contribution": -0.2218,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.1189,
+        "direction": "decreases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.1103,
+        "direction": "decreases"
+      },
+      {
+        "feature": "discharge_location",
+        "contribution": -0.0865,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000039": {
+    "hadm_id": 90000039,
+    "probability": 0.089136,
+    "threshold": 0.12,
+    "decision": 0,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "race",
+        "contribution": -0.2741,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2539,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.0961,
+        "direction": "decreases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.0875,
+        "direction": "decreases"
+      },
+      {
+        "feature": "discharge_location",
+        "contribution": -0.0764,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000040": {
+    "hadm_id": 90000040,
+    "probability": 0.090485,
+    "threshold": 0.12,
+    "decision": 0,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "race",
+        "contribution": -0.2606,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2166,
+        "direction": "decreases"
+      },
+      {
+        "feature": "medication_count",
+        "contribution": 0.1904,
+        "direction": "increases"
+      },
+      {
+        "feature": "discharge_location",
+        "contribution": -0.1714,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.0987,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000041": {
+    "hadm_id": 90000041,
+    "probability": 0.090789,
+    "threshold": 0.12,
+    "decision": 0,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "race",
+        "contribution": -0.2555,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2351,
+        "direction": "decreases"
+      },
+      {
+        "feature": "medication_count",
+        "contribution": 0.2012,
+        "direction": "increases"
+      },
+      {
+        "feature": "discharge_location",
+        "contribution": -0.176,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.1094,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000042": {
+    "hadm_id": 90000042,
+    "probability": 0.093646,
+    "threshold": 0.12,
+    "decision": 0,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.3501,
+        "direction": "decreases"
+      },
+      {
+        "feature": "race",
+        "contribution": -0.2513,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.1604,
+        "direction": "decreases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.1266,
+        "direction": "decreases"
+      },
+      {
+        "feature": "discharge_location",
+        "contribution": -0.1079,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000043": {
+    "hadm_id": 90000043,
+    "probability": 0.093974,
+    "threshold": 0.12,
+    "decision": 0,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.296,
+        "direction": "decreases"
+      },
+      {
+        "feature": "race",
+        "contribution": -0.2254,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.1282,
+        "direction": "decreases"
+      },
+      {
+        "feature": "recent_ed_visits",
+        "contribution": -0.1235,
+        "direction": "decreases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.1212,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000044": {
+    "hadm_id": 90000044,
+    "probability": 0.096555,
+    "threshold": 0.12,
+    "decision": 0,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2812,
+        "direction": "decreases"
+      },
+      {
+        "feature": "race",
+        "contribution": -0.2789,
+        "direction": "decreases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.1284,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.122,
+        "direction": "decreases"
+      },
+      {
+        "feature": "rdw_max",
+        "contribution": -0.0709,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000045": {
+    "hadm_id": 90000045,
+    "probability": 0.097928,
+    "threshold": 0.12,
+    "decision": 0,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "race",
+        "contribution": -0.2898,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2718,
+        "direction": "decreases"
+      },
+      {
+        "feature": "medication_count",
+        "contribution": 0.165,
+        "direction": "increases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.1237,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.1083,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000046": {
+    "hadm_id": 90000046,
+    "probability": 0.09802,
+    "threshold": 0.12,
+    "decision": 0,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.1948,
+        "direction": "decreases"
+      },
+      {
+        "feature": "discharge_location",
+        "contribution": -0.1363,
+        "direction": "decreases"
+      },
+      {
+        "feature": "medication_order_count",
+        "contribution": -0.116,
+        "direction": "decreases"
+      },
+      {
+        "feature": "index_los_days",
+        "contribution": 0.1089,
+        "direction": "increases"
+      },
+      {
+        "feature": "rdw_max",
+        "contribution": -0.082,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000047": {
+    "hadm_id": 90000047,
+    "probability": 0.099689,
+    "threshold": 0.12,
+    "decision": 0,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2836,
+        "direction": "decreases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.1173,
+        "direction": "decreases"
+      },
+      {
+        "feature": "discharge_location",
+        "contribution": -0.1035,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.0921,
+        "direction": "decreases"
+      },
+      {
+        "feature": "medication_order_count",
+        "contribution": -0.0885,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000048": {
+    "hadm_id": 90000048,
+    "probability": 0.099993,
+    "threshold": 0.12,
+    "decision": 0,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2846,
+        "direction": "decreases"
+      },
+      {
+        "feature": "race",
+        "contribution": -0.2547,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.1326,
+        "direction": "decreases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.118,
+        "direction": "decreases"
+      },
+      {
+        "feature": "medication_count",
+        "contribution": 0.0907,
+        "direction": "increases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000049": {
+    "hadm_id": 90000049,
+    "probability": 0.100327,
+    "threshold": 0.12,
+    "decision": 0,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "race",
+        "contribution": -0.199,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": 0.1763,
+        "direction": "increases"
+      },
+      {
+        "feature": "recent_ed_visits",
+        "contribution": -0.1461,
+        "direction": "decreases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.1316,
+        "direction": "decreases"
+      },
+      {
+        "feature": "rdw_max",
+        "contribution": -0.1158,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000050": {
+    "hadm_id": 90000050,
+    "probability": 0.105089,
+    "threshold": 0.12,
+    "decision": 0,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.3301,
+        "direction": "decreases"
+      },
+      {
+        "feature": "race",
+        "contribution": -0.2526,
+        "direction": "decreases"
+      },
+      {
+        "feature": "medication_count",
+        "contribution": 0.153,
+        "direction": "increases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.1399,
+        "direction": "decreases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.1348,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000051": {
+    "hadm_id": 90000051,
+    "probability": 0.108281,
+    "threshold": 0.12,
+    "decision": 0,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "race",
+        "contribution": -0.1851,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": 0.1702,
+        "direction": "increases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.1031,
+        "direction": "decreases"
+      },
+      {
+        "feature": "rdw_max",
+        "contribution": -0.0964,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.0911,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000052": {
+    "hadm_id": 90000052,
+    "probability": 0.10891,
+    "threshold": 0.12,
+    "decision": 0,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2472,
+        "direction": "decreases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.1185,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.0952,
+        "direction": "decreases"
+      },
+      {
+        "feature": "rdw_max",
+        "contribution": -0.0857,
+        "direction": "decreases"
+      },
+      {
+        "feature": "discharge_location",
+        "contribution": -0.073,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000053": {
+    "hadm_id": 90000053,
+    "probability": 0.109898,
+    "threshold": 0.12,
+    "decision": 0,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2436,
+        "direction": "decreases"
+      },
+      {
+        "feature": "recent_ed_visits",
+        "contribution": -0.1362,
+        "direction": "decreases"
+      },
+      {
+        "feature": "index_los_days",
+        "contribution": 0.1317,
+        "direction": "increases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.1003,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.0932,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000054": {
+    "hadm_id": 90000054,
+    "probability": 0.110798,
+    "threshold": 0.12,
+    "decision": 0,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "race",
+        "contribution": -0.2999,
+        "direction": "decreases"
+      },
+      {
+        "feature": "medication_count",
+        "contribution": 0.2317,
+        "direction": "increases"
+      },
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2258,
+        "direction": "decreases"
+      },
+      {
+        "feature": "discharge_location",
+        "contribution": -0.1474,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.1101,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000055": {
+    "hadm_id": 90000055,
+    "probability": 0.11151,
+    "threshold": 0.12,
+    "decision": 0,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2748,
+        "direction": "decreases"
+      },
+      {
+        "feature": "race",
+        "contribution": -0.2617,
+        "direction": "decreases"
+      },
+      {
+        "feature": "medication_count",
+        "contribution": 0.1354,
+        "direction": "increases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.1282,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.127,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000056": {
+    "hadm_id": 90000056,
+    "probability": 0.112871,
+    "threshold": 0.12,
+    "decision": 0,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "medication_count",
+        "contribution": 0.3493,
+        "direction": "increases"
+      },
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.3116,
+        "direction": "decreases"
+      },
+      {
+        "feature": "race",
+        "contribution": -0.2783,
+        "direction": "decreases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.1208,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.113,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000057": {
+    "hadm_id": 90000057,
+    "probability": 0.114806,
+    "threshold": 0.12,
+    "decision": 0,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "race",
+        "contribution": -0.2963,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2738,
+        "direction": "decreases"
+      },
+      {
+        "feature": "medication_count",
+        "contribution": 0.2223,
+        "direction": "increases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.1325,
+        "direction": "decreases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.1232,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000058": {
+    "hadm_id": 90000058,
+    "probability": 0.11484,
+    "threshold": 0.12,
+    "decision": 0,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2336,
+        "direction": "decreases"
+      },
+      {
+        "feature": "index_los_days",
+        "contribution": 0.1146,
+        "direction": "increases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.0943,
+        "direction": "decreases"
+      },
+      {
+        "feature": "medication_order_count",
+        "contribution": -0.0842,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.0739,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000059": {
+    "hadm_id": 90000059,
+    "probability": 0.114851,
+    "threshold": 0.12,
+    "decision": 0,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2574,
+        "direction": "decreases"
+      },
+      {
+        "feature": "recent_ed_visits",
+        "contribution": -0.1537,
+        "direction": "decreases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.0962,
+        "direction": "decreases"
+      },
+      {
+        "feature": "gender",
+        "contribution": 0.0943,
+        "direction": "increases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.0888,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000060": {
+    "hadm_id": 90000060,
+    "probability": 0.115097,
+    "threshold": 0.12,
+    "decision": 0,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2213,
+        "direction": "decreases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.112,
+        "direction": "decreases"
+      },
+      {
+        "feature": "medication_order_count",
+        "contribution": -0.0982,
+        "direction": "decreases"
+      },
+      {
+        "feature": "rdw_max",
+        "contribution": -0.0911,
+        "direction": "decreases"
+      },
+      {
+        "feature": "discharge_location",
+        "contribution": 0.0877,
+        "direction": "increases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000061": {
+    "hadm_id": 90000061,
+    "probability": 0.117713,
+    "threshold": 0.12,
+    "decision": 0,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "discharge_location",
+        "contribution": -0.2674,
+        "direction": "decreases"
+      },
+      {
+        "feature": "sodium_last",
+        "contribution": 0.2485,
+        "direction": "increases"
+      },
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2076,
+        "direction": "decreases"
+      },
+      {
+        "feature": "index_los_days",
+        "contribution": 0.1328,
+        "direction": "increases"
+      },
+      {
+        "feature": "recent_ed_visits",
+        "contribution": -0.1284,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000062": {
+    "hadm_id": 90000062,
+    "probability": 0.121961,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.3003,
+        "direction": "decreases"
+      },
+      {
+        "feature": "race",
+        "contribution": -0.2061,
+        "direction": "decreases"
+      },
+      {
+        "feature": "age",
+        "contribution": 0.1365,
+        "direction": "increases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.1256,
+        "direction": "decreases"
+      },
+      {
+        "feature": "discharge_location",
+        "contribution": 0.1129,
+        "direction": "increases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000063": {
+    "hadm_id": 90000063,
+    "probability": 0.123057,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "oncology_flag",
+        "contribution": 0.4441,
+        "direction": "increases"
+      },
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2255,
+        "direction": "decreases"
+      },
+      {
+        "feature": "race",
+        "contribution": -0.1957,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.0829,
+        "direction": "decreases"
+      },
+      {
+        "feature": "rdw_max",
+        "contribution": -0.0739,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000064": {
+    "hadm_id": 90000064,
+    "probability": 0.128455,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2307,
+        "direction": "decreases"
+      },
+      {
+        "feature": "sodium_last",
+        "contribution": 0.1282,
+        "direction": "increases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.109,
+        "direction": "decreases"
+      },
+      {
+        "feature": "index_los_days",
+        "contribution": 0.1077,
+        "direction": "increases"
+      },
+      {
+        "feature": "rdw_max",
+        "contribution": -0.0777,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000065": {
+    "hadm_id": 90000065,
+    "probability": 0.133297,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": 0.1827,
+        "direction": "increases"
+      },
+      {
+        "feature": "recent_ed_visits",
+        "contribution": -0.1603,
+        "direction": "decreases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.1218,
+        "direction": "decreases"
+      },
+      {
+        "feature": "rdw_max",
+        "contribution": -0.105,
+        "direction": "decreases"
+      },
+      {
+        "feature": "age",
+        "contribution": 0.093,
+        "direction": "increases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000066": {
+    "hadm_id": 90000066,
+    "probability": 0.13498,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2735,
+        "direction": "decreases"
+      },
+      {
+        "feature": "medication_count",
+        "contribution": 0.2332,
+        "direction": "increases"
+      },
+      {
+        "feature": "discharge_location",
+        "contribution": -0.1252,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.1105,
+        "direction": "decreases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.1012,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000067": {
+    "hadm_id": 90000067,
+    "probability": 0.136184,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.1898,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.0847,
+        "direction": "decreases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.0834,
+        "direction": "decreases"
+      },
+      {
+        "feature": "index_los_days",
+        "contribution": 0.0818,
+        "direction": "increases"
+      },
+      {
+        "feature": "rdw_max",
+        "contribution": -0.0714,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000068": {
+    "hadm_id": 90000068,
+    "probability": 0.136489,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2199,
+        "direction": "decreases"
+      },
+      {
+        "feature": "medication_count",
+        "contribution": 0.2144,
+        "direction": "increases"
+      },
+      {
+        "feature": "recent_ed_visits",
+        "contribution": -0.1298,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.0884,
+        "direction": "decreases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.0831,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000069": {
+    "hadm_id": 90000069,
+    "probability": 0.137738,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2502,
+        "direction": "decreases"
+      },
+      {
+        "feature": "medication_count",
+        "contribution": 0.2162,
+        "direction": "increases"
+      },
+      {
+        "feature": "discharge_location",
+        "contribution": -0.1278,
+        "direction": "decreases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.1048,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.0832,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000070": {
+    "hadm_id": 90000070,
+    "probability": 0.139164,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2025,
+        "direction": "decreases"
+      },
+      {
+        "feature": "sodium_last",
+        "contribution": 0.1873,
+        "direction": "increases"
+      },
+      {
+        "feature": "index_los_days",
+        "contribution": 0.097,
+        "direction": "increases"
+      },
+      {
+        "feature": "rdw_max",
+        "contribution": -0.0814,
+        "direction": "decreases"
+      },
+      {
+        "feature": "age",
+        "contribution": -0.0699,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000071": {
+    "hadm_id": 90000071,
+    "probability": 0.140876,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": 0.2185,
+        "direction": "increases"
+      },
+      {
+        "feature": "race",
+        "contribution": -0.1841,
+        "direction": "decreases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.1273,
+        "direction": "decreases"
+      },
+      {
+        "feature": "age",
+        "contribution": 0.1061,
+        "direction": "increases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.1016,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000072": {
+    "hadm_id": 90000072,
+    "probability": 0.141027,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "discharge_location",
+        "contribution": 0.3775,
+        "direction": "increases"
+      },
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.3353,
+        "direction": "decreases"
+      },
+      {
+        "feature": "race",
+        "contribution": -0.191,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.1443,
+        "direction": "decreases"
+      },
+      {
+        "feature": "age",
+        "contribution": 0.1365,
+        "direction": "increases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000073": {
+    "hadm_id": 90000073,
+    "probability": 0.143309,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "medication_count",
+        "contribution": 0.5461,
+        "direction": "increases"
+      },
+      {
+        "feature": "race",
+        "contribution": -0.2904,
+        "direction": "decreases"
+      },
+      {
+        "feature": "discharge_location",
+        "contribution": -0.2218,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.1655,
+        "direction": "decreases"
+      },
+      {
+        "feature": "age",
+        "contribution": -0.1269,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000074": {
+    "hadm_id": 90000074,
+    "probability": 0.145723,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "medication_count",
+        "contribution": 0.196,
+        "direction": "increases"
+      },
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.1816,
+        "direction": "decreases"
+      },
+      {
+        "feature": "discharge_location",
+        "contribution": -0.13,
+        "direction": "decreases"
+      },
+      {
+        "feature": "gender",
+        "contribution": 0.0839,
+        "direction": "increases"
+      },
+      {
+        "feature": "age",
+        "contribution": -0.0828,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000075": {
+    "hadm_id": 90000075,
+    "probability": 0.146861,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "medication_count",
+        "contribution": 0.4938,
+        "direction": "increases"
+      },
+      {
+        "feature": "discharge_location",
+        "contribution": -0.2434,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.1829,
+        "direction": "decreases"
+      },
+      {
+        "feature": "age",
+        "contribution": -0.1614,
+        "direction": "decreases"
+      },
+      {
+        "feature": "recent_ed_visits",
+        "contribution": -0.1449,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000076": {
+    "hadm_id": 90000076,
+    "probability": 0.148815,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.246,
+        "direction": "decreases"
+      },
+      {
+        "feature": "index_los_days",
+        "contribution": 0.1171,
+        "direction": "increases"
+      },
+      {
+        "feature": "medication_count",
+        "contribution": 0.1104,
+        "direction": "increases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.0979,
+        "direction": "decreases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.0936,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000077": {
+    "hadm_id": 90000077,
+    "probability": 0.149965,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": 0.3106,
+        "direction": "increases"
+      },
+      {
+        "feature": "race",
+        "contribution": -0.1333,
+        "direction": "decreases"
+      },
+      {
+        "feature": "recent_ed_visits",
+        "contribution": -0.1235,
+        "direction": "decreases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.1168,
+        "direction": "decreases"
+      },
+      {
+        "feature": "rdw_max",
+        "contribution": -0.1124,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000078": {
+    "hadm_id": 90000078,
+    "probability": 0.150901,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "race",
+        "contribution": -0.2121,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": 0.1899,
+        "direction": "increases"
+      },
+      {
+        "feature": "medication_count",
+        "contribution": 0.1879,
+        "direction": "increases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.1178,
+        "direction": "decreases"
+      },
+      {
+        "feature": "age",
+        "contribution": 0.1173,
+        "direction": "increases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000079": {
+    "hadm_id": 90000079,
+    "probability": 0.155998,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "medication_count",
+        "contribution": 0.5757,
+        "direction": "increases"
+      },
+      {
+        "feature": "race",
+        "contribution": -0.2915,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2777,
+        "direction": "decreases"
+      },
+      {
+        "feature": "discharge_location",
+        "contribution": -0.1834,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.1254,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000080": {
+    "hadm_id": 90000080,
+    "probability": 0.157081,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "medication_count",
+        "contribution": 0.5167,
+        "direction": "increases"
+      },
+      {
+        "feature": "race",
+        "contribution": -0.3353,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2587,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.1213,
+        "direction": "decreases"
+      },
+      {
+        "feature": "discharge_location",
+        "contribution": -0.0944,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000081": {
+    "hadm_id": 90000081,
+    "probability": 0.158161,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "oncology_flag",
+        "contribution": 0.3908,
+        "direction": "increases"
+      },
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.213,
+        "direction": "decreases"
+      },
+      {
+        "feature": "medication_order_count",
+        "contribution": -0.0814,
+        "direction": "decreases"
+      },
+      {
+        "feature": "index_los_days",
+        "contribution": 0.0782,
+        "direction": "increases"
+      },
+      {
+        "feature": "age",
+        "contribution": 0.0741,
+        "direction": "increases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000082": {
+    "hadm_id": 90000082,
+    "probability": 0.159958,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "medication_count",
+        "contribution": 0.5654,
+        "direction": "increases"
+      },
+      {
+        "feature": "race",
+        "contribution": -0.2851,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2397,
+        "direction": "decreases"
+      },
+      {
+        "feature": "discharge_location",
+        "contribution": -0.1454,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.1078,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000083": {
+    "hadm_id": 90000083,
+    "probability": 0.160296,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "medication_count",
+        "contribution": 0.5286,
+        "direction": "increases"
+      },
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2669,
+        "direction": "decreases"
+      },
+      {
+        "feature": "race",
+        "contribution": -0.2096,
+        "direction": "decreases"
+      },
+      {
+        "feature": "discharge_location",
+        "contribution": -0.1622,
+        "direction": "decreases"
+      },
+      {
+        "feature": "age",
+        "contribution": 0.115,
+        "direction": "increases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000084": {
+    "hadm_id": 90000084,
+    "probability": 0.163404,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "medication_count",
+        "contribution": 0.5476,
+        "direction": "increases"
+      },
+      {
+        "feature": "race",
+        "contribution": -0.2537,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2059,
+        "direction": "decreases"
+      },
+      {
+        "feature": "discharge_location",
+        "contribution": -0.1295,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.1111,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000085": {
+    "hadm_id": 90000085,
+    "probability": 0.163404,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "medication_count",
+        "contribution": 0.5476,
+        "direction": "increases"
+      },
+      {
+        "feature": "race",
+        "contribution": -0.2537,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2059,
+        "direction": "decreases"
+      },
+      {
+        "feature": "discharge_location",
+        "contribution": -0.1295,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.1111,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000086": {
+    "hadm_id": 90000086,
+    "probability": 0.166961,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "race",
+        "contribution": -0.2107,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": 0.1976,
+        "direction": "increases"
+      },
+      {
+        "feature": "medication_count",
+        "contribution": 0.1302,
+        "direction": "increases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.1025,
+        "direction": "decreases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.0962,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000087": {
+    "hadm_id": 90000087,
+    "probability": 0.168411,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": 0.1602,
+        "direction": "increases"
+      },
+      {
+        "feature": "rdw_max",
+        "contribution": -0.1335,
+        "direction": "decreases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.1031,
+        "direction": "decreases"
+      },
+      {
+        "feature": "sodium_last",
+        "contribution": 0.0856,
+        "direction": "increases"
+      },
+      {
+        "feature": "medication_order_count",
+        "contribution": -0.0739,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000088": {
+    "hadm_id": 90000088,
+    "probability": 0.169142,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "sodium_last",
+        "contribution": 0.2247,
+        "direction": "increases"
+      },
+      {
+        "feature": "recent_ed_visits",
+        "contribution": -0.1463,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": 0.1357,
+        "direction": "increases"
+      },
+      {
+        "feature": "rdw_max",
+        "contribution": -0.1177,
+        "direction": "decreases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.1039,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000089": {
+    "hadm_id": 90000089,
+    "probability": 0.172367,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "discharge_location",
+        "contribution": 0.3691,
+        "direction": "increases"
+      },
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.262,
+        "direction": "decreases"
+      },
+      {
+        "feature": "index_los_days",
+        "contribution": 0.1471,
+        "direction": "increases"
+      },
+      {
+        "feature": "recent_ed_visits",
+        "contribution": -0.1349,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.1039,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000090": {
+    "hadm_id": 90000090,
+    "probability": 0.177116,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": 0.1543,
+        "direction": "increases"
+      },
+      {
+        "feature": "discharge_location",
+        "contribution": -0.15,
+        "direction": "decreases"
+      },
+      {
+        "feature": "medication_count",
+        "contribution": 0.1297,
+        "direction": "increases"
+      },
+      {
+        "feature": "rdw_max",
+        "contribution": -0.1088,
+        "direction": "decreases"
+      },
+      {
+        "feature": "gender",
+        "contribution": 0.0983,
+        "direction": "increases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000091": {
+    "hadm_id": 90000091,
+    "probability": 0.182247,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "medication_count",
+        "contribution": 0.6226,
+        "direction": "increases"
+      },
+      {
+        "feature": "race",
+        "contribution": -0.3242,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2983,
+        "direction": "decreases"
+      },
+      {
+        "feature": "discharge_location",
+        "contribution": -0.163,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.1522,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000092": {
+    "hadm_id": 90000092,
+    "probability": 0.183591,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "oncology_flag",
+        "contribution": 0.4924,
+        "direction": "increases"
+      },
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2235,
+        "direction": "decreases"
+      },
+      {
+        "feature": "race",
+        "contribution": -0.2055,
+        "direction": "decreases"
+      },
+      {
+        "feature": "medication_count",
+        "contribution": 0.1226,
+        "direction": "increases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.0812,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000093": {
+    "hadm_id": 90000093,
+    "probability": 0.187911,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": 0.5385,
+        "direction": "increases"
+      },
+      {
+        "feature": "race",
+        "contribution": -0.1718,
+        "direction": "decreases"
+      },
+      {
+        "feature": "recent_ed_visits",
+        "contribution": -0.1682,
+        "direction": "decreases"
+      },
+      {
+        "feature": "rdw_max",
+        "contribution": -0.0985,
+        "direction": "decreases"
+      },
+      {
+        "feature": "age",
+        "contribution": -0.0783,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000094": {
+    "hadm_id": 90000094,
+    "probability": 0.19788,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "oncology_flag",
+        "contribution": 0.4424,
+        "direction": "increases"
+      },
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.182,
+        "direction": "decreases"
+      },
+      {
+        "feature": "rdw_max",
+        "contribution": -0.0844,
+        "direction": "decreases"
+      },
+      {
+        "feature": "index_los_days",
+        "contribution": 0.0743,
+        "direction": "increases"
+      },
+      {
+        "feature": "monocytes_min",
+        "contribution": -0.0678,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000095": {
+    "hadm_id": 90000095,
+    "probability": 0.202574,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "oncology_flag",
+        "contribution": 0.3466,
+        "direction": "increases"
+      },
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": 0.2565,
+        "direction": "increases"
+      },
+      {
+        "feature": "discharge_location",
+        "contribution": -0.138,
+        "direction": "decreases"
+      },
+      {
+        "feature": "age",
+        "contribution": 0.137,
+        "direction": "increases"
+      },
+      {
+        "feature": "recent_ed_visits",
+        "contribution": -0.1231,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000096": {
+    "hadm_id": 90000096,
+    "probability": 0.202692,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "discharge_location",
+        "contribution": 0.3534,
+        "direction": "increases"
+      },
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": 0.2955,
+        "direction": "increases"
+      },
+      {
+        "feature": "race",
+        "contribution": -0.1393,
+        "direction": "decreases"
+      },
+      {
+        "feature": "rdw_max",
+        "contribution": -0.1087,
+        "direction": "decreases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.0748,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000097": {
+    "hadm_id": 90000097,
+    "probability": 0.204766,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "oncology_flag",
+        "contribution": 0.5352,
+        "direction": "increases"
+      },
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2436,
+        "direction": "decreases"
+      },
+      {
+        "feature": "race",
+        "contribution": -0.2163,
+        "direction": "decreases"
+      },
+      {
+        "feature": "medication_count",
+        "contribution": 0.1151,
+        "direction": "increases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.1033,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000098": {
+    "hadm_id": 90000098,
+    "probability": 0.209767,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "medication_count",
+        "contribution": 0.5917,
+        "direction": "increases"
+      },
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.3061,
+        "direction": "decreases"
+      },
+      {
+        "feature": "race",
+        "contribution": -0.2993,
+        "direction": "decreases"
+      },
+      {
+        "feature": "recent_ed_visits",
+        "contribution": 0.1646,
+        "direction": "increases"
+      },
+      {
+        "feature": "discharge_location",
+        "contribution": -0.1535,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000099": {
+    "hadm_id": 90000099,
+    "probability": 0.212194,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "medication_count",
+        "contribution": 0.4267,
+        "direction": "increases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": 0.3462,
+        "direction": "increases"
+      },
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.1938,
+        "direction": "decreases"
+      },
+      {
+        "feature": "race",
+        "contribution": -0.1718,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_admission_count",
+        "contribution": -0.0875,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000100": {
+    "hadm_id": 90000100,
+    "probability": 0.22427,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "oncology_flag",
+        "contribution": 0.4557,
+        "direction": "increases"
+      },
+      {
+        "feature": "race",
+        "contribution": -0.2064,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": 0.1882,
+        "direction": "increases"
+      },
+      {
+        "feature": "rdw_max",
+        "contribution": -0.1086,
+        "direction": "decreases"
+      },
+      {
+        "feature": "monocytes_min",
+        "contribution": -0.0669,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000101": {
+    "hadm_id": 90000101,
+    "probability": 0.236823,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "medication_count",
+        "contribution": 0.45,
+        "direction": "increases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": 0.2704,
+        "direction": "increases"
+      },
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.2145,
+        "direction": "decreases"
+      },
+      {
+        "feature": "age",
+        "contribution": 0.1131,
+        "direction": "increases"
+      },
+      {
+        "feature": "discharge_location",
+        "contribution": -0.1047,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000102": {
+    "hadm_id": 90000102,
+    "probability": 0.242158,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "medication_count",
+        "contribution": 0.5971,
+        "direction": "increases"
+      },
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.1994,
+        "direction": "decreases"
+      },
+      {
+        "feature": "discharge_location",
+        "contribution": -0.1159,
+        "direction": "decreases"
+      },
+      {
+        "feature": "gender",
+        "contribution": 0.1006,
+        "direction": "increases"
+      },
+      {
+        "feature": "rdw_max",
+        "contribution": -0.0929,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000103": {
+    "hadm_id": 90000103,
+    "probability": 0.256513,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": 0.1776,
+        "direction": "increases"
+      },
+      {
+        "feature": "medication_count",
+        "contribution": 0.1547,
+        "direction": "increases"
+      },
+      {
+        "feature": "gender",
+        "contribution": 0.1106,
+        "direction": "increases"
+      },
+      {
+        "feature": "oncology_flag",
+        "contribution": -0.109,
+        "direction": "decreases"
+      },
+      {
+        "feature": "age",
+        "contribution": 0.0916,
+        "direction": "increases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000104": {
+    "hadm_id": 90000104,
+    "probability": 0.260115,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "oncology_flag",
+        "contribution": 0.4824,
+        "direction": "increases"
+      },
+      {
+        "feature": "sodium_last",
+        "contribution": 0.1947,
+        "direction": "increases"
+      },
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.1709,
+        "direction": "decreases"
+      },
+      {
+        "feature": "index_los_days",
+        "contribution": 0.107,
+        "direction": "increases"
+      },
+      {
+        "feature": "recent_ed_visits",
+        "contribution": -0.1068,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000105": {
+    "hadm_id": 90000105,
+    "probability": 0.280024,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "medication_count",
+        "contribution": 0.5192,
+        "direction": "increases"
+      },
+      {
+        "feature": "race",
+        "contribution": -0.2467,
+        "direction": "decreases"
+      },
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": 0.206,
+        "direction": "increases"
+      },
+      {
+        "feature": "age",
+        "contribution": 0.1868,
+        "direction": "increases"
+      },
+      {
+        "feature": "discharge_location",
+        "contribution": -0.1316,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000106": {
+    "hadm_id": 90000106,
+    "probability": 0.295693,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "medication_count",
+        "contribution": 0.6958,
+        "direction": "increases"
+      },
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.1931,
+        "direction": "decreases"
+      },
+      {
+        "feature": "gender",
+        "contribution": 0.1056,
+        "direction": "increases"
+      },
+      {
+        "feature": "recent_ed_visits",
+        "contribution": -0.1004,
+        "direction": "decreases"
+      },
+      {
+        "feature": "index_los_days",
+        "contribution": 0.0858,
+        "direction": "increases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000107": {
+    "hadm_id": 90000107,
+    "probability": 0.29975,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "oncology_flag",
+        "contribution": 0.3979,
+        "direction": "increases"
+      },
+      {
+        "feature": "medication_count",
+        "contribution": 0.1852,
+        "direction": "increases"
+      },
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": 0.1582,
+        "direction": "increases"
+      },
+      {
+        "feature": "recent_ed_visits",
+        "contribution": -0.1067,
+        "direction": "decreases"
+      },
+      {
+        "feature": "rdw_max",
+        "contribution": -0.1039,
+        "direction": "decreases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
+  },
+  "90000108": {
+    "hadm_id": 90000108,
+    "probability": 0.355278,
+    "threshold": 0.12,
+    "decision": 1,
+    "base_value": -1.33862,
+    "top_factors": [
+      {
+        "feature": "oncology_flag",
+        "contribution": 0.5058,
+        "direction": "increases"
+      },
+      {
+        "feature": "sodium_last",
+        "contribution": 0.2166,
+        "direction": "increases"
+      },
+      {
+        "feature": "prior_inpatient_days",
+        "contribution": -0.1897,
+        "direction": "decreases"
+      },
+      {
+        "feature": "sodium_min",
+        "contribution": 0.0939,
+        "direction": "increases"
+      },
+      {
+        "feature": "index_los_days",
+        "contribution": 0.0934,
+        "direction": "increases"
+      }
+    ],
+    "model_version": "readmission-final-20260723172647",
+    "feature_source": "hybrid",
+    "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
   }
 }
