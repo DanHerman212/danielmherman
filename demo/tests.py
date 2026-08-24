@@ -443,6 +443,42 @@ class A2uiCanvasTests(TestCase):
         self.assertNotIn('HOSPITAL COURSE', source['text'])
         self.assertEqual(source['cite'], 1)
 
+    def test_compose_snippets_meds_sentence_from_hospital_course(self):
+        """Eleanor Whitfield (90000035): no meds AND no instructions section —
+        the meds are one sentence inside the hospital course. The card must
+        show THAT sentence, so the passage visibly supports the claim instead
+        of reading as a mismatch."""
+        note = (
+            'ADMISSION DIAGNOSIS: Symptomatic thyroid goiter.\n\n'
+            'HOSPITAL COURSE: The patient underwent total thyroidectomy on '
+            '09/22/08, which she tolerated very well. She was judged stable '
+            'for discharge home on 09/25/08. She was given prescription for '
+            'Vicodin for pain and Synthroid thyroid hormone, and otherwise '
+            'the appropriate wound care instructions per my routine wound '
+            'care sheet.'
+        )
+        rag = {'passages': [
+            {'id': 'n_bhc_1', 'section': 'brief_hospital_course',
+             'text': note, 'score': 0.3},
+            {'id': 'n_dx_1', 'section': 'discharge_diagnosis',
+             'text': note, 'score': 0.2},
+        ], 'query': 'discharge notes'}
+        answer = ('The patient was discharged on the following medications: '
+                  'Vicodin for pain, Synthroid thyroid hormone.^[1]')
+        env = compose_risk_canvas(
+            None, rag, cite=1,
+            sections=('discharge_medications', 'discharge_instructions'),
+            answer=answer)
+        comps = env['messages'][1]['updateComponents']['components']
+        source = next(c for c in comps if c.get('component') == 'SourceCard')
+        # The passage really is the hospital course — the section label stays
+        # honest — but the body is the meds sentence, not the surgery narrative.
+        self.assertEqual(source['section'], 'brief_hospital_course')
+        self.assertIn('Vicodin', source['text'])
+        self.assertIn('Synthroid', source['text'])
+        self.assertNotIn('total thyroidectomy', source['text'])
+        self.assertEqual(source['cite'], 1)
+
     def test_extract_section_handles_mtsamples_headers(self):
         """Alias-aware extraction: MTSamples notes use different headers than
         MIMIC canon ("HOSPITAL COURSE:", "DISCHARGE DIAGNOSES:"), and the

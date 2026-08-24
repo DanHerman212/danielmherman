@@ -284,7 +284,8 @@ def a2ui_ask(request):
         _tool_response(result, 'predict_readmission'),
         _rag_response(result),
         cite=first_citation(result.get('answer') or ''),
-        sections=intent)
+        sections=intent,
+        answer=result.get('answer'))
     result['intent_sections'] = list(intent)
     result['remaining'] = DemoQuota.remaining(request.user)
     return JsonResponse(result)

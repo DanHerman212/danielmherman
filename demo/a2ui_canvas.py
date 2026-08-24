@@ -187,6 +187,57 @@ def first_citation(answer: str) -> int:
     return int(m.group(1)) if m else 1
 
 
+# Words that a meds answer capitalizes but that are not medication names.
+_MED_STOPWORDS = {
+    "the", "for", "and", "with", "was", "were", "she", "he", "her",
+    "his", "their", "patient", "admission", "discharged", "following",
+    "medication", "medications", "discharge", "daily", "tablets", "capsules",
+}
+
+
+def _answer_med_tokens(answer: str) -> set[str]:
+    """Capitalized words the answer introduces as medication names.
+
+    Pulled from markdown list items ("- Vicodin 5 mg ...") and from the prose
+    after the "following medications" phrase. Used only to locate the note
+    sentence(s) that actually name them — never to alter the answer.
+    """
+    if not answer:
+        return set()
+    tokens = set()
+    for m in re.findall(r"^\s*[-*•]?\s*([A-Z][a-zA-Z\-]{3,})", answer, re.M):
+        tokens.add(m.lower())
+    marker = re.search(r"medications?\s*[:,\-]", answer, re.IGNORECASE)
+    tail = answer[marker.end():] if marker else answer
+    for m in re.findall(r"\b([A-Z][a-zA-Z\-]{3,})\b", tail):
+        if m.lower() not in _MED_STOPWORDS:
+            tokens.add(m.lower())
+    return {t for t in tokens if t not in _MED_STOPWORDS}
+
+
+def _med_snippet(text: str, answer: str) -> str | None:
+    """The sentence(s) in `text` that name the answer's medications, or None.
+
+    Some notes have no medications (or instructions) section at all — the meds
+    are one sentence inside the hospital course (hadm 90000035: "She was given
+    prescription for Vicodin for pain and Synthroid thyroid hormone"). Showing
+    the whole hospital course then reads as a citation mismatch even though the
+    passage really contains the claim. Snippet down to the sentence(s) that
+    name the meds so the SourceCard visibly supports the claim.
+    """
+    tokens = _answer_med_tokens(answer)
+    if not tokens or not text:
+        return None
+    sentences = re.split(r"(?<=[.!?])\s+", text)
+    hits = [s for s in sentences if any(t in s.lower() for t in tokens)]
+    if not hits:
+        return None
+    return " ".join(hits).strip()
+
+
+_MEDS_INTENT_SECTIONS = {"discharge_medications", "discharge_instructions"}
+
+
 # Discharge-note sections a question can target, in preference order, with the
 # words that reveal the intent. A question maps to a SECTION SET because the
 # content can live in different sections across MTSamples notes: the meds
@@ -226,7 +277,8 @@ def intent_sections(question: str | None) -> tuple[str, ...]:
 
 
 def compose_risk_canvas(predict: dict | None, rag: dict | None,
-                        cite: int = 1, sections: tuple[str, ...] = ()) -> dict:
+                        cite: int = 1, sections: tuple[str, ...] = (),
+                        answer: str | None = None) -> dict:
     """Turn one predict (+ rag) payload into the A2UI risk-canvas envelope.
 
     predict is None when the question did not request a readmission estimate
@@ -352,6 +404,14 @@ def compose_risk_canvas(predict: dict | None, rag: dict | None,
         else:
             section_text = _extract_section(cited.get("text", ""), cited.get("section", ""))
             shown_section = cited.get("section", "discharge note")
+            # The supporting text may live OUTSIDE the intent sections (a note
+            # with no meds/instructions section carries the meds in the hospital
+            # course). Show the sentence(s) that name the meds so the card
+            # visibly supports the claim instead of reading as a mismatch.
+            if sections and shown_section not in set(sections) and answer:
+                snippet = _med_snippet(section_text or cited.get("text", ""), answer)
+                if snippet:
+                    section_text = snippet
         components.append({"id": "source", "component": "SourceCard",
                            "cite": badge,
                            "section": shown_section,

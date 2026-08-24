@@ -106,6 +106,41 @@ function renderA2uiCanvas(episode, api, envelope) {
   renderEnvelope(target);
 }
 
+const MED_STOPWORDS = new Set([
+  'the', 'for', 'and', 'with', 'was', 'were', 'she', 'he', 'her',
+  'his', 'their', 'patient', 'admission', 'discharged', 'following',
+  'medication', 'medications', 'discharge', 'daily', 'tablets', 'capsules',
+]);
+
+/** Capitalized words the answer introduces as medication names. */
+function answerMedTokens(answer) {
+  const tokens = new Set();
+  const text = String(answer || '');
+  for (const m of text.matchAll(/^\s*[-*•]?\s*([A-Z][a-zA-Z\-]{3,})/gm)) {
+    tokens.add(m[1].toLowerCase());
+  }
+  const marker = text.match(/medications?\s*[:,\-]/i);
+  const tail = marker ? text.slice(marker.index + marker[0].length) : text;
+  for (const m of tail.matchAll(/\b([A-Z][a-zA-Z\-]{3,})\b/g)) {
+    const t = m[1].toLowerCase();
+    if (!MED_STOPWORDS.has(t)) tokens.add(t);
+  }
+  return tokens;
+}
+
+/** The sentence(s) in `text` that name the answer's medications, or null.
+    Some notes have no meds section — the meds are a sentence inside the
+    hospital course. Snippet down to that sentence so the card visibly
+    supports the claim. */
+function medSnippet(text, answer) {
+  const tokens = answerMedTokens(answer);
+  if (!tokens.size || !text) return null;
+  const sentences = String(text).split(/(?<=[.!?])\s+/);
+  const hits = sentences.filter((s) =>
+    [...tokens].some((t) => s.toLowerCase().includes(t)));
+  return hits.length ? hits.join(' ').trim() : null;
+}
+
 /** Point the turn's envelope SourceCard at the cited passage (n is 1-based).
 
     When the turn's question targeted note section(s) (intentSections), resolve
@@ -141,7 +176,16 @@ function envelopeForCite(turn, n) {
   if (!source) return env;
   source.cite = n;
   source.section = (intentBody || matchedSection) ? matchedSection : passage.section;
-  source.text = intentBody || extractSection(passage.text, passage.section) || passage.text;
+  let body = intentBody || extractSection(passage.text, passage.section) || passage.text;
+  // Supporting text can live outside the intent sections (a note with no
+  // meds/instructions section carries the meds in the hospital course).
+  // Show the sentence(s) naming the meds so the card supports the claim.
+  const intentSet = new Set(turn.intentSections || []);
+  if (!intentBody && !matchedSection && intentSet.size && turn.text) {
+    const snippet = medSnippet(body, turn.text);
+    if (snippet) body = snippet;
+  }
+  source.text = body;
   source.query = turn.query || 'discharge note';
   return env;
 }

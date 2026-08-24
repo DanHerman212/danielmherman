@@ -45,6 +45,10 @@ CASES = [
     (90000015, "Cynthia Petrov", "meds section exists (discharge_medications)"),
     (90000005, "Alan Marchetti", "NO meds section — meds live in discharge_instructions"),
     (90000107, "Alan Boyle", "expired during admission — honest no-meds answer"),
+    (90000035, "Eleanor Whitfield", "NO meds/instructions section — meds sentence inside hospital course"),
+    (90000053, "Alan Ellison", "breadth: unvetted note shape"),
+    (90000054, "Clarence Whitfield", "breadth: unvetted note shape"),
+    (90000095, "Curtis Whitfield", "breadth: unvetted note shape"),
 ]
 
 MEDS_SECTIONS = ("discharge_medications", "discharge_instructions")
@@ -59,9 +63,25 @@ def source_card(a2ui):
     return None
 
 
+_MED_STOPWORDS = {
+    "the", "for", "and", "with", "was", "were", "she", "he", "her",
+    "his", "their", "patient", "admission", "discharged", "following",
+    "medication", "medications", "discharge", "daily", "tablets", "capsules",
+}
+
+
 def first_meds(answer):
-    """The first medication names the answer lists, in answer order."""
-    return re.findall(r"^\s*[-*]?\s*([A-Z][a-zA-Z\-]{2,})(?:\s|,|$)", answer, re.M)
+    """The medication names the answer introduces, in answer order."""
+    out = []
+    for m in re.findall(r"^\s*[-*•]?\s*([A-Z][a-zA-Z\-]{3,})", answer, re.M):
+        if m.lower() not in _MED_STOPWORDS:
+            out.append(m)
+    marker = re.search(r"medications?\s*[:,\-]", answer, re.I)
+    tail = answer[marker.end():] if marker else answer
+    for m in re.findall(r"\b([A-Z][a-zA-Z\-]{3,})\b", tail):
+        if m.lower() not in _MED_STOPWORDS:
+            out.append(m)
+    return out
 
 
 def main():
@@ -93,21 +113,26 @@ def main():
         card = source_card(body.get("a2ui") or {})
         meds = first_meds(answer)
 
-        if "No discharge medications were found" in answer:
-            # Honest-empty path: no meds list to anchor. The card must simply
-            # not be the empty "not found" placeholder and must not claim a
-            # meds section.
-            ok = card is not None and card["section"] not in MEDS_SECTIONS or \
-                (card is not None and card.get("text", "").strip())
-            detail = f"honest no-meds answer; card section={card['section'] if card else None}"
+        if not meds:
+            # No meds in the answer. Honest either way: the empty-result card
+            # (notes with no discharge content) or a real passage the agent
+            # grounded the no-meds answer in (Alan Boyle: expired during
+            # admission). Print the answer head for eyeballing.
+            ok = card is not None
+            detail = (f"no meds in answer (honest-empty path); "
+                      f"card section={card['section'] if card else None!r}; "
+                      f"answer head: {answer[:130]!r}")
         else:
             section_ok = card is not None and card["section"] in MEDS_SECTIONS
             overlap = [
                 m for m in meds
                 if m.lower() in (card.get("text") or "").lower()
             ]
-            ok = section_ok and bool(overlap)
+            # The user-facing truth: the card's text must NAME the medications
+            # the answer lists, whether or not the note has a meds section.
+            ok = card is not None and bool(overlap)
             detail = (f"section={card['section'] if card else None!r} "
+                      f"in_meds_sections={section_ok} "
                       f"first_answer_meds={meds[:3]} in_card={overlap[:3]}")
         print(f"{'PASS' if ok else 'FAIL'} {name} ({why})")
         print(f"     {detail}")
