@@ -379,12 +379,14 @@ class A2uiCanvasTests(TestCase):
         source = next(c for c in comps if c.get('component') == 'SourceCard')
         self.assertEqual(source['section'], 'brief_hospital_course')
 
-        # A section hint with no matching passage falls back to the number.
+        # A section hint the note does not have is a deterministic
+        # "not available" card — never a fallback to the wrong section.
         env = compose_risk_canvas(
             None, rag, cite=2, sections=('discharge_instructions',))
         comps = env['messages'][1]['updateComponents']['components']
         source = next(c for c in comps if c.get('component') == 'SourceCard')
-        self.assertEqual(source['section'], 'discharge_diagnosis')
+        self.assertEqual(source['section'], 'not available')
+        self.assertIn('instruction', source['text'])
 
     def test_compose_extracts_intent_section_from_whole_note_chunks(self):
         """The index stores whole-note chunks, so the intent-labeled passage
@@ -443,19 +445,16 @@ class A2uiCanvasTests(TestCase):
         self.assertNotIn('HOSPITAL COURSE', source['text'])
         self.assertEqual(source['cite'], 1)
 
-    def test_compose_snippets_meds_sentence_from_hospital_course(self):
+    def test_compose_unavailable_when_note_lacks_meds_sections(self):
         """Eleanor Whitfield (90000035): no meds AND no instructions section —
-        the meds are one sentence inside the hospital course. The card must
-        show THAT sentence, so the passage visibly supports the claim instead
-        of reading as a mismatch."""
+        the note mentions meds only inside the hospital course. The
+        deterministic answer is 'not available', never a meds sentence mined
+        from the hospital course narrative."""
         note = (
             'ADMISSION DIAGNOSIS: Symptomatic thyroid goiter.\n\n'
             'HOSPITAL COURSE: The patient underwent total thyroidectomy on '
-            '09/22/08, which she tolerated very well. She was judged stable '
-            'for discharge home on 09/25/08. She was given prescription for '
-            'Vicodin for pain and Synthroid thyroid hormone, and otherwise '
-            'the appropriate wound care instructions per my routine wound '
-            'care sheet.'
+            '09/22/08, which she tolerated very well. She was given '
+            'prescription for Vicodin for pain and Synthroid thyroid hormone.'
         )
         rag = {'passages': [
             {'id': 'n_bhc_1', 'section': 'brief_hospital_course',
@@ -463,21 +462,51 @@ class A2uiCanvasTests(TestCase):
             {'id': 'n_dx_1', 'section': 'discharge_diagnosis',
              'text': note, 'score': 0.2},
         ], 'query': 'discharge notes'}
-        answer = ('The patient was discharged on the following medications: '
-                  'Vicodin for pain, Synthroid thyroid hormone.^[1]')
         env = compose_risk_canvas(
             None, rag, cite=1,
-            sections=('discharge_medications', 'discharge_instructions'),
-            answer=answer)
+            sections=('discharge_medications', 'discharge_instructions'))
         comps = env['messages'][1]['updateComponents']['components']
         source = next(c for c in comps if c.get('component') == 'SourceCard')
-        # The passage really is the hospital course — the section label stays
-        # honest — but the body is the meds sentence, not the surgery narrative.
-        self.assertEqual(source['section'], 'brief_hospital_course')
-        self.assertIn('Vicodin', source['text'])
-        self.assertIn('Synthroid', source['text'])
-        self.assertNotIn('total thyroidectomy', source['text'])
+        self.assertEqual(source['section'], 'not available')
+        self.assertIn('No discharge medication information', source['text'])
+        self.assertNotIn('Vicodin', source['text'])
         self.assertEqual(source['cite'], 1)
+
+    def test_renumber_citations_first_appearance_order(self):
+        from demo.a2ui_canvas import renumber_citations
+        # A meds-only answer cites ^[3] (discharge_medications is the 3rd
+        # section in rag_search_sections order) — it must read as ^[1].
+        self.assertEqual(
+            renumber_citations(
+                'The patient was discharged on the following medications^[3]:'),
+            'The patient was discharged on the following medications^[1]:')
+        # Multi-citation: renumber by order of first appearance.
+        self.assertEqual(
+            renumber_citations('A^[2] and B^[1] and C^[3]'),
+            'A^[1] and B^[2] and C^[3]')
+        self.assertEqual(renumber_citations('no citations here'),
+                         'no citations here')
+        # Stacked citations on one claim collapse to a single marker.
+        self.assertEqual(
+            renumber_citations('discharged on pain medication ^[1]^[2]^[3]^[4]^[5].'),
+            'discharged on pain medication ^[1].')
+        self.assertEqual(
+            renumber_citations('discharged on pain medication ^[1] ^[2] ^[3].'),
+            'discharged on pain medication ^[1].')
+
+    def test_extract_section_bounds_at_allergies_and_activity(self):
+        """The meds source must not swallow trailing headers (Allergies,
+        Activity) that the site alias list previously did not recognize."""
+        from demo.a2ui_canvas import _extract_section
+        note = ('DISCHARGE MEDICATIONS: Tylenol 650 mg q.6h., Lasix 80 mg '
+                'daily.\n\n'
+                'ALLERGIES: None.\n\n'
+                'ACTIVITY: Per PT.\n\n'
+                'FOLLOWUP INSTRUCTIONS: Call the office.')
+        meds = _extract_section(note, 'discharge_medications')
+        self.assertIn('Tylenol', meds)
+        self.assertNotIn('ALLERGIES', meds)
+        self.assertNotIn('ACTIVITY', meds)
 
     def test_extract_section_handles_mtsamples_headers(self):
         """Alias-aware extraction: MTSamples notes use different headers than
@@ -577,7 +606,7 @@ class A2uiCanvasTests(TestCase):
         # Cache-busted stylesheet + module links so the shell CSS and the A2UI
         # component module are never stale in the browser.
         self.assertContains(response, 'demo_splitpane.css?v=6')
-        self.assertContains(response, 'demo_a2ui.js?v=9')
+        self.assertContains(response, 'demo_a2ui.js?v=10')
 
 
 @override_settings(DEMO_FIXTURE_MODE=False)

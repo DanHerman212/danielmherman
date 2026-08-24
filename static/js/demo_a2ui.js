@@ -12,7 +12,7 @@
  * comparison.
  */
 
-import { createDemoFlow, extractSection } from './demo_flow.js?v=15';
+import { createDemoFlow, extractSection } from './demo_flow.js?v=16';
 import { MessageProcessor } from '/static/vendor/a2ui/a2ui_web_core_0.10.5_v0_9_external_lit_zod.js';
 import { basicCatalog, Context } from '/static/vendor/a2ui/a2ui_lit_0.10.2_v0_9_external_lit_zod.js';
 import { ContextProvider } from '/static/vendor/a2ui/lit_context_1.1.6_external_lit.js';
@@ -106,39 +106,13 @@ function renderA2uiCanvas(episode, api, envelope) {
   renderEnvelope(target);
 }
 
-const MED_STOPWORDS = new Set([
-  'the', 'for', 'and', 'with', 'was', 'were', 'she', 'he', 'her',
-  'his', 'their', 'patient', 'admission', 'discharged', 'following',
-  'medication', 'medications', 'discharge', 'daily', 'tablets', 'capsules',
-]);
-
-/** Capitalized words the answer introduces as medication names. */
-function answerMedTokens(answer) {
-  const tokens = new Set();
-  const text = String(answer || '');
-  for (const m of text.matchAll(/^\s*[-*•]?\s*([A-Z][a-zA-Z\-]{3,})/gm)) {
-    tokens.add(m[1].toLowerCase());
+/** The deterministic message for a question whose target section the note
+    does not have. Never mines content from unrelated narrative. */
+function unavailableText(section) {
+  if (section === 'discharge_medications') {
+    return 'No discharge medication information is available for this patient.';
   }
-  const marker = text.match(/medications?\s*[:,\-]/i);
-  const tail = marker ? text.slice(marker.index + marker[0].length) : text;
-  for (const m of tail.matchAll(/\b([A-Z][a-zA-Z\-]{3,})\b/g)) {
-    const t = m[1].toLowerCase();
-    if (!MED_STOPWORDS.has(t)) tokens.add(t);
-  }
-  return tokens;
-}
-
-/** The sentence(s) in `text` that name the answer's medications, or null.
-    Some notes have no meds section — the meds are a sentence inside the
-    hospital course. Snippet down to that sentence so the card visibly
-    supports the claim. */
-function medSnippet(text, answer) {
-  const tokens = answerMedTokens(answer);
-  if (!tokens.size || !text) return null;
-  const sentences = String(text).split(/(?<=[.!?])\s+/);
-  const hits = sentences.filter((s) =>
-    [...tokens].some((t) => s.toLowerCase().includes(t)));
-  return hits.length ? hits.join(' ').trim() : null;
+  return `No ${String(section).replace(/_/g, ' ')} information is available for this patient.`;
 }
 
 /** Point the turn's envelope SourceCard at the cited passage (n is 1-based).
@@ -165,6 +139,21 @@ function envelopeForCite(turn, n) {
     }
     if (passage) break;
   }
+  if (!passage && (turn.intentSections || []).length) {
+    // The note has NONE of the targeted sections. The deterministic answer
+    // is "not available", not a passage mined from unrelated narrative.
+    const env = JSON.parse(JSON.stringify(turn.a2ui));
+    const update = env.messages.find((m) => m.updateComponents);
+    const source = update && update.updateComponents.components
+      .find((c) => c.component === 'SourceCard');
+    if (source) {
+      source.cite = n;
+      source.section = 'not available';
+      source.text = unavailableText(turn.intentSections[0]);
+      source.query = turn.query || 'discharge note';
+    }
+    return env;
+  }
   if (!passage && turn.passages && turn.passages[n - 1]) {
     passage = turn.passages[n - 1];
   }
@@ -176,16 +165,7 @@ function envelopeForCite(turn, n) {
   if (!source) return env;
   source.cite = n;
   source.section = (intentBody || matchedSection) ? matchedSection : passage.section;
-  let body = intentBody || extractSection(passage.text, passage.section) || passage.text;
-  // Supporting text can live outside the intent sections (a note with no
-  // meds/instructions section carries the meds in the hospital course).
-  // Show the sentence(s) naming the meds so the card supports the claim.
-  const intentSet = new Set(turn.intentSections || []);
-  if (!intentBody && !matchedSection && intentSet.size && turn.text) {
-    const snippet = medSnippet(body, turn.text);
-    if (snippet) body = snippet;
-  }
-  source.text = body;
+  source.text = intentBody || extractSection(passage.text, passage.section) || passage.text;
   source.query = turn.query || 'discharge note';
   return env;
 }

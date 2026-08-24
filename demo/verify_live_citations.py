@@ -40,15 +40,29 @@ from demo.models import DemoQuota
 # (manage.py test does this behind the scenes; a standalone script must too.)
 settings.ALLOWED_HOSTS = [*settings.ALLOWED_HOSTS, "testserver"]
 
-# (hadm_id, display name, why this case matters)
+# (hadm_id, display name, expected card kind, why this case matters)
+# card kinds:
+#   meds_section     -> section == discharge_medications AND answer meds in card
+#   instructions     -> section == discharge_instructions AND answer meds in card
+#   unavailable      -> section == 'not available' (note lacks the sections)
+#   empty_passages   -> section == 'not found' (no passages returned at all)
 CASES = [
-    (90000015, "Cynthia Petrov", "meds section exists (discharge_medications)"),
-    (90000005, "Alan Marchetti", "NO meds section — meds live in discharge_instructions"),
-    (90000107, "Alan Boyle", "expired during admission — honest no-meds answer"),
-    (90000035, "Eleanor Whitfield", "NO meds/instructions section — meds sentence inside hospital course"),
-    (90000053, "Alan Ellison", "breadth: unvetted note shape"),
-    (90000054, "Clarence Whitfield", "breadth: unvetted note shape"),
-    (90000095, "Curtis Whitfield", "breadth: unvetted note shape"),
+    (90000015, "Cynthia Petrov", "meds_section",
+     "meds section exists (discharge_medications)"),
+    (90000005, "Alan Marchetti", "instructions",
+     "NO meds section — meds live in discharge_instructions"),
+    (90000107, "Alan Boyle", "unavailable",
+     "expired during admission — honest no-meds answer"),
+    (90000035, "Eleanor Whitfield", "unavailable",
+     "NO meds/instructions section — meds mentioned only in hospital course"),
+    (90000053, "Alan Ellison", "instructions",
+     "breadth: meds in instructions"),
+    (90000091, "Jordan Sokolov", "instructions",
+     "no meds section, no NAMED meds — must not stack citations on one claim"),
+    (90000054, "Clarence Whitfield", "empty_passages",
+     "breadth: outpatient therapy note, no discharge content"),
+    (90000095, "Curtis Whitfield", "empty_passages",
+     "breadth: admission note, no discharge content"),
 ]
 
 MEDS_SECTIONS = ("discharge_medications", "discharge_instructions")
@@ -98,7 +112,7 @@ def main():
 
     failures = 0
 
-    for hadm_id, name, why in CASES:
+    for hadm_id, name, expected, why in CASES:
         resp = client.post(
             "/demo/a2ui/ask/",
             data=json.dumps({"hadm_id": hadm_id, "chip": "meds"}),
@@ -112,32 +126,37 @@ def main():
         answer = body.get("answer") or ""
         card = source_card(body.get("a2ui") or {})
         meds = first_meds(answer)
+        section = card["section"] if card else None
 
-        if not meds:
-            # No meds in the answer. Honest either way: the empty-result card
-            # (notes with no discharge content) or a real passage the agent
-            # grounded the no-meds answer in (Alan Boyle: expired during
-            # admission). Print the answer head for eyeballing.
-            ok = card is not None
-            detail = (f"no meds in answer (honest-empty path); "
-                      f"card section={card['section'] if card else None!r}; "
-                      f"answer head: {answer[:130]!r}")
+        if expected == "unavailable":
+            ok = section == "not available"
+            if meds:
+                print(f"  WARN {name}: live agent still lists meds "
+                      f"({meds[:3]}) — the harness prompt rule aligns the "
+                      f"answer once the agent redeploys")
+        elif expected == "empty_passages":
+            ok = section == "not found"
         else:
-            section_ok = card is not None and card["section"] in MEDS_SECTIONS
+            want_section = {
+                "meds_section": "discharge_medications",
+                "instructions": "discharge_instructions",
+            }[expected]
             overlap = [
                 m for m in meds
                 if m.lower() in (card.get("text") or "").lower()
             ]
-            # The user-facing truth: the card's text must NAME the medications
-            # the answer lists, whether or not the note has a meds section.
-            ok = card is not None and bool(overlap)
-            detail = (f"section={card['section'] if card else None!r} "
-                      f"in_meds_sections={section_ok} "
-                      f"first_answer_meds={meds[:3]} in_card={overlap[:3]}")
+            ok = section == want_section and bool(overlap)
+        detail = (f"expected={expected!r} section={section!r} "
+                  f"first_answer_meds={meds[:3]}")
         print(f"{'PASS' if ok else 'FAIL'} {name} ({why})")
         print(f"     {detail}")
         if card:
             print(f"     card text head: {card.get('text', '')[:110]!r}")
+        # The renumbered answer must not stack citations (^[1]^[2]^[3] on one
+        # claim is a formatting bug the demo normalizes server-side).
+        if re.search(r"\]\s*\^\[", answer):
+            ok = False
+            print(f"     FAIL: stacked citations still in answer: {answer!r}")
         if not ok:
             failures += 1
 

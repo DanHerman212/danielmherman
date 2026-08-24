@@ -29,6 +29,16 @@ AUDIENCE = ["user"]
 # (the next known header), so a citation click shows the cited section's body
 # instead of the whole note.
 _SECTION_ALIASES: dict[str, tuple[str, ...]] = {
+    "name": ("Name",),
+    "unit_no": ("Unit No", "Unit No.", "Medical Record Number", "MRN"),
+    "admission_date": ("Admission Date", "Date of Admission"),
+    "discharge_date": ("Discharge Date", "Date of Discharge"),
+    "date_of_birth": ("Date of Birth", "DOB"),
+    "sex": ("Sex",),
+    "service": ("Service",),
+    "attending": ("Attending",),
+    "allergies": ("Allergies", "Allergy", "Allergies to"),
+    "activity": ("Activity",),
     "chief_complaint": ("Chief Complaint", "Reason for Admission"),
     "major_procedure": (
         "Major Surgical or Invasive Procedure",
@@ -67,7 +77,7 @@ _SECTION_ALIASES: dict[str, tuple[str, ...]] = {
     "brief_hospital_course": (
         "Brief Hospital Course", "Hospital Course", "Course in the Hospital",
         "History and Hospital Course", "Brief Hospital Course Summary",
-        "Brief Summary of Hospital Course",
+        "Brief Summary of Hospital Course", "Course on Admission",
     ),
     "medications_on_admission": ("Medications on Admission",),
     "discharge_medications": (
@@ -81,7 +91,8 @@ _SECTION_ALIASES: dict[str, tuple[str, ...]] = {
         "Admission Diagnosis", "Admission Diagnoses", "Admitting Diagnosis",
         "Admitting Diagnoses", "Secondary Diagnosis", "Secondary Diagnoses",
         "Diagnoses on Admission", "Diagnoses on Discharge", "Primary Diagnoses",
-        "Final Diagnosis", "Final Diagnoses",
+        "Final Diagnosis", "Final Diagnoses", "Diagnosis at Admission",
+        "Diagnoses",
     ),
     "discharge_condition": (
         "Discharge Condition", "Condition", "Condition on Discharge",
@@ -91,12 +102,14 @@ _SECTION_ALIASES: dict[str, tuple[str, ...]] = {
     "discharge_instructions": (
         "Discharge Instructions", "Discharge Plan", "Additional Instructions",
         "Special Instructions", "Instructions to Patient", "Discharge Diet",
-        "Discharge Activities", "Physical Activity",
+        "Discharge Activities", "Physical Activity", "Recommendations",
+        "Discharge Instructions/Medications",
         # MTSamples 2788-style long-form instructions header (the demo
         # extracts it directly; the harness alias list is the source of truth
         # for chunking and may adopt it too).
         "Instructions Given to the Patient at the Time of Discharge",
     ),
+    "discharge_summary": ("Discharge Summary", "Discharge Summaries"),
     "followup_instructions": (
         "Followup Instructions", "Follow-up Instructions", "Followup",
         "Follow Up", "Follow-Up", "Followup Appointments",
@@ -187,55 +200,72 @@ def first_citation(answer: str) -> int:
     return int(m.group(1)) if m else 1
 
 
-# Words that a meds answer capitalizes but that are not medication names.
-_MED_STOPWORDS = {
-    "the", "for", "and", "with", "was", "were", "she", "he", "her",
-    "his", "their", "patient", "admission", "discharged", "following",
-    "medication", "medications", "discharge", "daily", "tablets", "capsules",
-}
+_CITATION_RE = re.compile(r"\^\[(\d+(?:\s*,\s*\d+)*|\d+\s*-\s*\d+)\]")
 
 
-def _answer_med_tokens(answer: str) -> set[str]:
-    """Capitalized words the answer introduces as medication names.
+def _expand_citations(inner: str) -> list[int]:
+    """Expand a ^[n] marker body ("3" / "1, 2" / "1-3") to a number list."""
+    if "-" in inner:
+        a, b = (int(x.strip()) for x in inner.split("-", 1))
+        return list(range(a, b + 1))
+    return [int(x.strip()) for x in inner.split(",") if x.strip()]
 
-    Pulled from markdown list items ("- Vicodin 5 mg ...") and from the prose
-    after the "following medications" phrase. Used only to locate the note
-    sentence(s) that actually name them — never to alter the answer.
+
+def renumber_citations(answer: str) -> str:
+    """Renumber ^[n] markers to first-appearance order (1, 2, 3, ...).
+
+    The model numbers citations by the tool's array position: a meds-only
+    answer cites ^[3] because discharge_medications is the THIRD section in
+    rag_search_sections order. In a meds-only turn that reads illogically —
+    the first (and only) citation should be ^[1]. Renumber deterministically
+    so citations always start at 1 in order of appearance; the canvas's
+    section-intent resolution keeps the passage mapping correct regardless.
+
+    Also collapses STACKED citations (^[1]^[2]^[3]... with only whitespace
+    between them — the model dumping every returned passage onto one claim) to
+    a single marker, since a row of citations on one claim has no per-claim
+    granularity to preserve.
     """
     if not answer:
-        return set()
-    tokens = set()
-    for m in re.findall(r"^\s*[-*•]?\s*([A-Z][a-zA-Z\-]{3,})", answer, re.M):
-        tokens.add(m.lower())
-    marker = re.search(r"medications?\s*[:,\-]", answer, re.IGNORECASE)
-    tail = answer[marker.end():] if marker else answer
-    for m in re.findall(r"\b([A-Z][a-zA-Z\-]{3,})\b", tail):
-        if m.lower() not in _MED_STOPWORDS:
-            tokens.add(m.lower())
-    return {t for t in tokens if t not in _MED_STOPWORDS}
+        return answer
+    markers = list(_CITATION_RE.finditer(answer))
+    if not markers:
+        return answer
+    # Group markers separated only by whitespace into one cluster.
+    clusters: list[list[re.Match]] = [[markers[0]]]
+    for m in markers[1:]:
+        gap = answer[clusters[-1][-1].end():m.start()]
+        if gap.strip():
+            clusters.append([m])
+        else:
+            clusters[-1].append(m)
+    # Renumber by first appearance, cluster by cluster.
+    old_to_new: dict[int, int] = {}
+    nxt = 1
+    for cl in clusters:
+        for m in cl:
+            for num in _expand_citations(m.group(1)):
+                if num not in old_to_new:
+                    old_to_new[num] = nxt
+                    nxt += 1
+    # Rebuild: one marker per cluster, carrying the cluster's first number.
+    out: list[str] = []
+    last = 0
+    for cl in clusters:
+        out.append(answer[last:cl[0].start()])
+        first = _expand_citations(cl[0].group(1))[0]
+        out.append(f"^[{old_to_new[first]}]")
+        last = cl[-1].end()
+    out.append(answer[last:])
+    return "".join(out)
 
 
-def _med_snippet(text: str, answer: str) -> str | None:
-    """The sentence(s) in `text` that name the answer's medications, or None.
-
-    Some notes have no medications (or instructions) section at all — the meds
-    are one sentence inside the hospital course (hadm 90000035: "She was given
-    prescription for Vicodin for pain and Synthroid thyroid hormone"). Showing
-    the whole hospital course then reads as a citation mismatch even though the
-    passage really contains the claim. Snippet down to the sentence(s) that
-    name the meds so the SourceCard visibly supports the claim.
-    """
-    tokens = _answer_med_tokens(answer)
-    if not tokens or not text:
-        return None
-    sentences = re.split(r"(?<=[.!?])\s+", text)
-    hits = [s for s in sentences if any(t in s.lower() for t in tokens)]
-    if not hits:
-        return None
-    return " ".join(hits).strip()
-
-
-_MEDS_INTENT_SECTIONS = {"discharge_medications", "discharge_instructions"}
+def _unavailable_text(section: str) -> str:
+    """The deterministic message for a question whose target section the note
+    does not have. Never mine the content from unrelated narrative."""
+    if section == "discharge_medications":
+        return "No discharge medication information is available for this patient."
+    return f"No {section.replace('_', ' ')} information is available for this patient."
 
 
 # Discharge-note sections a question can target, in preference order, with the
@@ -277,8 +307,7 @@ def intent_sections(question: str | None) -> tuple[str, ...]:
 
 
 def compose_risk_canvas(predict: dict | None, rag: dict | None,
-                        cite: int = 1, sections: tuple[str, ...] = (),
-                        answer: str | None = None) -> dict:
+                        cite: int = 1, sections: tuple[str, ...] = ()) -> dict:
     """Turn one predict (+ rag) payload into the A2UI risk-canvas envelope.
 
     predict is None when the question did not request a readmission estimate
@@ -306,11 +335,10 @@ def compose_risk_canvas(predict: dict | None, rag: dict | None,
         fallback = ("The readmission-risk service did not return a usable "
                     "estimate for this question.")
     elif estimate is None:
-        children += ["note"]
-        components.append({"id": "note", "component": "Text",
-                           "text": "No 30-day readmission risk estimate was "
-                                   "requested for this question.",
-                           "variant": "h2"})
+        # Non-risk question (meds / summarize / free text): no estimate, and no
+        # big "no risk estimate" heading either — that space belongs to the
+        # citation source. The small provenance caption below already says
+        # plainly that no estimate was requested.
         fallback = "No 30-day readmission risk estimate was requested for this question."
     else:
         probability = float(estimate["probability"])
@@ -386,32 +414,33 @@ def compose_risk_canvas(predict: dict | None, rag: dict | None,
                     break
             if cited is not None:
                 break
-        if cited is None:
+        if cited is None and sections:
+            # The note has NONE of the targeted sections. The deterministic
+            # answer is "not available", not a passage mined from unrelated
+            # narrative (e.g. meds mentioned inside the hospital course).
+            badge = max(cite, 1)
+            shown_section = "not available"
+            section_text = _unavailable_text(sections[0])
+        elif cited is None:
             # cite is 1-based from the answer prose; clamp to a real passage.
             idx = min(max(cite, 1), len(passages)) - 1
             cited = passages[idx]
             badge = idx + 1
+            shown_section = cited.get("section", "discharge note")
+            section_text = _extract_section(cited.get("text", ""), shown_section)
         else:
             # Badge mirrors the thread's citation number (the answer's ^[n]),
             # not the passage's array position.
             badge = max(cite, 1)
-        if intent_body is not None:
-            section_text = intent_body
-            shown_section = matched_section
-        elif matched_section is not None:
-            section_text = _extract_section(cited.get("text", ""), matched_section)
-            shown_section = matched_section
-        else:
-            section_text = _extract_section(cited.get("text", ""), cited.get("section", ""))
-            shown_section = cited.get("section", "discharge note")
-            # The supporting text may live OUTSIDE the intent sections (a note
-            # with no meds/instructions section carries the meds in the hospital
-            # course). Show the sentence(s) that name the meds so the card
-            # visibly supports the claim instead of reading as a mismatch.
-            if sections and shown_section not in set(sections) and answer:
-                snippet = _med_snippet(section_text or cited.get("text", ""), answer)
-                if snippet:
-                    section_text = snippet
+            if intent_body is not None:
+                section_text = intent_body
+                shown_section = matched_section
+            elif matched_section is not None:
+                section_text = _extract_section(cited.get("text", ""), matched_section)
+                shown_section = matched_section
+            else:
+                shown_section = cited.get("section", "discharge note")
+                section_text = _extract_section(cited.get("text", ""), shown_section)
         components.append({"id": "source", "component": "SourceCard",
                            "cite": badge,
                            "section": shown_section,

@@ -13,7 +13,9 @@ from django.shortcuts import render
 from django.views.decorators.http import require_POST
 
 from .agent_client import AgentError, ask as ask_agent
-from .a2ui_canvas import compose_risk_canvas, first_citation, intent_sections
+from .a2ui_canvas import (
+    compose_risk_canvas, first_citation, intent_sections, renumber_citations,
+)
 from .fixtures import CHIPS, band_for, fixture_ask, risk_for
 from .models import DemoPatient, DemoQuota
 
@@ -280,12 +282,19 @@ def a2ui_ask(request):
         intent = intent_sections(CHIPS.get(payload.get('chip')))
     else:
         intent = intent_sections(question)
+    # Citation numbers the model emits reflect the tool's array position (a
+    # meds-only answer cites ^[3] because discharge_medications is the 3rd
+    # section in rag_search_sections order), which reads illogically. Renumber
+    # to order of first appearance so the first citation is always ^[1]. The
+    # canvas's section-intent resolution keeps the passage mapping correct
+    # regardless of the number.
+    if result.get('answer'):
+        result['answer'] = renumber_citations(result['answer'])
     result['a2ui'] = compose_risk_canvas(
         _tool_response(result, 'predict_readmission'),
         _rag_response(result),
         cite=first_citation(result.get('answer') or ''),
-        sections=intent,
-        answer=result.get('answer'))
+        sections=intent)
     result['intent_sections'] = list(intent)
     result['remaining'] = DemoQuota.remaining(request.user)
     return JsonResponse(result)

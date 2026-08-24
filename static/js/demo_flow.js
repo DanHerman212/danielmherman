@@ -40,6 +40,16 @@ const PAGE_SIZE = 10;
    (the next known header), so a citation click shows the cited section's body
    instead of the whole note. */
 const SECTION_ALIASES = {
+  name: ['Name'],
+  unit_no: ['Unit No', 'Unit No.', 'Medical Record Number', 'MRN'],
+  admission_date: ['Admission Date', 'Date of Admission'],
+  discharge_date: ['Discharge Date', 'Date of Discharge'],
+  date_of_birth: ['Date of Birth', 'DOB'],
+  sex: ['Sex'],
+  service: ['Service'],
+  attending: ['Attending'],
+  allergies: ['Allergies', 'Allergy', 'Allergies to'],
+  activity: ['Activity'],
   chief_complaint: ['Chief Complaint', 'Reason for Admission'],
   major_procedure: [
     'Major Surgical or Invasive Procedure', 'Major Surgical or Invasive Procedures',
@@ -76,7 +86,7 @@ const SECTION_ALIASES = {
   brief_hospital_course: [
     'Brief Hospital Course', 'Hospital Course', 'Course in the Hospital',
     'History and Hospital Course', 'Brief Hospital Course Summary',
-    'Brief Summary of Hospital Course',
+    'Brief Summary of Hospital Course', 'Course on Admission',
   ],
   medications_on_admission: ['Medications on Admission'],
   discharge_medications: [
@@ -89,7 +99,8 @@ const SECTION_ALIASES = {
     'Discharge Diagnosis', 'Discharge Diagnoses', 'Admission Diagnosis',
     'Admission Diagnoses', 'Admitting Diagnosis', 'Admitting Diagnoses',
     'Secondary Diagnosis', 'Secondary Diagnoses', 'Diagnoses on Admission',
-    'Diagnoses on Discharge', 'Primary Diagnoses', 'Final Diagnosis', 'Final Diagnoses',
+    'Diagnoses on Discharge', 'Primary Diagnoses', 'Final Diagnosis',
+    'Final Diagnoses', 'Diagnosis at Admission', 'Diagnoses',
   ],
   discharge_condition: [
     'Discharge Condition', 'Condition', 'Condition on Discharge',
@@ -99,9 +110,11 @@ const SECTION_ALIASES = {
   discharge_instructions: [
     'Discharge Instructions', 'Discharge Plan', 'Additional Instructions',
     'Special Instructions', 'Instructions to Patient', 'Discharge Diet',
-    'Discharge Activities', 'Physical Activity',
+    'Discharge Activities', 'Physical Activity', 'Recommendations',
+    'Discharge Instructions/Medications',
     'Instructions Given to the Patient at the Time of Discharge',
   ],
+  discharge_summary: ['Discharge Summary', 'Discharge Summaries'],
   followup_instructions: [
     'Followup Instructions', 'Follow-up Instructions', 'Followup', 'Follow Up',
     'Follow-Up', 'Followup Appointments', 'Instructions for Followup',
