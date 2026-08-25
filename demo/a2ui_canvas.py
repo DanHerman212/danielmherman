@@ -17,6 +17,8 @@ so this is the message list the agent would emit for this payload — the
 
 import re
 
+from .feature_labels import humanize
+
 CATALOG_ID = "https://example.com/catalogs/readmission-risk-v1.json"
 SURFACE_ID = "risk-canvas"
 A2UI_VERSION = "v0.9"
@@ -345,6 +347,13 @@ def compose_risk_canvas(predict: dict | None, rag: dict | None,
         threshold = float(estimate["threshold"])
         band = _band(probability, threshold)
         factors = estimate.get("top_factors") or []
+        # Post-process the SHAP names for visual consumption: each factor gets
+        # a human label (feature_labels.humanize) so the bars never show a raw
+        # model key (camelCase or snake_case).
+        factors = [
+            {**f, "label": humanize(f["feature"])}
+            for f in factors
+        ]
 
         # Each widget is a self-contained custom component whose chrome (card,
         # widget title, band pill, SHAP bars, cited source) mirrors the custom

@@ -148,7 +148,7 @@ class FactorBarsElement extends A2uiLitElement {
           const w = max > 0 ? (Math.abs(v) / max) * 100 : 0;
           return html`
             <div class="driver-row">
-              <span class="driver-name">${f.feature}</span>
+              <span class="driver-name">${f.label || f.feature}</span>
               <span class="driver-track">
                 <span class="driver-bar ${f.direction === 'increases' ? 'up' : 'down'}" style="width:${w.toFixed(1)}%"></span>
               </span>

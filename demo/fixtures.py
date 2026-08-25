@@ -23,6 +23,8 @@ has real passages once the endpoints are redeployed.
 
 import json
 from functools import lru_cache
+
+from .feature_labels import label_for
 from pathlib import Path
 
 from django.conf import settings
@@ -128,7 +130,7 @@ def _compose_answer(chip: str, tool_calls: list[dict]) -> str:
         if factors:
             top = factors[0]
             sentences.append(
-                f"The strongest driver is {top['feature']} "
+                f"The strongest driver is {label_for(top['feature'])} "
                 f"({top['direction']} risk).")
         if passages:
             sec = passages[0]['section'].replace('_', ' ')
