@@ -150,8 +150,8 @@ class QuotaTests(TestCase):
 
 @override_settings(DEMO_FIXTURE_MODE=False)
 class AskEndpointTests(TestCase):
-    # The live-agent path. Fixture mode is the default while the endpoints are
-    # down, so these tests pin it off to exercise the mocked agent proxy.
+    # The live-agent path (the production default). Pinned explicitly so the
+    # mocked agent proxy is exercised regardless of the local env.
     def setUp(self):
         self.user = User.objects.create_user('demo', password='x')
         self.client.force_login(self.user)
@@ -222,8 +222,9 @@ class AskEndpointTests(TestCase):
         self.assertNotIn('agent-internal', response.json()['error'])
 
 
+@override_settings(DEMO_FIXTURE_MODE=True)
 class FixtureModeTests(TestCase):
-    """The fixture path serves real captured payloads while endpoints are down."""
+    """The fixture path serves real captured payloads (dev scaffolding only)."""
 
     def setUp(self):
         self.user = User.objects.create_user('demo', password='x')
@@ -275,6 +276,7 @@ class FixtureModeTests(TestCase):
         self.assertEqual(response.json()['error'], 'unsupported_in_fixture_mode')
 
 
+@override_settings(DEMO_FIXTURE_MODE=True)
 class A2uiCanvasTests(TestCase):
     """The A2UI spike: server composes the canvas as A2UI messages."""
 

@@ -13,12 +13,41 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 import os
 from pathlib import Path
 
+from django.core.exceptions import ImproperlyConfigured
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # ---------- ENVIRONMENT ----------
-ENVIRONMENT = os.environ.get('ENVIRONMENT', 'development')
+# Fail-closed (S1-01/ECC-46): no permissive default — every runtime must say
+# what it is. 'collectstatic' exists for the image build, which needs settings
+# but neither secrets nor a database.
+_ALLOWED_ENVIRONMENTS = ('production', 'development', 'collectstatic')
+ENVIRONMENT = os.environ.get('ENVIRONMENT', '').strip()
+if ENVIRONMENT not in _ALLOWED_ENVIRONMENTS:
+    raise ImproperlyConfigured(
+        "ENVIRONMENT must be set to one of: production, development, "
+        f"collectstatic (got {ENVIRONMENT!r}). See .env.example."
+    )
 IS_PRODUCTION = ENVIRONMENT == 'production'
+
+# Fail fast on missing prod config (S9-01) — these otherwise surface as opaque
+# runtime failures (empty /cloudsql/ host, 400s, 403s on every POST).
+if IS_PRODUCTION:
+    _missing = [
+        name for name in (
+            'GOOGLE_CLOUD_PROJECT',
+            'CLOUD_SQL_CONNECTION_NAME',
+            'ALLOWED_HOSTS',
+            'CSRF_TRUSTED_ORIGINS',
+            'GS_BUCKET_NAME',
+            'DEMO_AGENT_URL',
+        ) if not os.environ.get(name, '').strip()
+    ]
+    if _missing:
+        raise ImproperlyConfigured(
+            'Missing required production env vars: ' + ', '.join(_missing)
+        )
 
 # ---------- SECRET KEY ----------
 if IS_PRODUCTION:
@@ -46,33 +75,36 @@ else:
 DEBUG = not IS_PRODUCTION
 
 # ---------- ALLOWED HOSTS ----------
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+# Strip + drop empty entries (S9-03): "a.com, b.com" must not yield ' b.com'.
+def _env_list(name, default=''):
+    return [p.strip() for p in os.environ.get(name, default).split(',') if p.strip()]
+
+ALLOWED_HOSTS = _env_list('ALLOWED_HOSTS', 'localhost,127.0.0.1')
 
 # ---------- CSRF ----------
-CSRF_TRUSTED_ORIGINS = os.environ.get(
-    'CSRF_TRUSTED_ORIGINS',
-    'http://localhost:8000'
-).split(',')
+CSRF_TRUSTED_ORIGINS = _env_list('CSRF_TRUSTED_ORIGINS', 'http://localhost:8000')
 
 # ---------- CLINICAL COPILOT DEMO ----------
 # The private Cloud Run agent. Must be the service URL with no path: it doubles
 # as the ID token audience, and a mismatched audience fails with a 401 that
-# looks exactly like a missing IAM binding.
-DEMO_AGENT_URL = os.environ.get(
-    'DEMO_AGENT_URL',
-    'https://agent-jamycsjjzq-ue.a.run.app',
-)
+# looks exactly like a missing IAM binding. No committed default (S1-10):
+# required in production, and agent_client raises a clear error when unset.
+DEMO_AGENT_URL = os.environ.get('DEMO_AGENT_URL', '')
 # Generous on purpose: a cold agent instance and a cold MCP instance can land on
 # the same request, and both scale to zero.
 DEMO_AGENT_TIMEOUT = int(os.environ.get('DEMO_AGENT_TIMEOUT', '120'))
 DEMO_DAILY_LIMIT = int(os.environ.get('DEMO_DAILY_LIMIT', '10'))
 
-# When True (default while the Vertex endpoints are torn down), the demo answers
-# the starter chips from captured real payloads (demo/data/demo_fixtures/)
-# instead of calling the live agent. Set DEMO_FIXTURE_MODE=false to go live.
+# Dev scaffolding only (S1-02): captured payloads used while building the UI.
+# Off by default and never allowed in production — the live site always calls
+# the live agent.
 DEMO_FIXTURE_MODE = os.environ.get(
-    'DEMO_FIXTURE_MODE', 'true'
+    'DEMO_FIXTURE_MODE', 'false'
 ).strip().lower() in ('1', 'true', 'yes', 'on')
+if IS_PRODUCTION and DEMO_FIXTURE_MODE:
+    raise ImproperlyConfigured(
+        'DEMO_FIXTURE_MODE is dev scaffolding and must not be enabled in production.'
+    )
 
 LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'demo:console'
@@ -280,7 +312,7 @@ if IS_PRODUCTION:
     STORAGES["default"] = {
         "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
     }
-    GS_BUCKET_NAME = os.environ.get('GS_BUCKET_NAME', 'danielmherman-media')
+    GS_BUCKET_NAME = os.environ['GS_BUCKET_NAME']  # required, validated at boot
     GS_DEFAULT_ACL = 'publicRead'
     MEDIA_URL = f'https://storage.googleapis.com/{GS_BUCKET_NAME}/'
 else:

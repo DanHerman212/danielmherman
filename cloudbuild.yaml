@@ -18,6 +18,8 @@ steps:
 
   # Run migrations FIRST — before the new revision serves traffic.
   # Deploying first would briefly run new code against the old schema.
+  # Env is declared here (ECC-46): settings.py fails closed without ENVIRONMENT,
+  # so a job recreated from this file can never silently run against SQLite.
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args:
@@ -31,6 +33,8 @@ steps:
       - 'us-east1'
       - '--service-account'
       - 'website-sa@$PROJECT_ID.iam.gserviceaccount.com'
+      - '--set-env-vars'
+      - '^@^ENVIRONMENT=production@GOOGLE_CLOUD_PROJECT=$PROJECT_ID@CLOUD_SQL_CONNECTION_NAME=$PROJECT_ID:us-east1:danielmherman-db@GS_BUCKET_NAME=danielmherman-media@ALLOWED_HOSTS=danielmherman.com,www.danielmherman.com,.run.app@CSRF_TRUSTED_ORIGINS=https://danielmherman.com,https://www.danielmherman.com@DEMO_AGENT_URL=https://agent-jamycsjjzq-ue.a.run.app'
 
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
@@ -65,6 +69,8 @@ steps:
       - 'us-east1'
       - '--service-account'
       - 'website-sa@$PROJECT_ID.iam.gserviceaccount.com'
+      - '--set-env-vars'
+      - '^@^ENVIRONMENT=production@GOOGLE_CLOUD_PROJECT=$PROJECT_ID@CLOUD_SQL_CONNECTION_NAME=$PROJECT_ID:us-east1:danielmherman-db@GS_BUCKET_NAME=danielmherman-media@ALLOWED_HOSTS=danielmherman.com,www.danielmherman.com,.run.app@CSRF_TRUSTED_ORIGINS=https://danielmherman.com,https://www.danielmherman.com@DEMO_AGENT_URL=https://agent-jamycsjjzq-ue.a.run.app'
       - '--args'
       - 'manage.py,seed_demo_patients,--prune'
 
@@ -102,6 +108,14 @@ steps:
       - 'managed'
       - '--service-account'
       - 'website-sa@$PROJECT_ID.iam.gserviceaccount.com'
+      # Full runtime env, declared in the repo (ECC-46/S1-01): recreating the
+      # service from this file yields a correctly configured production site,
+      # never a fail-open debug one. ^@^ makes @ the list separator so the
+      # comma-holding values survive (see GCP_DEPLOYMENT_GUIDE §15).
+      # DEMO_FIXTURE_MODE is intentionally absent: dev scaffolding, forbidden
+      # in production by settings.py (S1-02).
+      - '--set-env-vars'
+      - '^@^ENVIRONMENT=production@GOOGLE_CLOUD_PROJECT=$PROJECT_ID@CLOUD_SQL_CONNECTION_NAME=$PROJECT_ID:us-east1:danielmherman-db@GS_BUCKET_NAME=danielmherman-media@ALLOWED_HOSTS=danielmherman.com,www.danielmherman.com,.run.app@CSRF_TRUSTED_ORIGINS=https://danielmherman.com,https://www.danielmherman.com@DEMO_AGENT_URL=https://agent-jamycsjjzq-ue.a.run.app'
 
 images:
   - 'us-east1-docker.pkg.dev/$PROJECT_ID/danielmherman-repo/danielmherman:$COMMIT_SHA'
