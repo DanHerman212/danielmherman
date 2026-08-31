@@ -111,8 +111,9 @@ class QuotaTests(TestCase):
 
     def test_consume_stops_at_the_limit(self):
         DemoQuota.objects.create(user=self.user, daily_limit=3)
+        today = timezone.localdate()
         self.assertEqual([DemoQuota.consume(self.user) for _ in range(4)],
-                         [True, True, True, False])
+                         [today, today, today, None])
         self.assertEqual(DemoQuota.remaining(self.user), 0)
 
     def test_counter_resets_on_a_new_day(self):
@@ -133,15 +134,46 @@ class QuotaTests(TestCase):
 
     def test_refund_returns_a_credit(self):
         DemoQuota.objects.create(user=self.user, daily_limit=2)
-        DemoQuota.consume(self.user)
-        DemoQuota.refund(self.user)
+        period = DemoQuota.consume(self.user)
+        DemoQuota.refund(self.user, period)
         self.assertEqual(DemoQuota.remaining(self.user), 2)
 
     def test_refund_cannot_go_negative(self):
         DemoQuota.objects.create(user=self.user, daily_limit=2)
-        DemoQuota.refund(self.user)
-        DemoQuota.refund(self.user)
+        today = timezone.localdate()
+        DemoQuota.refund(self.user, today)
+        DemoQuota.refund(self.user, today)
         self.assertEqual(DemoQuota.objects.get(user=self.user).used, 0)
+
+    def test_refund_only_targets_the_period_it_debited(self):
+        """A refund presented after the counter rolled to a new day must be
+        dropped, not deducted from the new day's count (S1-07)."""
+        DemoQuota.objects.create(user=self.user, daily_limit=5)
+        yesterday = timezone.localdate() - timedelta(days=1)
+        DemoQuota.consume(self.user)  # today's counter: used=1
+        DemoQuota.refund(self.user, yesterday)  # stale claim token
+        self.assertEqual(DemoQuota.objects.get(user=self.user).used, 1)
+
+    @override_settings(DEMO_DAILY_REFUND_CAP=2)
+    def test_billed_refunds_are_capped_per_day(self):
+        """Refunds for failures that still bought model spend stop at the cap,
+        or a request engineered to always fail downstream loops the quota
+        into unmetered spend (S1-09)."""
+        DemoQuota.objects.create(user=self.user, daily_limit=10)
+        for _ in range(3):
+            period = DemoQuota.consume(self.user)
+            DemoQuota.refund(self.user, period)  # spent=True default
+        self.assertEqual(DemoQuota.objects.get(user=self.user).used, 1)
+        self.assertEqual(DemoQuota.remaining(self.user), 9)
+
+    @override_settings(DEMO_DAILY_REFUND_CAP=0)
+    def test_zero_spend_refunds_bypass_the_cap(self):
+        """Pre-dispatch failures (connection refused, busy) provably billed
+        nothing and refund freely."""
+        DemoQuota.objects.create(user=self.user, daily_limit=10)
+        period = DemoQuota.consume(self.user)
+        DemoQuota.refund(self.user, period, spent=False)
+        self.assertEqual(DemoQuota.remaining(self.user), 10)
 
     def test_consume_creates_a_quota_on_first_use(self):
         self.assertTrue(DemoQuota.consume(self.user))
@@ -206,6 +238,33 @@ class AskEndpointTests(TestCase):
                 self.assertEqual(self._post(payload).status_code, 400)
         self.assertEqual(DemoQuota.remaining(self.user), 5)
         mocked.assert_not_called()
+
+    @patch('demo.views.ask_agent')
+    def test_unknown_admission_is_rejected_before_the_quota_is_touched(self, mocked):
+        """Ids outside the demo cohort must never reach the agent (S1-09):
+        a nonexistent admission is a guaranteed downstream tool error that
+        would be refunded every time — an unmetered spend loop."""
+        DemoQuota.objects.create(user=self.user, daily_limit=5)
+        response = self._post({'hadm_id': 12345678})
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(DemoQuota.remaining(self.user), 5)
+        mocked.assert_not_called()
+
+    def test_malformed_agent_responses_raise_agent_error(self):
+        """Malformed agent bodies must surface as AgentError so the views'
+        existing refund path runs (S1-11), instead of a 500 after the credit
+        was consumed."""
+        from .agent_client import _validated
+        for bad in (['not', 'a', 'dict'], 'text', None,
+                    {'answer': 'x', 'tool_calls': 'nope'},
+                    {'answer': 'x', 'tool_calls': ['nope']},
+                    {'answer': 'x', 'tool_calls': [{'name': 't', 'response': 'nope'}]}):
+            with self.subTest(bad=bad):
+                with self.assertRaises(AgentError):
+                    _validated(bad)
+        # Well-formed shapes pass through untouched.
+        good = {'answer': 'x', 'tool_calls': [{'name': 't', 'response': {'ok': 1}}]}
+        self.assertIs(_validated(good), good)
 
     def test_malformed_json_is_rejected(self):
         response = self.client.post(

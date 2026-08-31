@@ -64,6 +64,13 @@ def _question_for(payload):
             return None, 'hadm_id must be an integer.'
         if hadm_id <= 0:
             return None, 'hadm_id must be positive.'
+        # The demo cohort is the server-side authorization boundary (S1-09):
+        # an id outside it is rejected BEFORE any credit is consumed or any
+        # agent spend happens — otherwise a nonexistent admission is a
+        # guaranteed downstream tool error that gets refunded every time,
+        # turning the refund loop into unmetered Gemini spend.
+        if not DemoPatient.objects.filter(pk=hadm_id).exists():
+            return None, 'Unknown admission id.'
 
         chip = payload.get('chip')
         if chip is not None:
@@ -116,8 +123,9 @@ def ask(request):
 
     # Claim the credit before spending anything. Checking the quota after the
     # call would let a burst of concurrent requests all pass the check and all
-    # bill.
-    if not DemoQuota.consume(request.user):
+    # bill. `period` is the claim token a refund must present (S1-07).
+    period = DemoQuota.consume(request.user)
+    if not period:
         return JsonResponse({
             'error': 'Daily demo limit reached.',
             'remaining': 0,
@@ -126,8 +134,9 @@ def ask(request):
     try:
         result = ask_agent(question)
     except AgentError as exc:
-        # The credit bought nothing, so give it back.
-        DemoQuota.refund(request.user)
+        # Give the credit back — freely if provably nothing was billed,
+        # under the daily refund cap otherwise (S1-09).
+        DemoQuota.refund(request.user, period, spent=exc.spent)
         return JsonResponse({
             'error': 'The clinical copilot is unavailable. Please try again.',
             'detail': str(exc),
@@ -139,7 +148,7 @@ def ask(request):
     # the Vertex endpoint is down). That is a failure for quota purposes too:
     # a credit was spent and no real answer came back, so refund + 502.
     if _tools_errored(result):
-        DemoQuota.refund(request.user)
+        DemoQuota.refund(request.user, period)
         return JsonResponse({
             'error': 'The clinical copilot is unavailable. Please try again.',
             'remaining': DemoQuota.remaining(request.user),
@@ -244,8 +253,9 @@ def a2ui_ask(request):
 
         # Claim the credit before spending anything. Checking the quota after
         # the call would let a burst of concurrent requests all pass the check
-        # and all bill.
-        if not DemoQuota.consume(request.user):
+        # and all bill. `period` is the claim token a refund must present.
+        period = DemoQuota.consume(request.user)
+        if not period:
             return JsonResponse({
                 'error': 'Daily demo limit reached.',
                 'remaining': 0,
@@ -254,8 +264,9 @@ def a2ui_ask(request):
         try:
             result = ask_agent(question)
         except AgentError as exc:
-            # The credit bought nothing, so give it back.
-            DemoQuota.refund(request.user)
+            # Give the credit back — freely if provably nothing was billed,
+            # under the daily refund cap otherwise (S1-09).
+            DemoQuota.refund(request.user, period, spent=exc.spent)
             return JsonResponse({
                 'error': 'The clinical copilot is unavailable. Please try again.',
                 'detail': str(exc),
@@ -266,7 +277,7 @@ def a2ui_ask(request):
         # payloads with HTTP 200 — refund + 502 so a credit is never silently
         # consumed for an answer that never materialized.
         if _tools_errored(result):
-            DemoQuota.refund(request.user)
+            DemoQuota.refund(request.user, period)
             return JsonResponse({
                 'error': 'The clinical copilot is unavailable. Please try again.',
                 'remaining': DemoQuota.remaining(request.user),

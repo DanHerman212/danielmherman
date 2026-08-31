@@ -71,9 +71,16 @@ class DemoQuota(models.Model):
         help_text='Requests permitted per calendar day.',
     )
     used = models.PositiveSmallIntegerField(default=0)
+    # Refunds granted today for failures that still incurred model spend
+    # (agent timeout, downstream tool error). Capped by DEMO_DAILY_REFUND_CAP:
+    # unlimited refunds would let a request engineered to always fail
+    # downstream burn a Gemini round trip per attempt, forever (S1-09).
+    refunds = models.PositiveSmallIntegerField(default=0)
     # The day `used` refers to. Storing it beats a nightly cron: the counter
     # resets lazily on the first request of a new day, so there is no scheduled
     # job to fail silently and no window where a stale count blocks everyone.
+    # NOTE: rollover happens at midnight in TIME_ZONE (UTC here) for every
+    # user, not local midnight.
     period_start = models.DateField(default=timezone.localdate)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -86,7 +93,11 @@ class DemoQuota(models.Model):
 
     @classmethod
     def consume(cls, user):
-        """Claim one credit. Returns True if granted.
+        """Claim one credit. Returns the period (date) debited, or None.
+
+        The returned date is the claim token a later `refund` must present, so
+        a refund can only ever target the counter the consume actually
+        debited — not whatever day it happens to be by then (S1-07).
 
         Every write here is a single UPDATE with the arithmetic evaluated by
         the database. The read-modify-write version of this method — load the
@@ -105,26 +116,42 @@ class DemoQuota(models.Model):
         # `period_start__lt`, so if two requests race the loser's UPDATE simply
         # matches no rows.
         cls.objects.filter(user=user, period_start__lt=today).update(
-            used=0, period_start=today
+            used=0, refunds=0, period_start=today
         )
 
         granted = cls.objects.filter(
             user=user, period_start=today, used__lt=F('daily_limit')
         ).update(used=F('used') + 1)
-        return bool(granted)
+        return today if granted else None
 
     @classmethod
-    def refund(cls, user):
+    def refund(cls, user, period, spent=True):
         """Return a credit after a failure that was not the user's fault.
 
         Without this an agent outage silently eats the day's allowance: the
         credit was spent, no answer was produced, and the user has no way to
-        tell the difference. Guarded by `used__gt=0` so a refund can never
-        drive the counter negative.
+        tell the difference.
+
+        `period` is the date `consume` returned; if the counter has since
+        rolled to a new day the UPDATE matches no rows and the stale credit is
+        dropped rather than deducted from the wrong day's count (S1-07).
+
+        `spent=True` (the default) means the failed request still bought a
+        Gemini round trip upstream — those refunds are capped per day so a
+        request engineered to always fail downstream cannot loop the quota
+        (S1-09). Pass `spent=False` only for provably-zero-spend failures
+        (e.g. connection refused before dispatch), which refund freely.
+
+        Guarded by `used__gt=0` so a refund can never drive the counter
+        negative.
         """
-        cls.objects.filter(
-            user=user, period_start=timezone.localdate(), used__gt=0
-        ).update(used=F('used') - 1)
+        qs = cls.objects.filter(user=user, period_start=period, used__gt=0)
+        if spent:
+            qs.filter(refunds__lt=settings.DEMO_DAILY_REFUND_CAP).update(
+                used=F('used') - 1, refunds=F('refunds') + 1
+            )
+        else:
+            qs.update(used=F('used') - 1)
 
     @classmethod
     def remaining(cls, user):

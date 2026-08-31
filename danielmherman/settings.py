@@ -94,6 +94,16 @@ DEMO_AGENT_URL = os.environ.get('DEMO_AGENT_URL', '')
 # the same request, and both scale to zero.
 DEMO_AGENT_TIMEOUT = int(os.environ.get('DEMO_AGENT_TIMEOUT', '120'))
 DEMO_DAILY_LIMIT = int(os.environ.get('DEMO_DAILY_LIMIT', '10'))
+# Refunds for failures that DID incur model spend (agent timeouts, tool
+# errors) are capped per user per day, or a request engineered to always fail
+# downstream turns the refund loop into unmetered Gemini spend (S1-09).
+# Provably-zero-spend failures (connection refused before dispatch) refund
+# without touching the cap.
+DEMO_DAILY_REFUND_CAP = int(os.environ.get('DEMO_DAILY_REFUND_CAP', '3'))
+# Agent calls block a sync-view worker thread for up to DEMO_AGENT_TIMEOUT.
+# Bounding them per instance keeps slow agent calls from exhausting the
+# thread pool and stalling the whole public site (S1-15).
+DEMO_AGENT_MAX_CONCURRENCY = int(os.environ.get('DEMO_AGENT_MAX_CONCURRENCY', '4'))
 
 # Dev scaffolding only (S1-02): captured payloads used while building the UI.
 # Off by default and never allowed in production — the live site always calls
