@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 import os
 from pathlib import Path
 
+from csp.constants import NONCE, NONE, SELF
 from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -144,6 +145,9 @@ INSTALLED_APPS = [
 # container disk while MEDIA_URL points at the GCS bucket, so uploaded images
 # 404.
 CKEDITOR_5_UPLOAD_FILE_TYPES = ['jpeg', 'jpg', 'png', 'gif', 'webp']
+# Only staff may hit the upload route (S1-13) — it is mounted publicly at
+# /ckeditor5/ and would otherwise accept uploads from any authenticated user.
+CKEDITOR_5_FILE_UPLOAD_PERMISSION = 'staff'
 
 CKEDITOR_5_CONFIGS = {
     'default': {
@@ -206,9 +210,22 @@ CKEDITOR_5_CONFIGS = {
         'table': {
             'contentToolbar': ['tableColumn', 'tableRow', 'mergeTableCells'],
         },
+        # Concrete allowlist (S1-13), not the previous allow-everything
+        # /.*/ — this is editor-side convenience config only; the actual
+        # security boundary is the server-side nh3 sanitizer applied at
+        # render (content_extras.sanitize, S6-01). Keep the two lists in sync.
         'htmlSupport': {
             'allow': [
-                {'name': '/.*/','attributes': True, 'classes': True, 'styles': True},
+                {'name': name, 'attributes': True, 'classes': True, 'styles': True}
+                for name in (
+                    'p', 'br', 'hr', 'blockquote',
+                    'h2', 'h3', 'h4', 'h5', 'h6',
+                    'ul', 'ol', 'li',
+                    'strong', 'em', 'u', 's', 'sup', 'sub', 'span', 'mark',
+                    'a', 'img', 'figure', 'figcaption', 'oembed', 'iframe',
+                    'pre', 'code',
+                    'table', 'thead', 'tbody', 'tr', 'td', 'th',
+                )
             ]
         },
     },
@@ -218,6 +235,7 @@ CKEDITOR_5_CONFIGS = {
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
+    'danielmherman.csp_middleware.PathExemptCSPMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -225,6 +243,34 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
+# ---------- CONTENT SECURITY POLICY (S6-10 / S7-03) ----------
+# The backstop for a site that renders sanitized rich HTML plus CDN scripts:
+# a missed sink can no longer load foreign script. Inline scripts use nonces
+# ({{ request.csp_nonce }}); style allows inline because CKEditor content and
+# mermaid/AOS legitimately emit style attributes. /admin/ and /ckeditor5/ are
+# exempted in the middleware subclass — the editor relies on inline script,
+# and those routes are staff-only.
+CONTENT_SECURITY_POLICY = {
+    'DIRECTIVES': {
+        'default-src': [SELF],
+        'script-src': [SELF, NONCE,
+                       'https://cdn.jsdelivr.net', 'https://cdnjs.cloudflare.com'],
+        'style-src': [SELF, "'unsafe-inline'",
+                      'https://cdn.jsdelivr.net', 'https://cdnjs.cloudflare.com',
+                      'https://fonts.googleapis.com'],
+        'font-src': [SELF, 'data:', 'https://fonts.gstatic.com',
+                     'https://cdnjs.cloudflare.com', 'https://cdn.jsdelivr.net'],
+        'img-src': [SELF, 'data:', 'https://storage.googleapis.com',
+                    'https://static.djangoproject.com'],
+        'connect-src': [SELF],
+        'frame-src': ['https://www.youtube.com', 'https://www.youtube-nocookie.com'],
+        'object-src': [NONE],
+        'base-uri': [SELF],
+        'form-action': [SELF],
+        'frame-ancestors': [SELF],
+    },
+}
 
 ROOT_URLCONF = 'danielmherman.urls'
 
@@ -323,6 +369,9 @@ if IS_PRODUCTION:
         "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
     }
     GS_BUCKET_NAME = os.environ['GS_BUCKET_NAME']  # required, validated at boot
+    # Portfolio media (article/project images) is intentionally world-readable
+    # — it renders on public pages. Uploads are staff-only (S1-13); nothing
+    # sensitive is ever written to this bucket.
     GS_DEFAULT_ACL = 'publicRead'
     MEDIA_URL = f'https://storage.googleapis.com/{GS_BUCKET_NAME}/'
 else:

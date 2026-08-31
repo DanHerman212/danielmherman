@@ -1,5 +1,6 @@
 <!--content/templates/content/project_detail.html-->
 {% extends 'content/base.html' %}
+{% load content_extras %}
 
 {% block content %}
 <div class="container">
@@ -48,7 +49,7 @@
             <!-- Project Content (article-style with diagrams, plots, etc.) -->
             {% if project.content %}
             <div class="article-content project-content">
-                {{ project.content|safe }}
+                {{ project.content|sanitize }}
             </div>
             {% endif %}
         </div>

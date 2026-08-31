@@ -10,6 +10,11 @@ google-cloud-secret-manager==2.21.0
 whitenoise==6.8.2
 channels==4.2.0
 channels-redis==4.2.1
+# Server-side HTML sanitizer for CKEditor content (S6-01) — the actual
+# stored-XSS boundary; the editor's htmlSupport config is client-side only.
+nh3==0.3.7
+# Content-Security-Policy header middleware (S6-10 / S7-03).
+django-csp==4.0
 # Both arrive transitively via google-cloud-secret-manager, but
 # demo/agent_client.py imports them directly to mint Cloud Run ID tokens.
 # Pin what you import.

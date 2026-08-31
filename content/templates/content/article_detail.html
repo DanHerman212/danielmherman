@@ -1,5 +1,6 @@
 <!--content/templates/content/article_detail.html -->
 {% extends 'content/base.html' %}
+{% load content_extras %}
 
 {% block title %}{{ article.title }} - My Website{% endblock %}
 
@@ -15,7 +16,7 @@
         </p>
 
         <div class="article-content">
-            {{ article.content|safe }}
+            {{ article.content|sanitize }}
         </div>
 
         <hr class="my-4">

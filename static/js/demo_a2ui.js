@@ -30,11 +30,10 @@ const toggleMsg = document.getElementById('a2ui-toggle-msg');
 // The markdown provider must sit above the surface (basic Text renders MD).
 new ContextProvider(host, { context: Context.markdown, initialValue: renderMarkdown });
 
-const EMPTY_MARKUP =
-  '<i class="fa-solid fa-heart-pulse"></i>' +
-  '<p>Select a patient to see their assessment.</p>' +
-  '<p class="canvas-empty-sub">The A2UI renderer draws the canvas from ' +
-  'agent-composed messages.</p>';
+const EMPTY_STATE = {
+  title: 'Select a patient to see their assessment.',
+  sub: 'The A2UI renderer draws the canvas from agent-composed messages.',
+};
 
 /** Mount an envelope's messages into a fresh A2UI surface. */
 function renderEnvelope(target) {
@@ -95,7 +94,7 @@ function renderA2uiCanvas(episode, api, envelope) {
 
   if (!target || !target.messages) {
     canvasMode.textContent = '';
-    showEmpty(EMPTY_MARKUP);
+    showEmpty(EMPTY_STATE);
     return;
   }
 

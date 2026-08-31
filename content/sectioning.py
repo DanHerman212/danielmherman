@@ -6,6 +6,7 @@ a hero section), and each section is also its own URL. Authoring is unchanged
 admin.
 """
 
+import html
 import re
 from html.parser import HTMLParser
 
@@ -91,12 +92,19 @@ class _Splitter(HTMLParser):
         self.buf.append(f"</{tag}>")
 
     def handle_data(self, data):
-        self.buf.append(data)
+        # convert_charrefs=True decoded the author's entities (&lt; → <), so
+        # text data MUST be re-escaped on the way out or author-escaped markup
+        # (&lt;script&gt;, code samples) becomes live HTML in section bodies
+        # (S6-06). quote=False: bare quotes in prose need no escaping.
+        self.buf.append(html.escape(data, quote=False))
 
     @staticmethod
     def _render(tag, attrs, selfclosing=False):
+        # Attribute values are decoded by the parser too; re-escape with
+        # quote=True or a decoded '"' breaks out of the attribute (S6-06).
         attr_html = "".join(
-            f' {k}="{v}"' if v is not None else f" {k}" for k, v in attrs
+            f' {k}="{html.escape(v, quote=True)}"' if v is not None else f" {k}"
+            for k, v in attrs
         )
         return f"<{tag}{attr_html}{' /' if selfclosing else ''}>"
 
@@ -116,7 +124,9 @@ def split_sections(content_html: str) -> list:
         if part["kind"] == "heading":
             if pending is not None:
                 sections.append(pending)
-            title = strip_tags(part["html"]).replace("\xa0", " ").strip() or "Section"
+            # Bodies carry escaped entities now; titles are plain text that
+            # templates autoescape, so unescape after stripping tags.
+            title = html.unescape(strip_tags(part["html"])).replace("\xa0", " ").strip() or "Section"
             pending = {"level": part["level"], "title": title,
                        "slug": section_slug(title), "body": ""}
         elif part["kind"] == "body" and pending is not None:
@@ -151,7 +161,7 @@ def _add_subheading_toc(sec: dict) -> None:
     def _repl(m: re.Match) -> str:
         nonlocal parent
         level, attrs, inner = m.group(1), m.group(2), m.group(3)
-        title = strip_tags(inner).replace("\xa0", " ").strip() or "Section"
+        title = html.unescape(strip_tags(inner)).replace("\xa0", " ").strip() or "Section"
         existing = re.search(r'id="([^"]+)"', attrs, re.I)
         slug = existing.group(1) if existing else section_slug(title)
         if int(level) <= 3:

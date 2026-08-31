@@ -224,11 +224,11 @@ function renderCanvasWidgets(episode, api) {
 
   if (!episode) {
     canvasMode.textContent = '';
-    showEmpty(
-      '<i class="fa-solid fa-heart-pulse"></i>' +
-      '<p>Select a patient to see their assessment.</p>' +
-      '<p class="canvas-empty-sub">The risk score, its drivers, and the cited ' +
-      'note passages render here as structured widgets — never buried in the chat.</p>');
+    showEmpty({
+      title: 'Select a patient to see their assessment.',
+      sub: 'The risk score, its drivers, and the cited note passages render ' +
+           'here as structured widgets — never buried in the chat.',
+    });
     return;
   }
 
@@ -243,11 +243,11 @@ function renderCanvasWidgets(episode, api) {
   const hasRisk = episode.assessments.length > 0;
   const hasSources = episode.sources.length > 0;
   if (!hasRisk && !hasSources) {
-    showEmpty(
-      '<i class="fa-solid fa-heart-pulse"></i>' +
-      '<p>Select a patient to see their assessment.</p>' +
-      '<p class="canvas-empty-sub">The risk score, its drivers, and the cited ' +
-      'note passages render here as structured widgets — never buried in the chat.</p>');
+    showEmpty({
+      title: 'Select a patient to see their assessment.',
+      sub: 'The risk score, its drivers, and the cited note passages render ' +
+           'here as structured widgets — never buried in the chat.',
+    });
     return;
   }
   if (hasRisk) {

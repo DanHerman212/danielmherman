@@ -8,6 +8,7 @@
         the CTA buttons (Live Demo / View Code) on the breadcrumb row (right)
         so the CTAs survive the sidebar removal. -->
 {% extends 'content/base.html' %}
+{% load content_extras %}
 
 {% block content %}
 <div class="container">
@@ -44,7 +45,7 @@
             {% endif %}
 
             <div class="article-content project-content">
-                {{ section.body|safe }}
+                {{ section.body|sanitize }}
             </div>
         </div>
 
@@ -88,7 +89,7 @@
     <div class="row">
         <div class="col-lg-8">
             <div class="article-content project-content">
-                {{ section.body|safe }}
+                {{ section.body|sanitize }}
             </div>
         </div>
         <div class="col-lg-4">
@@ -114,7 +115,7 @@
     {% else %}
     <!-- Short section: plain full-width body. -->
     <div class="article-content project-content">
-        {{ section.body|safe }}
+        {{ section.body|sanitize }}
     </div>
     {% endif %}
     {% endif %}
@@ -145,7 +146,7 @@
 
 {% block extra_js %}
 {% if section.toc %}
-<script>
+<script nonce="{{ request.csp_nonce }}">
 // Scrollspy for the "On this page" rail: highlight the TOC link for the
 // section currently in view.
 //  - Clicking a link immediately marks THAT link active (pins it), and it

@@ -77,7 +77,7 @@
 
 {% block extra_js %}
 <script src="{% static 'vendor/aos/aos.js' %}"></script>
-<script>
+<script nonce="{{ request.csp_nonce }}">
     AOS.init({ once: true, duration: 700, offset: 80 });
 </script>
 {% endblock %}

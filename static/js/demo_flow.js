@@ -15,7 +15,7 @@
  *
  * renderCanvas(episode, api) draws the canvas for the current episode. episode
  * is null when no patient is selected (or after Back). api exposes:
- *   { canvas, canvasMode, traceOn, clearCanvas(), showEmpty(markup) }.
+ *   { canvas, canvasMode, traceOn, clearCanvas(), showEmpty({icon,title,sub}) }.
  * onCite(episode, turnIndex, n, api) handles citation clicks in the agent
  * prose (defaults to re-rendering the canvas).
  *
@@ -273,11 +273,24 @@ export function createDemoFlow({ root, askUrl, renderCanvas, onCite }) {
     get canvasMode() { return els.canvasMode; },
     get traceOn() { return state.traceOn; },
     clearCanvas() { els.canvas.replaceChildren(); },
-    showEmpty(markup) {
+    // Safe builder, not an innerHTML sink (S7-01): callers pass a plain-text
+    // spec ({ icon, title, sub }) and every value lands via textContent /
+    // className, so a future dynamic caller can never inject markup.
+    showEmpty(spec) {
       els.canvas.replaceChildren();
       const div = document.createElement('div');
       div.className = 'canvas-empty';
-      div.innerHTML = markup;
+      const icon = document.createElement('i');
+      icon.className = String((spec && spec.icon) || 'fa-solid fa-heart-pulse');
+      div.appendChild(icon);
+      [[spec && spec.title, ''], [spec && spec.sub, 'canvas-empty-sub']]
+        .forEach(([text, cls]) => {
+          if (!text) return;
+          const p = document.createElement('p');
+          if (cls) p.className = cls;
+          p.textContent = String(text);
+          div.appendChild(p);
+        });
       els.canvas.appendChild(div);
     },
     episodeFor,
