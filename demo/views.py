@@ -5,6 +5,7 @@ signup route anywhere in this app, by design.
 """
 
 import json
+import logging
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
@@ -18,6 +19,8 @@ from .a2ui_canvas import (
 )
 from .fixtures import CHIPS, band_for, fixture_ask, risk_for
 from .models import DemoPatient, DemoQuota
+
+logger = logging.getLogger(__name__)
 
 MAX_QUESTION_CHARS = 2000
 
@@ -135,11 +138,13 @@ def ask(request):
         result = ask_agent(question)
     except AgentError as exc:
         # Give the credit back — freely if provably nothing was billed,
-        # under the daily refund cap otherwise (S1-09).
+        # under the daily refund cap otherwise (S1-09). The exception text can
+        # embed the private agent URL / upstream error detail, so it is logged
+        # server-side and never returned to the client (S1-03).
+        logger.error('ask: agent call failed: %s', exc)
         DemoQuota.refund(request.user, period, spent=exc.spent)
         return JsonResponse({
             'error': 'The clinical copilot is unavailable. Please try again.',
-            'detail': str(exc),
             'remaining': DemoQuota.remaining(request.user),
         }, status=502)
 
@@ -265,11 +270,12 @@ def a2ui_ask(request):
             result = ask_agent(question)
         except AgentError as exc:
             # Give the credit back — freely if provably nothing was billed,
-            # under the daily refund cap otherwise (S1-09).
+            # under the daily refund cap otherwise (S1-09). Exception detail
+            # is logged server-side, never returned to the client (S1-03).
+            logger.error('a2ui_ask: agent call failed: %s', exc)
             DemoQuota.refund(request.user, period, spent=exc.spent)
             return JsonResponse({
                 'error': 'The clinical copilot is unavailable. Please try again.',
-                'detail': str(exc),
                 'remaining': DemoQuota.remaining(request.user),
             }, status=502)
 

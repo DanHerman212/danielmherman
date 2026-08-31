@@ -278,7 +278,12 @@ class AskEndpointTests(TestCase):
     @patch('demo.views.ask_agent', side_effect=AgentError('https://agent-internal/ask 403'))
     def test_agent_internals_are_not_leaked_in_the_main_message(self, mocked):
         response = self._post({'hadm_id': 90000009})
-        self.assertNotIn('agent-internal', response.json()['error'])
+        body = response.json()
+        self.assertNotIn('agent-internal', body['error'])
+        # S1-03: exception text (private agent URL, upstream status detail) is
+        # logged server-side, never echoed to the client in ANY field.
+        self.assertNotIn('detail', body)
+        self.assertNotIn('agent-internal', json.dumps(body))
 
 
 @override_settings(DEMO_FIXTURE_MODE=True)
