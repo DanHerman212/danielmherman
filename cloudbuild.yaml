@@ -64,6 +64,10 @@ steps:
   # check --deploy is the S1-18 gate: with prod hardening now in place
   # (HSTS, secure cookies, fail-closed env) it should pass clean and fail the
   # build loudly if a security setting regresses.
+  # --command sh is REQUIRED: the entrypoint must be the shell. gcloud jobs
+  # update only overwrites the flags you pass, so an omitted --command left the
+  # stale `python` entrypoint a previous cloudbuild version persisted — the job
+  # then ran `python sh -c ...` and died on "can't open file '/app/sh'".
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args:
@@ -79,8 +83,10 @@ steps:
       - 'website-sa@$PROJECT_ID.iam.gserviceaccount.com'
       - '--set-env-vars'
       - '^@^ENVIRONMENT=production@GOOGLE_CLOUD_PROJECT=$PROJECT_ID@CLOUD_SQL_CONNECTION_NAME=$PROJECT_ID:us-east1:danielmherman-db@GS_BUCKET_NAME=danielmherman-media@ALLOWED_HOSTS=danielmherman.com,www.danielmherman.com,.run.app@CSRF_TRUSTED_ORIGINS=https://danielmherman.com,https://www.danielmherman.com@DEMO_AGENT_URL=https://agent-jamycsjjzq-ue.a.run.app'
+      - '--command'
+      - 'sh'
       - '--args'
-      - 'sh,-c,python manage.py check --deploy --fail-level WARNING && python manage.py migrate && python manage.py createcachetable'
+      - '-c,python manage.py check --deploy --fail-level WARNING && python manage.py migrate && python manage.py createcachetable'
 
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
@@ -117,6 +123,8 @@ steps:
       - 'website-sa@$PROJECT_ID.iam.gserviceaccount.com'
       - '--set-env-vars'
       - '^@^ENVIRONMENT=production@GOOGLE_CLOUD_PROJECT=$PROJECT_ID@CLOUD_SQL_CONNECTION_NAME=$PROJECT_ID:us-east1:danielmherman-db@GS_BUCKET_NAME=danielmherman-media@ALLOWED_HOSTS=danielmherman.com,www.danielmherman.com,.run.app@CSRF_TRUSTED_ORIGINS=https://danielmherman.com,https://www.danielmherman.com@DEMO_AGENT_URL=https://agent-jamycsjjzq-ue.a.run.app'
+      - '--command'
+      - 'python'
       - '--args'
       - 'manage.py,seed_demo_patients,--prune'
 
