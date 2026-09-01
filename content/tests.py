@@ -83,6 +83,11 @@ class SectioningTests(TestCase):
         sec = split_sections(content)[0]
         self.assertEqual(sec["toc"], [])
 
+    def test_preview_slug_is_reserved(self):
+        # S6-08: a section titled "Preview" must not shadow the staff preview URL.
+        from .sectioning import section_slug
+        self.assertEqual(section_slug("Preview"), "preview-section")
+
     def test_pre_heading_content_becomes_overview_section(self):
         # S6-07: content before the first <h2> used to be silently dropped.
         content = "<p>intro para</p><h2>Architecture</h2><p>arch body</p>"
@@ -218,6 +223,18 @@ class ContactFormTests(TestCase):
     def test_honeypot_is_silently_dropped(self):
         resp = self._post(website='http://spam.example')
         self.assertRedirects(resp, '/contact/')
+        self.assertEqual(ContactMessage.objects.count(), 0)
+
+    def test_whitespace_only_name_is_rejected(self):
+        # S6-12: a whitespace-only field must not pass validation.
+        self._post(name='   ')
+        self.assertEqual(ContactMessage.objects.count(), 0)
+
+    def test_error_path_retains_submitted_values(self):
+        # S6-12: the bound form re-renders the user's input on error.
+        resp = self._post(name='Dan', email='bad-email')
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'value="Dan"')
         self.assertEqual(ContactMessage.objects.count(), 0)
 
     def test_sixth_submission_within_window_is_dropped(self):

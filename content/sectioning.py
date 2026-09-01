@@ -39,7 +39,13 @@ SECTION_ICONS = {
 def section_slug(title: str) -> str:
     """Match the client-side anchor id scheme so deep links stay stable."""
     s = _SPACES.sub("-", _SLUG_STRIP.sub("", title.lower()).strip())
-    return _DASHES.sub("-", s)[:50]
+    s = _DASHES.sub("-", s)[:50]
+    # S6-08: 'preview' is a reserved URL segment — the staff preview route owns
+    # projects/<slug>/preview/, so a section slugged 'preview' would be shadowed
+    # by it and unreachable at its own URL.
+    if s == "preview":
+        return "preview-section"
+    return s
 
 
 def icon_for(title: str) -> str:
