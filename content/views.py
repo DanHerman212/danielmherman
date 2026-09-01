@@ -174,6 +174,11 @@ class ProjectDetailView(DetailView):
     template_name = 'content/project_detail.html'
     context_object_name = 'project'
 
+    def get_queryset(self):
+        # Inactive projects are not publicly served (S6-13): deactivating a
+        # project in the admin retires its detail page too, not just the list.
+        return Project.objects.filter(is_active=True)
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         project = self.object
@@ -188,6 +193,11 @@ class ProjectSectionView(DetailView):
     model = Project
     template_name = 'content/project_section.html'
     context_object_name = 'project'
+
+    def get_queryset(self):
+        # Same gate as ProjectDetailView (S6-13): section pages of inactive
+        # projects must not stay reachable by slug.
+        return Project.objects.filter(is_active=True)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

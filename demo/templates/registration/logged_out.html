@@ -1,0 +1,15 @@
+{% extends "content/base.html" %}
+{% comment %}
+Rendered by django.contrib.auth.views.LogoutView on a GET (S1-06: the route is
+now mounted explicitly, so this template cannot silently 500).
+{% endcomment %}
+
+{% block title %}Signed out{% endblock %}
+
+{% block content %}
+<div class="container py-5" style="max-width: 28rem;">
+  <h1 class="h3 mb-4">Signed out</h1>
+  <p>You have been signed out of the demo.</p>
+  <a class="btn btn-dark" href="{% url 'login' %}">Sign in again</a>
+</div>
+{% endblock %}

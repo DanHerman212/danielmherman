@@ -20,6 +20,9 @@ steps:
   # Deploying first would briefly run new code against the old schema.
   # Env is declared here (ECC-46): settings.py fails closed without ENVIRONMENT,
   # so a job recreated from this file can never silently run against SQLite.
+  # --args is stated explicitly (not left to the job's persisted state) and
+  # also runs createcachetable: the DatabaseCache table django-axes needs for
+  # cross-instance lockout state (S1-05). Idempotent on every build.
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args:
@@ -35,6 +38,8 @@ steps:
       - 'website-sa@$PROJECT_ID.iam.gserviceaccount.com'
       - '--set-env-vars'
       - '^@^ENVIRONMENT=production@GOOGLE_CLOUD_PROJECT=$PROJECT_ID@CLOUD_SQL_CONNECTION_NAME=$PROJECT_ID:us-east1:danielmherman-db@GS_BUCKET_NAME=danielmherman-media@ALLOWED_HOSTS=danielmherman.com,www.danielmherman.com,.run.app@CSRF_TRUSTED_ORIGINS=https://danielmherman.com,https://www.danielmherman.com@DEMO_AGENT_URL=https://agent-jamycsjjzq-ue.a.run.app'
+      - '--args'
+      - 'sh,-c,python manage.py migrate && python manage.py createcachetable'
 
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud

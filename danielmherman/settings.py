@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
 import os
+from datetime import timedelta
 from pathlib import Path
 
 from csp.constants import NONCE, NONE, SELF
@@ -121,6 +122,30 @@ LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'demo:console'
 LOGOUT_REDIRECT_URL = 'home'
 
+# Admin lives off the default path (S1-05): /admin/ is the first thing a
+# credential-guessing script or scanner probes. ADMIN_PATH is env-configurable
+# so a deploy can rotate it without a code change.
+ADMIN_PATH = os.environ.get('ADMIN_PATH', 'staff-console').strip('/')
+
+# Sessions hold only auth — quota is DB-backed per demo user — so ending the
+# session when the browser closes costs nothing and caps the lifetime of a
+# stolen demo cookie (S1-04).
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+
+# ---------- LOGIN THROTTLING / LOCKOUT (S1-05) ----------
+# django-axes: failed-login lockout on the public /accounts/login/ surface and
+# the admin. Behind Cloud Run, REMOTE_ADDR is the load balancer's address, so
+# locking per IP would lock every visitor out at once — demo accounts are
+# named, so lockout keys on username only.
+AUTHENTICATION_BACKENDS = [
+    'axes.backends.AxesStandaloneBackend',
+    'django.contrib.auth.backends.ModelBackend',
+]
+AXES_FAILURE_LIMIT = 5
+AXES_COOLOFF_TIME = timedelta(hours=1)
+AXES_RESET_ON_SUCCESS = True
+AXES_LOCKOUT_PARAMETERS = ['username']
+
 
 # Application definition
 
@@ -131,6 +156,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'axes',        # failed-login throttling/lockout (S1-05)
     'content', # added app
     'demo',    # clinical copilot demo: patient cohort + quota
     'django_ckeditor_5',
@@ -240,6 +266,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'axes.middleware.AxesMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -315,6 +342,26 @@ else:
     }
 
 
+# ---------- CACHE (axes lockout records) ----------
+# Production uses the database cache so failure counters and lockout state are
+# shared across Cloud Run instances (locmem would give each uvicorn worker its
+# own counter). The cache table is created by `createcachetable`, wired into
+# the cloudbuild migrate step (S1-05).
+if IS_PRODUCTION:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
+            'LOCATION': 'django_cache',
+        },
+    }
+else:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        },
+    }
+
+
 # Password validation
 # https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
 
@@ -384,6 +431,13 @@ if IS_PRODUCTION:
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
+    # HSTS (S1-12): the missing piece of the transport-hardening set. Started
+    # at 30 days deliberately — ramp to 6+ months once the deployment proves
+    # stable over that period. Preload is not requested: this is a demo site
+    # behind Cloud Run, not a preload candidate.
+    SECURE_HSTS_SECONDS = 2592000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = False
 
 # ---------- ASGI / CHANNELS ----------
 ASGI_APPLICATION = 'danielmherman.asgi.application'

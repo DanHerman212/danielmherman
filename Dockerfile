@@ -25,6 +25,12 @@ COPY . .
 # a silent failure here ships a container whose site loads with no CSS/JS and no error.
 RUN ENVIRONMENT=collectstatic python manage.py collectstatic --noinput
 
+# Non-root runtime user (S1-14): uvicorn and everything after this point run
+# as 'app', so a code-execution bug cannot escalate to root in the container.
+# Static files were collected above as root and stay world-readable.
+RUN useradd --system --no-create-home app
+USER app
+
 # Expose port
 EXPOSE 8080
 

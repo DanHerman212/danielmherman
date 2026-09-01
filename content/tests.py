@@ -160,6 +160,7 @@ class CSPHeaderTests(TestCase):
         self.assertIn(b'<script nonce="', resp.content)
 
     def test_admin_route_is_exempt(self):
-        resp = self.client.get('/admin/login/')
+        from django.conf import settings
+        resp = self.client.get(f'/{settings.ADMIN_PATH}/login/')
         self.assertNotIn('Content-Security-Policy', resp.headers)
 

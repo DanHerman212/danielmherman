@@ -914,7 +914,8 @@ gcloud run jobs execute migrate --region us-east1 --wait
 
 ## 16. Create a Superuser in Production
 
-You need an admin user to access `/admin/`.
+You need an admin user to access the Django admin, which lives at
+`/{ADMIN_PATH}/` (default `/staff-console/`, env-configurable — S1-05).
 
 > **Do not pass the password as a plaintext env var.** It would be stored in the job
 > config, your shell history, and potentially Cloud Logging. Put it in Secret Manager

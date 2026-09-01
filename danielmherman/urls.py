@@ -1,15 +1,19 @@
 # danielmherman/urls.py
-from django.contrib import admin
-from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from django.contrib import admin
+from django.contrib.auth import views as auth_views
+from django.urls import path, include
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
+    # Admin off the default path (S1-05); env-configurable via ADMIN_PATH.
+    path(f'{settings.ADMIN_PATH}/', admin.site.urls),
     path('ckeditor5/', include('django_ckeditor_5.urls')),
-    # Login/logout only. django.contrib.auth.urls deliberately does not include
-    # a signup route — demo accounts are issued, not self-registered.
-    path('accounts/', include('django.contrib.auth.urls')),
+    # Login/logout ONLY (S1-06). auth.urls also mounts password_change/reset,
+    # which have no templates here (a 500 on every hit) and a password-reset
+    # email path makes no sense when accounts are issued, not self-registered.
+    path('accounts/login/', auth_views.LoginView.as_view(), name='login'),
+    path('accounts/logout/', auth_views.LogoutView.as_view(), name='logout'),
     path('demo/', include('demo.urls')),
     path('', include('content.urls'))
 ]
