@@ -35,11 +35,11 @@ class SectioningTests(TestCase):
 
     def test_only_h2_becomes_sections(self):
         titles = [s["title"] for s in split_sections(LONGFORM_CONTENT)]
-        self.assertEqual(titles, ["Project Overview", "Architecture",
+        self.assertEqual(titles, ["Overview", "Project Overview", "Architecture",
                                   "Agent Evaluation"])
 
     def test_subheadings_build_nested_toc(self):
-        eval_sec = split_sections(LONGFORM_CONTENT)[2]
+        eval_sec = split_sections(LONGFORM_CONTENT)[3]
         top = [t["title"] for t in eval_sec["toc"]]
         self.assertEqual(top, ["Evaluation Methodology: LLM-as-a-Judge",
                                "Scoring Rubric", "Results"])
@@ -52,20 +52,20 @@ class SectioningTests(TestCase):
         self.assertEqual(eval_sec["toc"][0]["children"], [])
 
     def test_subheadings_injected_with_stable_ids(self):
-        body = split_sections(LONGFORM_CONTENT)[2]["body"]
+        body = split_sections(LONGFORM_CONTENT)[3]["body"]
         self.assertIn('id="evaluation-methodology-llm-as-a-judge"', body)
         self.assertIn('id="faithfulness"', body)
         self.assertIn('id="groundedness"', body)
         self.assertIn('id="results"', body)
 
     def test_subheading_html_stays_in_body(self):
-        body = split_sections(LONGFORM_CONTENT)[2]["body"]
+        body = split_sections(LONGFORM_CONTENT)[3]["body"]
         self.assertIn("<h3", body)
         self.assertIn("<h4", body)
 
     def test_decorate_adds_icon_and_overview(self):
         dec = decorate_sections(LONGFORM_CONTENT)
-        eval_sec = dec[2]
+        eval_sec = dec[3]
         self.assertEqual(eval_sec["icon"], "fa-cogs")  # 'agent' in title
         self.assertFalse(eval_sec["is_overview"])
         self.assertEqual(len(eval_sec["toc"]), 3)
@@ -82,6 +82,20 @@ class SectioningTests(TestCase):
         content = "<h2>Overview</h2><p>body</p>"
         sec = split_sections(content)[0]
         self.assertEqual(sec["toc"], [])
+
+    def test_pre_heading_content_becomes_overview_section(self):
+        # S6-07: content before the first <h2> used to be silently dropped.
+        content = "<p>intro para</p><h2>Architecture</h2><p>arch body</p>"
+        secs = split_sections(content)
+        self.assertEqual([s["title"] for s in secs], ["Overview", "Architecture"])
+        self.assertIn("intro para", secs[0]["body"])
+
+    def test_pre_heading_content_merges_into_existing_overview(self):
+        content = "<p>intro para</p><h2>Overview</h2><p>ov body</p>"
+        secs = split_sections(content)
+        self.assertEqual([s["title"] for s in secs], ["Overview"])
+        self.assertIn("intro para", secs[0]["body"])
+        self.assertIn("ov body", secs[0]["body"])
 
 
 class SanitizeFilterTests(TestCase):

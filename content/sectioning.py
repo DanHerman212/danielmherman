@@ -120,6 +120,15 @@ def split_sections(content_html: str) -> list:
 
     sections = []
     pending = None
+    lead: list[str] = []  # S6-07: body before the first h2 (previously dropped)
+
+    def _flush_lead(sec) -> None:
+        nonlocal lead
+        body = "".join(lead)
+        lead = []
+        if body.strip():
+            sec["body"] = body + sec["body"]
+
     for part in parser.parts:
         if part["kind"] == "heading":
             if pending is not None:
@@ -129,10 +138,25 @@ def split_sections(content_html: str) -> list:
             title = html.unescape(strip_tags(part["html"])).replace("\xa0", " ").strip() or "Section"
             pending = {"level": part["level"], "title": title,
                        "slug": section_slug(title), "body": ""}
-        elif part["kind"] == "body" and pending is not None:
-            pending["body"] += part["html"]
+            if section_slug(title) == "overview":
+                # A real Overview heading absorbs the pre-heading intro.
+                _flush_lead(pending)
+            elif "".join(lead).strip():
+                # Surface the pre-heading content as a synthetic Overview card
+                # instead of silently dropping it (S6-07).
+                sections.append({"level": TOP_LEVEL, "title": "Overview",
+                                 "slug": "overview", "body": "".join(lead)})
+                lead = []
+        elif part["kind"] == "body":
+            if pending is not None:
+                pending["body"] += part["html"]
+            else:
+                lead.append(part["html"])
     if pending is not None:
         sections.append(pending)
+    elif "".join(lead).strip():
+        sections.append({"level": TOP_LEVEL, "title": "Overview",
+                         "slug": "overview", "body": "".join(lead)})
     for sec in sections:
         _add_subheading_toc(sec)
     return sections
