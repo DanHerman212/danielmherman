@@ -38,7 +38,14 @@ const PAGE_SIZE = 10;
    variants, e.g. "Hospital Course:", "Discharge Diagnoses:", "Medications:").
    Extraction uses these BOTH to locate a section's start and to bound its end
    (the next known header), so a citation click shows the cited section's body
-   instead of the whole note. */
+   instead of the whole note.
+
+   S7-02: this is a hand-maintained copy of the server-side vocabulary (the
+   canonical source lives in the ECC repo: rag/sections.py KNOWN_HEADINGS and
+   rag/chunking.py INDEX_SECTIONS). The two repos can't import each other, so
+   consolidation (server-emitted JSON) is sequenced with the semantic-layer
+   cleanup — Step 8 of the implementation runbook. If a header is added there,
+   mirror it here. */
 const SECTION_ALIASES = {
   name: ['Name'],
   unit_no: ['Unit No', 'Unit No.', 'Medical Record Number', 'MRN'],
