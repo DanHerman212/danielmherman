@@ -292,6 +292,24 @@ gcloud secrets add-iam-policy-binding db-password \
 > **`db-root-password` is deliberately not granted.** The application never authenticates
 > as the Postgres superuser, so Cloud Run has no reason to read it. Keep that blast radius small.
 
+### 7a. Rotating a secret (ECC-51)
+
+`settings.get_secret` reads `versions/latest`, so rotation is: add a new version,
+then redeploy. A running revision keeps reading the value it fetched at boot, so
+the old secret stays in force until the new revision replaces it.
+
+```bash
+# Add a new version (becomes :latest immediately)
+printf '%s' "$NEW_VALUE" | gcloud secrets versions add django-secret-key --data-file=-
+
+# Redeploy so the running revision picks it up
+# (the site Cloud Build pipeline does this on the next push to main)
+```
+
+For a controlled rollout (rather than an instant global flip), pin a specific
+version per deploy instead of `latest` — but for this single-service demo,
+"rotate then redeploy" is the simpler, sufficient procedure.
+
 ---
 
 ## 8. Update the Django App for Production

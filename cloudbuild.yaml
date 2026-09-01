@@ -61,6 +61,9 @@ steps:
   # --args is stated explicitly (not left to the job's persisted state) and
   # also runs createcachetable: the DatabaseCache table django-axes needs for
   # cross-instance lockout state (S1-05). Idempotent on every build.
+  # check --deploy is the S1-18 gate: with prod hardening now in place
+  # (HSTS, secure cookies, fail-closed env) it should pass clean and fail the
+  # build loudly if a security setting regresses.
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args:
@@ -77,7 +80,7 @@ steps:
       - '--set-env-vars'
       - '^@^ENVIRONMENT=production@GOOGLE_CLOUD_PROJECT=$PROJECT_ID@CLOUD_SQL_CONNECTION_NAME=$PROJECT_ID:us-east1:danielmherman-db@GS_BUCKET_NAME=danielmherman-media@ALLOWED_HOSTS=danielmherman.com,www.danielmherman.com,.run.app@CSRF_TRUSTED_ORIGINS=https://danielmherman.com,https://www.danielmherman.com@DEMO_AGENT_URL=https://agent-jamycsjjzq-ue.a.run.app'
       - '--args'
-      - 'sh,-c,python manage.py migrate && python manage.py createcachetable'
+      - 'sh,-c,python manage.py check --deploy --fail-level WARNING && python manage.py migrate && python manage.py createcachetable'
 
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud

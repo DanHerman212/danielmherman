@@ -59,6 +59,10 @@ if IS_PRODUCTION:
     PROJECT_ID = os.environ.get('GOOGLE_CLOUD_PROJECT')
 
     def get_secret(secret_id):
+        # Reads the LATEST version (ECC-51): rotation is "add a new version,
+        # then redeploy" — the new value takes effect on the next deploy, and
+        # any running revision keeps the old value until it is replaced. See
+        # GCP_DEPLOYMENT_GUIDE §7 for the rotation procedure.
         name = f"projects/{PROJECT_ID}/secrets/{secret_id}/versions/latest"
         response = client.access_secret_version(request={"name": name})
         return response.payload.data.decode("UTF-8")
