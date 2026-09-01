@@ -1,5 +1,7 @@
-# Use Python 3.12 slim image
-FROM python:3.12-slim
+# Use Python 3.12 slim image. Pinned by digest (multi-arch manifest list) so
+# rebuilds are reproducible: resolves linux/amd64 on Cloud Build and arm64 on
+# Apple Silicon. A floating tag would let the base drift under a stable build.
+FROM python:3.12-slim@sha256:e5c9fa26ffb76e11e0f054f30dc2523a2f9693f0c36c0cf1e39b27e152d899fc
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
