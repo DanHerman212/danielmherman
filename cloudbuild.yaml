@@ -1,3 +1,12 @@
+# Dedicated build service account (ECC-58): builds must not run as the project
+# default SA, which holds broad roles. Create cicd-deployer once (see
+# GCP_DEPLOYMENT_GUIDE §18c) and grant it:
+#   roles/run.admin                    (deploy + update-traffic + jobs)
+#   roles/iam.serviceAccountUser       on website-sa (impersonate the runtime SA)
+#   roles/artifactregistry.writer      (push the built image)
+#   roles/logging.logWriter            (required for user-specified SAs)
+serviceAccount: 'projects/$PROJECT_ID/serviceAccounts/cicd-deployer@$PROJECT_ID.iam.gserviceaccount.com'
+
 steps:
   # Build the Docker image
   - name: 'gcr.io/cloud-builders/docker'
@@ -16,7 +25,36 @@ steps:
       - '--all-tags'
       - 'us-east1-docker.pkg.dev/$PROJECT_ID/danielmherman-repo/danielmherman'
 
-  # Run migrations FIRST — before the new revision serves traffic.
+  # Deploy the new revision with --no-traffic FIRST (ECC-56): the revision is
+  # created but receives no traffic, so the OLD revision keeps serving
+  # untouched while migrations and the cohort seed mutate the database below.
+  # If any later step fails, the build stops here and production is still the
+  # old revision on the old schema — rollback is simply "don't promote".
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'danielmherman'
+      - '--image'
+      - 'us-east1-docker.pkg.dev/$PROJECT_ID/danielmherman-repo/danielmherman:$COMMIT_SHA'
+      - '--region'
+      - 'us-east1'
+      - '--platform'
+      - 'managed'
+      - '--no-traffic'
+      - '--service-account'
+      - 'website-sa@$PROJECT_ID.iam.gserviceaccount.com'
+      # Full runtime env, declared in the repo (ECC-46/S1-01): recreating the
+      # service from this file yields a correctly configured production site,
+      # never a fail-open debug one. ^@^ makes @ the list separator so the
+      # comma-holding values survive (see GCP_DEPLOYMENT_GUIDE §15).
+      # DEMO_FIXTURE_MODE is intentionally absent: dev scaffolding, forbidden
+      # in production by settings.py (S1-02).
+      - '--set-env-vars'
+      - '^@^ENVIRONMENT=production@GOOGLE_CLOUD_PROJECT=$PROJECT_ID@CLOUD_SQL_CONNECTION_NAME=$PROJECT_ID:us-east1:danielmherman-db@GS_BUCKET_NAME=danielmherman-media@ALLOWED_HOSTS=danielmherman.com,www.danielmherman.com,.run.app@CSRF_TRUSTED_ORIGINS=https://danielmherman.com,https://www.danielmherman.com@DEMO_AGENT_URL=https://agent-jamycsjjzq-ue.a.run.app'
+
+  # Run migrations — before the new revision serves traffic.
   # Deploying first would briefly run new code against the old schema.
   # Env is declared here (ECC-46): settings.py fails closed without ENVIRONMENT,
   # so a job recreated from this file can never silently run against SQLite.
@@ -90,37 +128,21 @@ steps:
       - 'us-east1'
       - '--wait'
 
-  # Deploy to Cloud Run only after migrations succeed.
-  # If the migrate step fails, the build stops here and the old revision keeps serving.
-  #
-  # --service-account is stated explicitly even though `run deploy --image` would
-  # preserve whatever the service already had. Leaving it implicit means the identity
-  # lives only in console state: anyone who recreates the service from this file gets
-  # the default compute account, which can read every bucket in the project. Naming it
-  # here makes the least-privilege choice part of the repo rather than a setting
-  # someone has to remember.
+  # Promote the new revision ONLY after migrations and the cohort seed have
+  # succeeded. Until this step runs, production still serves the old revision
+  # (the --no-traffic revision above was created but never routed to).
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args:
       - 'run'
-      - 'deploy'
+      - 'services'
+      - 'update-traffic'
       - 'danielmherman'
-      - '--image'
-      - 'us-east1-docker.pkg.dev/$PROJECT_ID/danielmherman-repo/danielmherman:$COMMIT_SHA'
+      - '--to-latest'
       - '--region'
       - 'us-east1'
       - '--platform'
       - 'managed'
-      - '--service-account'
-      - 'website-sa@$PROJECT_ID.iam.gserviceaccount.com'
-      # Full runtime env, declared in the repo (ECC-46/S1-01): recreating the
-      # service from this file yields a correctly configured production site,
-      # never a fail-open debug one. ^@^ makes @ the list separator so the
-      # comma-holding values survive (see GCP_DEPLOYMENT_GUIDE §15).
-      # DEMO_FIXTURE_MODE is intentionally absent: dev scaffolding, forbidden
-      # in production by settings.py (S1-02).
-      - '--set-env-vars'
-      - '^@^ENVIRONMENT=production@GOOGLE_CLOUD_PROJECT=$PROJECT_ID@CLOUD_SQL_CONNECTION_NAME=$PROJECT_ID:us-east1:danielmherman-db@GS_BUCKET_NAME=danielmherman-media@ALLOWED_HOSTS=danielmherman.com,www.danielmherman.com,.run.app@CSRF_TRUSTED_ORIGINS=https://danielmherman.com,https://www.danielmherman.com@DEMO_AGENT_URL=https://agent-jamycsjjzq-ue.a.run.app'
 
 images:
   - 'us-east1-docker.pkg.dev/$PROJECT_ID/danielmherman-repo/danielmherman:$COMMIT_SHA'

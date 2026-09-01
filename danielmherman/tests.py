@@ -172,3 +172,24 @@ class ProductionSettingsTests(TestCase):
             timeout=120,
         )
         self.assertIn('PROD SETTINGS OK', result.stdout, result.stderr)
+
+
+class CloudBuildConfigTests(TestCase):
+    """ECC-56/58: deploy ordering and dedicated build identity in cloudbuild."""
+
+    def test_cloudbuild_deploys_no_traffic_then_promotes(self):
+        text = (Path(__file__).resolve().parent.parent / 'cloudbuild.yaml').read_text()
+        # ECC-56: the new revision is created with --no-traffic before migrate/
+        # seed mutate the DB, and is promoted with update-traffic only at the end.
+        self.assertIn('--no-traffic', text)
+        self.assertIn('update-traffic', text)
+        self.assertIn('--to-latest', text)
+        # Ordering: no-traffic deploy < migrate/seed jobs < promote step.
+        self.assertLess(text.index('--no-traffic'), text.index("- 'seed-demo-patients'"))
+        self.assertLess(text.index("- 'seed-demo-patients'"), text.index("- 'services'"))
+
+    def test_cloudbuild_pins_dedicated_build_service_account(self):
+        text = (Path(__file__).resolve().parent.parent / 'cloudbuild.yaml').read_text()
+        self.assertIn('serviceAccount:', text)
+        self.assertIn('cicd-deployer@', text)
+

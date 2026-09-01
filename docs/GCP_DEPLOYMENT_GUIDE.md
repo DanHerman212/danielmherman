@@ -1046,6 +1046,12 @@ This is what makes `git push` automatically deploy your site.
 
 ### 18b. Create `cloudbuild.yaml`
 
+> **The canonical `cloudbuild.yaml` in the repo root is the source of truth.**
+> It now deploys with `--no-traffic`, runs migrations + the cohort seed, then
+> promotes traffic with `update-traffic` (ECC-56), and pins the build identity
+> via a top-level `serviceAccount:` (ECC-58). The snippet below is the
+> historical, illustrative version.
+
 Create this file in your project root:
 
 ```yaml
