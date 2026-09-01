@@ -451,6 +451,21 @@ if IS_PRODUCTION:
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = False
 
+# ---------- SILENCED CHECKS (documented, deliberate deviations) ----------
+# `check --deploy --fail-level WARNING` (S1-18) must fail on any NEW warning,
+# but these two are intentional and already documented:
+#   * axes.W006 — AXES_LOCKOUT_PARAMETERS omits 'ip_address' by design (S1-05):
+#     behind the shared Cloud Run LB, REMOTE_ADDR is the LB's address, so
+#     IP-keyed lockout would lock out every visitor at once; lockout keys on
+#     username instead.
+#   * security.W021 — HSTS preload deliberately off (S1-12): a demo site is not
+#     a preload-list candidate (preload is a long-lifetime, hard-to-revoke
+#     commitment). HSTS itself is on (30d + includeSubdomains).
+SILENCED_SYSTEM_CHECKS = [
+    'axes.W006',
+    'security.W021',
+]
+
 # ---------- ASGI / CHANNELS ----------
 ASGI_APPLICATION = 'danielmherman.asgi.application'
 
