@@ -11,7 +11,7 @@ by calling the agent directly.
 """
 
 import logging
-import subprocess
+import subprocess  # nosec B404 — local-only ID-token path, fixed args, no shell
 import threading
 
 import requests
@@ -69,7 +69,7 @@ def _id_token(audience):
     # Local development against a real deployed agent. gcloud is not present in
     # the container image, so this branch cannot be reached in production.
     try:
-        result = subprocess.run(
+        result = subprocess.run(  # nosec B603 B607 — fixed argv, no shell, local dev only
             ['gcloud', 'auth', 'print-identity-token'],
             capture_output=True, text=True, check=True, timeout=60,
         )

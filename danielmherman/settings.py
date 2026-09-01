@@ -419,6 +419,14 @@ if IS_PRODUCTION:
     # Portfolio media (article/project images) is intentionally world-readable
     # — it renders on public pages. Uploads are staff-only (S1-13); nothing
     # sensitive is ever written to this bucket.
+    #
+    # S9-04 caveat: per-object `publicRead` ACLs are the LEGACY mechanism. If
+    # the bucket has (or is migrated to) Uniform Bucket-Level Access, per-object
+    # ACLs are ignored and uploads can 400. The UBLA-safe equivalent is to drop
+    # GS_DEFAULT_ACL + set GS_QUERYSTRING_AUTH=False and grant public read via
+    # bucket IAM: `gcloud storage buckets add-iam-policy-binding gs://BUCKET \
+    #   --member=allUsers --role=roles/storage.objectViewer`. Do this during the
+    # IaC step (Step 6) so the bucket's ACL mode and the code match.
     GS_DEFAULT_ACL = 'publicRead'
     MEDIA_URL = f'https://storage.googleapis.com/{GS_BUCKET_NAME}/'
 else:
@@ -501,6 +509,13 @@ LOGGING = {
         },
         # Application code: use logging.getLogger(__name__) in views/services.
         'content': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        # The demo surface (agent client + console views) logs through __name__.
+        # It is the surface that most needs telemetry (S9-06).
+        'demo': {
             'handlers': ['console'],
             'level': 'INFO',
             'propagate': False,
