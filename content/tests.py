@@ -1,5 +1,7 @@
+from django.core.cache import cache
 from django.test import TestCase
 
+from .models import Article, Category, ContactMessage, Project
 from .sectioning import decorate_sections, split_sections
 from .templatetags.content_extras import first_sentence, sanitize
 
@@ -163,4 +165,107 @@ class CSPHeaderTests(TestCase):
         from django.conf import settings
         resp = self.client.get(f'/{settings.ADMIN_PATH}/login/')
         self.assertNotIn('Content-Security-Policy', resp.headers)
+
+
+class ContactFormTests(TestCase):
+    """S6-02/S6-03: the public contact form validates server-side, drops
+    honeypot spam, and throttles per client IP."""
+
+    def setUp(self):
+        super().setUp()
+        cache.clear()
+
+    def _post(self, **overrides):
+        data = {
+            'name': 'Dan', 'email': 'dan@example.com',
+            'subject': 'Hello', 'message': 'A short message.',
+        }
+        data.update(overrides)
+        return self.client.post('/contact/', data)
+
+    def test_valid_submission_creates_message_and_redirects(self):
+        resp = self._post()
+        self.assertRedirects(resp, '/contact/')
+        self.assertTrue(ContactMessage.objects.filter(email='dan@example.com').exists())
+
+    def test_missing_name_does_not_create(self):
+        resp = self._post(name='')
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(ContactMessage.objects.count(), 0)
+
+    def test_invalid_email_does_not_create(self):
+        self._post(email='not-an-email')
+        self.assertEqual(ContactMessage.objects.count(), 0)
+
+    def test_oversized_message_is_rejected(self):
+        self._post(message='x' * 5001)
+        self.assertEqual(ContactMessage.objects.count(), 0)
+
+    def test_honeypot_is_silently_dropped(self):
+        resp = self._post(website='http://spam.example')
+        self.assertRedirects(resp, '/contact/')
+        self.assertEqual(ContactMessage.objects.count(), 0)
+
+    def test_sixth_submission_within_window_is_dropped(self):
+        for _ in range(5):
+            self._post()
+        self.assertEqual(ContactMessage.objects.count(), 5)
+        self._post()  # 6th: silently dropped by the throttle
+        self.assertEqual(ContactMessage.objects.count(), 5)
+
+
+class SlugDedupTests(TestCase):
+    """S6-04: same-title rows get unique slugs instead of 500ing the admin."""
+
+    def test_duplicate_article_titles_get_unique_slugs(self):
+        cat = Category.objects.create(name='tech', title='Tech')
+        a1 = Article.objects.create(category=cat, title='Same Title', content='x')
+        a2 = Article.objects.create(category=cat, title='Same Title', content='y')
+        self.assertEqual(a1.slug, 'same-title')
+        self.assertEqual(a2.slug, 'same-title-2')
+        self.assertNotEqual(a1.slug, a2.slug)
+
+    def test_duplicate_project_titles_get_unique_slugs(self):
+        p1 = Project.objects.create(title='Same Project', content='x')
+        p2 = Project.objects.create(title='Same Project', content='y')
+        self.assertEqual(p1.slug, 'same-project')
+        self.assertEqual(p2.slug, 'same-project-2')
+        self.assertNotEqual(p1.slug, p2.slug)
+
+
+class ContentSurfaceTests(TestCase):
+    """S6-05: the public content surface (publishing filters + staff previews)."""
+
+    def setUp(self):
+        super().setUp()
+        self.cat = Category.objects.create(name='tech', title='Tech')
+        self.published = Article.objects.create(
+            category=self.cat, title='Published', content='x', is_published=True)
+        self.draft = Article.objects.create(
+            category=self.cat, title='Draft', content='y', is_published=False)
+
+    def test_article_list_excludes_drafts(self):
+        resp = self.client.get('/articles/')
+        self.assertContains(resp, 'Published')
+        self.assertNotContains(resp, 'Draft')
+
+    def test_category_page_filters_unpublished(self):
+        resp = self.client.get('/category/tech/')
+        self.assertContains(resp, 'Published')
+        self.assertNotContains(resp, 'Draft')
+
+    def test_draft_article_detail_404s(self):
+        self.assertEqual(self.client.get(f'/article/{self.draft.slug}/').status_code, 404)
+
+    def test_published_article_detail_200s(self):
+        self.assertEqual(self.client.get(f'/article/{self.published.slug}/').status_code, 200)
+
+    def test_article_preview_requires_staff(self):
+        from django.conf import settings
+        resp = self.client.get(f'/article/{self.draft.slug}/preview/')
+        self.assertEqual(resp.status_code, 302)
+        # staff_member_required redirects to the ADMIN login, not the public one.
+        self.assertIn(f'/{settings.ADMIN_PATH}/login/', resp['Location'])
+
+
 

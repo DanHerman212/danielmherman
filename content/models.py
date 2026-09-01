@@ -3,6 +3,22 @@ from django.db import models
 from django.utils.text import slugify
 from django_ckeditor_5.fields import CKEditor5Field
 
+
+def _unique_slug(model_cls, instance, base):
+    """Dedupe a slug against existing rows (S6-04).
+
+    Two rows with the same title used to slugify to the same value and collide
+    on the unique constraint, 500ing on admin save. Append a -2, -3, … suffix
+    until the slug is free (excluding the instance itself on update).
+    """
+    slug = base
+    n = 1
+    while model_cls.objects.filter(slug=slug).exclude(pk=instance.pk).exists():
+        n += 1
+        slug = f"{base}-{n}"
+    return slug
+
+
 class Category(models.Model):
     """Represents the main menu categories"""
     CATEGORY_CHOICES = [
@@ -43,7 +59,7 @@ class Article(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.slug:
-            self.slug = slugify(self.title)
+            self.slug = _unique_slug(type(self), self, slugify(self.title) or 'untitled')
         super().save(*args, **kwargs)
 
     def __str__(self):
@@ -72,7 +88,7 @@ class Project(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.slug:
-            self.slug = slugify(self.title)
+            self.slug = _unique_slug(type(self), self, slugify(self.title) or 'untitled')
         super().save(*args, **kwargs)
 
     def __str__(self):

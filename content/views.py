@@ -5,13 +5,37 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.views.generic import ListView, DetailView, TemplateView
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
+from django.core.cache import cache
 from django.utils.decorators import method_decorator
+from .forms import ContactForm
 from .models import Category, Article, Project, ContactMessage
 from .sectioning import decorate_sections
 
 # The blog taxonomy shown as filter chips on the Articles hub. These are the
 # article categories; resume/projects/contact are separate site sections.
 ARTICLE_CATEGORY_NAMES = ["tech", "music", "enlightenment"]
+
+# Public contact-form throttle (S6-02): max valid submissions per client IP
+# per hour. Behind the Cloud Run load balancer REMOTE_ADDR is the LB, so the
+# client IP is read from X-Forwarded-For.
+CONTACT_MAX_PER_HOUR = 5
+
+
+def _client_ip(request) -> str:
+    forwarded = request.META.get('HTTP_X_FORWARDED_FOR', '')
+    if forwarded:
+        return forwarded.split(',')[0].strip()
+    return request.META.get('REMOTE_ADDR', '')
+
+
+def _contact_rate_limited(request) -> bool:
+    ip = _client_ip(request)
+    key = f'contact-throttle:{ip}'
+    count = cache.get(key, 0)
+    if count >= CONTACT_MAX_PER_HOUR:
+        return True
+    cache.set(key, count + 1, 3600)
+    return False
 
 
 def _article_categories():
@@ -226,25 +250,31 @@ class ProjectPreviewView(DetailView):
         
     
 class ContactView(TemplateView):
-    """Contact page with form"""
+    """Contact page with form."""
     template_name = 'content/contact.html'
 
-    def post(self, request):
-        name = request.POST.get('name')
-        email = request.POST.get('email')
-        subject = request.POST.get('subject')
-        message = request.POST.get('message')
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['form'] = ContactForm()
+        return context
 
-        if all([name, email, subject, message]):
-            ContactMessage.objects.create(
-                name=name,
-                email=email,
-                subject=subject,
-                message=message
-            )
-            
+    def post(self, request):
+        # Honeypot (S6-02): a bot filling the hidden field is silently dropped.
+        if request.POST.get('website'):
+            return redirect('contact')
+
+        form = ContactForm(request.POST)
+        if form.is_valid():
+            # Per-IP throttle (S6-02): cap submissions, drop silently so the
+            # sender gets no signal (behind the Cloud Run LB, X-Forwarded-For
+            # carries the client IP).
+            if _contact_rate_limited(request):
+                return redirect('contact')
+            form.save()
             messages.success(request, 'Thank you for your message! I will get back to you soon.')
             return redirect('contact')
-        else:
-            messages.error(request, "Please fill out all fields.")
-        return render(request, self.template_name)
+
+        # S6-03: server-side validation — re-render with errors instead of
+        # crashing on PostgreSQL length limits.
+        messages.error(request, 'Please correct the errors below.')
+        return render(request, self.template_name, {'form': form})
