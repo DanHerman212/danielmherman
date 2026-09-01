@@ -12,7 +12,7 @@
  * comparison.
  */
 
-import { createDemoFlow, extractSection } from './demo_flow.js?v=16';
+import { createDemoFlow, extractSection } from './demo_flow.js?v=17';  // S7-13: keep in sync with demo_splitpane.js
 import { MessageProcessor } from '/static/vendor/a2ui/a2ui_web_core_0.10.5_v0_9_external_lit_zod.js';
 import { basicCatalog, Context } from '/static/vendor/a2ui/a2ui_lit_0.10.2_v0_9_external_lit_zod.js';
 import { ContextProvider } from '/static/vendor/a2ui/lit_context_1.1.6_external_lit.js';
@@ -94,6 +94,9 @@ function renderA2uiCanvas(episode, api, envelope) {
 
   if (!target || !target.messages) {
     canvasMode.textContent = '';
+    // S7-16: clear the composed-messages pane too — it otherwise keeps the
+    // previous patient's envelope JSON (cross-patient bleed in the trace view).
+    msgPre.textContent = '';
     showEmpty(EMPTY_STATE);
     return;
   }
@@ -123,6 +126,9 @@ function unavailableText(section) {
     n straight into the passages array shows the wrong section. */
 function envelopeForCite(turn, n) {
   if (!turn.a2ui) return null;
+
+  // Resolve which passage/section this footnote actually supports
+  // (intent-section aware — the model mis-numbers citations).
   let passage = null;
   let intentBody = null;
   let matchedSection = null;
@@ -138,35 +144,66 @@ function envelopeForCite(turn, n) {
     }
     if (passage) break;
   }
+
+  // Decide the SourceCard's section label + body text.
+  let sectionLabel;
+  let bodyText;
   if (!passage && (turn.intentSections || []).length) {
     // The note has NONE of the targeted sections. The deterministic answer
     // is "not available", not a passage mined from unrelated narrative.
-    const env = JSON.parse(JSON.stringify(turn.a2ui));
-    const update = env.messages.find((m) => m.updateComponents);
-    const source = update && update.updateComponents.components
-      .find((c) => c.component === 'SourceCard');
-    if (source) {
-      source.cite = n;
-      source.section = 'not available';
-      source.text = unavailableText(turn.intentSections[0]);
-      source.query = turn.query || 'discharge note';
+    sectionLabel = 'not available';
+    bodyText = unavailableText(turn.intentSections[0]);
+  } else {
+    if (!passage && turn.passages && turn.passages[n - 1]) {
+      passage = turn.passages[n - 1];
     }
-    return env;
+    if (!passage) return turn.a2ui;
+    const extracted = intentBody || extractSection(passage.text, passage.section) || null;
+    if (extracted === null) {
+      // S7-17(b): extraction failed — the body is the whole note, so label it
+      // honestly instead of claiming the matched section.
+      sectionLabel = 'note';
+      bodyText = passage.text;
+    } else {
+      sectionLabel = matchedSection || passage.section;
+      bodyText = extracted;
+    }
   }
-  if (!passage && turn.passages && turn.passages[n - 1]) {
-    passage = turn.passages[n - 1];
-  }
-  if (!passage) return turn.a2ui;
+  const source = {
+    cite: n,
+    section: sectionLabel,
+    text: bodyText,
+    query: turn.query || 'discharge note',
+  };
+
   const env = JSON.parse(JSON.stringify(turn.a2ui));
   const update = env.messages.find((m) => m.updateComponents);
-  const source = update && update.updateComponents.components
+  const card = update && update.updateComponents.components
     .find((c) => c.component === 'SourceCard');
-  if (!source) return env;
-  source.cite = n;
-  source.section = (intentBody || matchedSection) ? matchedSection : passage.section;
-  source.text = intentBody || extractSection(passage.text, passage.section) || passage.text;
-  source.query = turn.query || 'discharge note';
-  return env;
+  if (card) {
+    Object.assign(card, source);
+    return env;
+  }
+  // S7-17(a): the envelope has no SourceCard to repoint — synthesize a minimal
+  // source-only surface so the cite click still shows the passage.
+  return sourceOnlyEnvelope(source);
+}
+
+/** A minimal single-SourceCard surface, used when a turn's composed envelope
+    has no SourceCard to repoint (S7-17). */
+function sourceOnlyEnvelope(source) {
+  return {
+    surface_id: 'risk-canvas',
+    audience: ['user'],
+    messages: [
+      { version: 'v0.9', createSurface: { surfaceId: 'risk-canvas', catalogId: CATALOG.id } },
+      { version: 'v0.9', updateComponents: { surfaceId: 'risk-canvas', components: [
+        { id: 'root', component: 'Card', child: 'body' },
+        { id: 'body', component: 'Column', children: ['source'] },
+        { id: 'source', component: 'SourceCard', ...source },
+      ] } },
+    ],
+  };
 }
 
 createDemoFlow({

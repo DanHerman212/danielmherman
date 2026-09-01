@@ -92,7 +92,7 @@ emitted (the trace element).
             <button type="button"
                     class="patient-row"
                     data-hadm-id="{{ row.patient.hadm_id }}"
-                    data-probability="{{ row.probability }}"
+                    data-probability="{{ row.probability|default:'' }}"
                     data-band="{{ row.band|default:'none' }}">
               <span class="risk-dot risk-{{ row.band|default:'none' }}"
                     title="{{ row.band_label|default:'no cached risk' }}"></span>

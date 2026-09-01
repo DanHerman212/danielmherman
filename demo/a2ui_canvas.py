@@ -149,10 +149,18 @@ def _extract_section(note_text: str, section: str) -> str | None:
     start = None
     matched = None
     for alias in aliases:
-        m = re.search(rf"\b{re.escape(alias)}\b\s*:", note_text, re.IGNORECASE)
+        # S7-12: anchor to a line start (^ or \n), consistent with the end
+        # bound, so generic aliases (History, Condition, Medications…) can't
+        # match mid-sentence and truncate the wrong body.
+        m = re.search(
+            rf"(^|\n)\s*{re.escape(alias)}\b\s*:", note_text, re.IGNORECASE
+        )
         if m:
-            start = m.start()
-            matched = m.group(0)
+            anchor = m.group(1)
+            rest = m.group(0)[len(anchor):]
+            ws = len(rest) - len(rest.lstrip())
+            start = m.start() + len(anchor) + ws
+            matched = rest[ws:]
             break
     if start is None or matched is None:
         return None

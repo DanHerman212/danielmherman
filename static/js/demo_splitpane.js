@@ -11,13 +11,22 @@
 import {
   createDemoFlow,
   esc, pct, bandOf, bandColor, extractSection,
-} from './demo_flow.js?v=11';
+} from './demo_flow.js?v=17';  // S7-13: keep in sync with demo_a2ui.js
 
 /* ---------- canvas widget builders (Screen 2, right) ---------- */
 
 function riskBlock(payload) {
   const prob = Number(payload.probability);
   const thr = Number(payload.threshold);
+  // S7-04: fall back to a clear empty state on a malformed payload instead of
+  // rendering NaN%/Infinity% and a wrong band.
+  if (!Number.isFinite(prob) || !Number.isFinite(thr)) {
+    const card = document.createElement('div');
+    card.className = 'widget';
+    card.innerHTML =
+      '<p class="widget-fallback">Risk score unavailable for this assessment.</p>';
+    return card;
+  }
   const band = bandOf(prob, thr);
   const color = bandColor(band);
 
@@ -81,10 +90,9 @@ function driversBlock(payload) {
   return card;
 }
 
-function sourceBlock(episode, sourceIndex) {
+function sourceCard(src) {
   const card = document.createElement('div');
   card.className = 'widget widget-source';
-  const src = episode.sources[sourceIndex];
   if (!src) return card;
 
   card.innerHTML = `<div class="widget-title">Source · ${esc(src.query || 'discharge note')}</div>`;
@@ -99,6 +107,10 @@ function sourceBlock(episode, sourceIndex) {
   }
   passages.forEach((p, i) => card.appendChild(passageRow(p, i)));
   return card;
+}
+
+function sourceBlock(episode, sourceIndex) {
+  return sourceCard(episode.sources[sourceIndex]);
 }
 
 /** S7-09: which retrieved passages do this turn's citations actually support?
@@ -178,20 +190,17 @@ function passageRow(passage, index) {
 function renderSourceForTurn(episode, turnIndex, api) {
   const turn = episode.turns[turnIndex];
   if (!turn || !turn.passages) return;
-  // Materialize a source entry for that turn and surface it (S7-09: carry
-  // intentSections so resolvePassages can resolve the citation numbering).
-  const query = turn.query || 'discharge note';
-  let sourceIndex = episode.sources.findIndex((s) => s.query === query);
-  if (sourceIndex === -1) {
-    episode.sources.push({
-      query, passages: turn.passages, cited: turn.cited,
-      intentSections: turn.intentSections,
-    });
-    sourceIndex = episode.sources.length - 1;
-  }
+  // S7-15: build the card from THIS turn's own passages — never a query-text
+  // lookup that a repeated or null-question turn would resolve to an earlier
+  // turn's passages.
   api.canvasMode.textContent = 'source: cited';
   api.clearCanvas();
-  api.canvas.appendChild(sourceBlock(episode, sourceIndex));
+  api.canvas.appendChild(sourceCard({
+    query: turn.query,
+    passages: turn.passages,
+    cited: turn.cited,
+    intentSections: turn.intentSections,
+  }));
 }
 
 function highlightPassage(n, api) {

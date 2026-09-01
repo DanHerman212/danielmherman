@@ -146,7 +146,9 @@ export function esc(value) {
 }
 
 export function pct(probability) {
-  return `${(Number(probability) * 100).toFixed(1)}%`;
+  const n = Number(probability);
+  // S7-04: a missing/non-numeric value must not render "NaN%" or "Infinity%".
+  return Number.isFinite(n) ? `${(n * 100).toFixed(1)}%` : '—';
 }
 
 export function bandOf(probability, threshold) {
@@ -175,9 +177,19 @@ export function extractSection(noteText, section) {
   let start = -1;
   let matched = '';
   for (const alias of aliases) {
-    const re = new RegExp(`\\b${escapeRegex(alias)}\\b\\s*:`, 'i');
+    // S7-12: anchor the start to a line start (^ or \n), consistent with the
+    // end bound, so generic aliases (History, Condition, Medications…) can't
+    // match mid-sentence and truncate the wrong body.
+    const re = new RegExp(`(^|\\n)\\s*${escapeRegex(alias)}\\b\\s*:`, 'i');
     const m = re.exec(noteText);
-    if (m) { start = m.index; matched = m[0]; break; }
+    if (m) {
+      const anchor = m[1];
+      const rest = m[0].slice(anchor.length);
+      const ws = rest.length - rest.trimStart().length;
+      start = m.index + anchor.length + ws;
+      matched = rest.slice(ws);
+      break;
+    }
   }
   if (start < 0 || !matched) return null;
   let end = noteText.length;
@@ -197,17 +209,24 @@ export function extractSection(noteText, section) {
     and numbers the expanded citation ids. */
 function citationMarkers(text) {
   const out = [];
-  const re = /\^\[(\d+(?:\s*,\s*\d+)*|\d+\s*-\s*\d+)\]/g;
+  // S7-11: support mixed lists (^[1, 3-5]) and guard reversed ranges.
+  const re = /\^\[(\d+(?:\s*-\s*\d+)?(?:\s*,\s*\d+(?:\s*-\s*\d+)?)*)\]/g;
   let m;
   while ((m = re.exec(String(text || '')))) {
-    const inner = m[1];
     const numbers = [];
-    if (inner.includes('-')) {
-      const [a, b] = inner.split('-').map((s) => Number(s.trim()));
-      for (let i = a; i <= b; i++) numbers.push(i);
-    } else {
-      for (const part of inner.split(',')) numbers.push(Number(part.trim()));
+    let valid = true;
+    for (const part of m[1].split(',')) {
+      const p = part.trim();
+      if (p.includes('-')) {
+        const [a, b] = p.split('-').map((s) => Number(s.trim()));
+        if (a > b) { valid = false; break; }   // leave the marker as raw text
+        for (let i = a; i <= b; i++) numbers.push(i);
+      } else {
+        numbers.push(Number(p));
+      }
     }
+    // A reversed/empty marker is kept as prose, never silently consumed.
+    if (!valid || numbers.length === 0) continue;
     out.push({ full: m[0], numbers });
   }
   return out;
@@ -573,7 +592,12 @@ export function createDemoFlow({ root, askUrl, renderCanvas, onCite }) {
   }
 
   /** Lightweight inline markdown for agent prose — operates on ESCAPED text,
-      so the output is safe to inject (no raw HTML survives esc()). */
+      so the output is safe to inject (no raw HTML survives esc()).
+
+      S7-05: because it runs on already-escaped text, an entity the model wrote
+      literally (e.g. `&amp;`) displays as the literal string `&amp;`. That is
+      the intended, safe behavior — the output shows exactly what the model
+      produced and never re-introduces raw markup. */
   function renderAgentMarkdown(escapedText) {
     const out = [];
     let list = null;                       // 'ul' | 'ol' | null
@@ -617,7 +641,7 @@ export function createDemoFlow({ root, askUrl, renderCanvas, onCite }) {
       to the SAME passage collapse to the first occurrence (the agent sometimes
       tags every sentence with the same ^[n]; that reads as noise). */
   function wireCitations(root, turnIndex, episode) {
-    const re = /(\^\[(?:\d+(?:\s*,\s*\d+)*|\d+\s*-\s*\d+)\])/g;
+    const re = /(\^\[\d+(?:\s*-\s*\d+)?(?:\s*,\s*\d+(?:\s*-\s*\d+)?)*\])/g;
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
     const nodes = [];
     while (walker.nextNode()) {
