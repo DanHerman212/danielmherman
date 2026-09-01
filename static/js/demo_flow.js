@@ -244,6 +244,7 @@ export function createDemoFlow({ root, askUrl, renderCanvas, onCite }) {
     current: null,               // { hadmId, name, meta }
     episodes: new Map(),         // hadmId -> episode
     traceOn: false,
+    asking: false,               // S7-06: one request in flight at a time
     page: 1,
   };
 
@@ -327,8 +328,8 @@ export function createDemoFlow({ root, askUrl, renderCanvas, onCite }) {
     els.threadName.textContent = name;
     els.threadMeta.textContent = state.current.meta;
     els.backBtn.hidden = false;
-    els.input.disabled = false;
-    els.askBtn.disabled = false;
+    els.input.disabled = state.asking;
+    els.askBtn.disabled = state.asking;
 
     renderThread(episodeFor(hadmId));
     paint(episodeFor(hadmId));
@@ -413,6 +414,18 @@ export function createDemoFlow({ root, askUrl, renderCanvas, onCite }) {
     const pane = els.thread.closest('.pane-thread');
     if (pane) pane.classList.toggle('is-working', working);
     if (els.canvas) els.canvas.classList.toggle('is-working', working);
+  }
+
+  /** Disable the composer (input + ask button + chips) while a request is in
+      flight, so a second ask can't be sent mid-flight (S7-06). */
+  function setComposerDisabled(disabled) {
+    els.input.disabled = disabled || !state.current;
+    els.askBtn.disabled = disabled || !state.current;
+    if (els.composerChips) {
+      for (const chip of els.composerChips.querySelectorAll('.chip')) {
+        chip.disabled = disabled;
+      }
+    }
   }
 
   /** Render the thread as chapters: turns grouped into [user, agent] pairs,
@@ -513,7 +526,9 @@ export function createDemoFlow({ root, askUrl, renderCanvas, onCite }) {
     if (turn.role === 'user') {
       const label = document.createElement('div');
       label.className = 'turn-label';
-      label.textContent = state.current.name;
+      // S7-07: the asker's name is pinned to the turn, so old turns keep the
+      // right patient even after switching (and after Back, state.current is null).
+      label.textContent = turn.patientName || (state.current && state.current.name) || 'You';
       block.appendChild(label);
       const text = document.createElement('div');
       text.className = 'turn-text';
@@ -619,7 +634,7 @@ export function createDemoFlow({ root, askUrl, renderCanvas, onCite }) {
               if (typeof onCite === 'function') {
                 onCite(episode, turnIndex, n, api);
               } else {
-                paint(episodeFor(state.current.hadmId));
+                paint(state.current ? episodeFor(state.current.hadmId) : null);
               }
             });
             frag.appendChild(sup);
@@ -649,15 +664,15 @@ export function createDemoFlow({ root, askUrl, renderCanvas, onCite }) {
     const used = toolCalls.map((tc) => tc.name).join(', ') || 'none';
     const metaParts = [`used: ${used}`];
     if (data.source === 'fixture') metaParts.push('fixture mode');
-    if (predict) metaParts.push(`model ${predict.response.model_version || ''}`);
+    if (predict) metaParts.push(`model ${predict?.response?.model_version || ''}`);
 
     return {
       role: 'agent',
       text: data.answer || 'No answer returned.',
       meta: metaParts.filter(Boolean).join(' · '),
       toolCalls: toolCalls,
-      passages: (rag && rag.response.passages) || [],
-      query: (rag && rag.response.query) || null,
+      passages: (rag?.response?.passages) || [],
+      query: (rag?.response?.query) || null,
       intentSections: data.intent_sections || null,
       cited: citedNumbers(data.answer || ''),
       // The A2UI canvas renders a per-turn envelope, so a footnote click in an
@@ -683,17 +698,32 @@ export function createDemoFlow({ root, askUrl, renderCanvas, onCite }) {
   /* ---------- ask flow ---------- */
 
   async function post(body, userText) {
-    const episode = episodeFor(state.current.hadmId);
+    if (state.asking) return;                 // S7-06: one request at a time
+    state.asking = true;
+    setComposerDisabled(true);
 
-    // show the user turn immediately
-    episode.turns.push({ role: 'user', text: userText });
+    const episode = episodeFor(state.current.hadmId);
+    const hadmId = state.current.hadmId;      // S7-07: capture at send time
+
+    // Show the user turn immediately (asker's name pinned for S7-07).
+    episode.turns.push({ role: 'user', text: userText, patientName: state.current.name });
     renderThread(episode);
 
-    // pending indicator + working animation
+    // Pending indicator + working animation.
     const pending = { role: 'agent', text: '…', meta: 'working', pending: true };
     episode.turns.push(pending);
     renderThread(episode);
     setWorking(true);
+
+    // S7-06: replace the pending turn by identity, never by tail position.
+    const replacePending = (turn) => {
+      const i = episode.turns.indexOf(pending);
+      if (i !== -1) episode.turns[i] = turn;
+    };
+    // S7-07: only touch the DOM if this patient is still the one on screen.
+    const renderIfCurrent = () => {
+      if (state.current && state.current.hadmId === hadmId) renderThread(episode);
+    };
 
     let data;
     try {
@@ -705,45 +735,63 @@ export function createDemoFlow({ root, askUrl, renderCanvas, onCite }) {
       data = await res.json();
       if (typeof data.remaining === 'number') els.remaining.textContent = data.remaining;
       if (!res.ok) {
-        // replace the pending turn with the readable error
-        episode.turns[episode.turns.length - 1] = {
+        replacePending({
           role: 'agent',
           text: data.message || data.error || `HTTP ${res.status}`,
           meta: data.error ? `error: ${data.error}` : '',
           passages: [], toolCalls: [],
-        };
-        renderThread(episode);
+        });
+        renderIfCurrent();
         return;
       }
     } catch (err) {
-      episode.turns[episode.turns.length - 1] = {
+      replacePending({
         role: 'agent', text: `Request failed: ${err}`, meta: '', passages: [], toolCalls: [],
-      };
-      renderThread(episode);
+      });
+      renderIfCurrent();
       return;
     } finally {
       setWorking(false);
+      state.asking = false;
+      setComposerDisabled(false);
     }
 
-    const turn = agentTurnFromResponse(userText, data);
-    episode.turns[episode.turns.length - 1] = turn;
+    // S7-08: a malformed payload must never strand the pending turn.
+    let turn;
+    try {
+      turn = agentTurnFromResponse(userText, data);
+    } catch (err) {
+      turn = {
+        role: 'agent',
+        text: data.answer || 'No answer returned.',
+        meta: 'error: malformed response',
+        passages: [], toolCalls: [],
+      };
+    }
+    replacePending(turn);
     episode.lastMode = data.source || 'live';
     episode.lastFixtureNote = data.fixture_note || '';
     // The A2UI renderer reads this envelope to draw the agent-composed canvas.
     episode.a2ui = data.a2ui || null;
 
-    // episodic write: risk assessments feed the canvas (latest risk + drivers)
+    // Episodic write: risk assessments feed the canvas (latest risk + drivers).
     const predict = (data.tool_calls || []).find((tc) => tc.name === 'predict_readmission');
     if (predict && predict.response && predict.response.probability != null) {
       episode.assessments.push(predict.response);
     }
-    // sources accumulate for the SOURCE widget
+    // Sources accumulate for the SOURCE widget (S7-09: keep intentSections so
+    // the canvas renderer can resolve citation numbering).
     if (turn.passages.length || turn.query) {
-      episode.sources.push({ query: turn.query, passages: turn.passages, cited: turn.cited });
+      episode.sources.push({
+        query: turn.query,
+        passages: turn.passages,
+        cited: turn.cited,
+        intentSections: turn.intentSections,
+      });
     }
 
-    renderThread(episode);
-    paint(episode);
+    renderIfCurrent();
+    if (state.current && state.current.hadmId === hadmId) paint(episode);
   }
 
   function askChip(chip) {

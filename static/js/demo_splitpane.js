@@ -88,23 +88,44 @@ function sourceBlock(episode, sourceIndex) {
   if (!src) return card;
 
   card.innerHTML = `<div class="widget-title">Source · ${esc(src.query || 'discharge note')}</div>`;
-  if (src.passages.length === 0) {
+  // S7-09: resolve citations through intentSections (or the footnote numbers)
+  // so the card shows the passage the citations actually support.
+  const passages = resolvePassages(src);
+  if (passages.length === 0) {
     card.innerHTML +=
       '<p class="widget-fallback">No supporting note passage was found for this question. ' +
       'An empty result is a real answer — the agent does not fabricate passages.</p>';
     return card;
   }
-  // Show only the passages the answer actually cites, so the footnote count
-  // in the prose always matches the number of source cards.
-  const cited = src.cited || new Set(src.passages.map((_, i) => i + 1));
-  let shown = 0;
-  for (let i = 0; i < src.passages.length; i++) {
-    if (!cited.has(i + 1)) continue;
-    card.appendChild(passageRow(src.passages[i], i));
-    shown++;
-  }
-  if (shown === 0) card.appendChild(passageRow(src.passages[0], 0));
+  passages.forEach((p, i) => card.appendChild(passageRow(p, i)));
   return card;
+}
+
+/** S7-09: which retrieved passages do this turn's citations actually support?
+
+    The model mis-numbers citations (a meds answer cites ^[1] while its
+    supporting passage sits elsewhere). When the turn targeted specific note
+    section(s) (intentSections), resolve to the first passage whose section
+    matches an intent section — or that CONTAINS it (the index stores
+    whole-note chunks, so extractSection finds the target inside) — mirroring
+    the A2UI demo's envelopeForCite. Otherwise the footnote numbers map
+    straight onto the passages array. */
+function resolvePassages(src) {
+  const passages = (src && src.passages) || [];
+  if (!passages.length) return [];
+  const intents = (src && src.intentSections) || [];
+  const cited = src.cited || new Set(passages.map((_, i) => i + 1));
+  const byNumber = () => passages.filter((_, i) => cited.has(i + 1));
+  if (!intents.length) return byNumber();
+  const resolved = [];
+  for (const sec of intents) {
+    const direct = passages.find((p) => p.section === sec);
+    if (direct) { if (!resolved.includes(direct)) resolved.push(direct); continue; }
+    for (const p of passages) {
+      if (extractSection(p.text, sec)) { if (!resolved.includes(p)) resolved.push(p); break; }
+    }
+  }
+  return resolved.length ? resolved : byNumber();
 }
 
 function passageRow(passage, index) {
@@ -119,7 +140,7 @@ function passageRow(passage, index) {
   badge.textContent = `[${index + 1}]`;
   const section = document.createElement('span');
   section.className = 'source-section';
-  section.textContent = passage.section.replace(/_/g, ' ');
+  section.textContent = String(passage.section || '').replace(/_/g, ' ');
   head.appendChild(badge);
   head.appendChild(section);
   row.appendChild(head);
@@ -157,20 +178,28 @@ function passageRow(passage, index) {
 function renderSourceForTurn(episode, turnIndex, api) {
   const turn = episode.turns[turnIndex];
   if (!turn || !turn.passages) return;
-  // Materialize a source entry for that turn and surface it.
-  const sourceIndex = episode.sources.findIndex((s) => s.query === turn.query);
+  // Materialize a source entry for that turn and surface it (S7-09: carry
+  // intentSections so resolvePassages can resolve the citation numbering).
+  const query = turn.query || 'discharge note';
+  let sourceIndex = episode.sources.findIndex((s) => s.query === query);
   if (sourceIndex === -1) {
-    episode.sources.push({ query: turn.query, passages: turn.passages, cited: turn.cited });
+    episode.sources.push({
+      query, passages: turn.passages, cited: turn.cited,
+      intentSections: turn.intentSections,
+    });
+    sourceIndex = episode.sources.length - 1;
   }
-  const idx = sourceIndex === -1 ? episode.sources.length - 1 : sourceIndex;
   api.canvasMode.textContent = 'source: cited';
   api.clearCanvas();
-  api.canvas.appendChild(sourceBlock(episode, idx));
+  api.canvas.appendChild(sourceBlock(episode, sourceIndex));
 }
 
 function highlightPassage(n, api) {
   const rows = api.canvas.querySelectorAll('.source-passage');
-  const target = api.canvas.querySelector(`.source-passage[data-passage="${n}"]`);
+  let target = api.canvas.querySelector(`.source-passage[data-passage="${n}"]`);
+  // S7-09: after intent-section resolution the rows are renumbered 1..k, so
+  // footnote n may not index a row — fall back to the first resolved row.
+  if (!target && rows.length) target = rows[0];
   if (!target) return;
   rows.forEach((r) => r.classList.remove('is-cited'));
   target.classList.add('is-cited');
