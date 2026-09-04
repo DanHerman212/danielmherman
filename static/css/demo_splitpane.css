@@ -162,10 +162,10 @@ body:has(#demo-root), body:has(#a2ui-root) { overflow-x: auto; }
 .demo-rail-list { flex: 1; overflow-y: auto; }
 .patient-row {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: 1fr auto;
   grid-template-areas:
-    "dot name age"
-    "dot summary summary";
+    "name age"
+    "summary summary";
   align-items: center; column-gap: 8px;
   width: 100%; text-align: left; border: none; background: none; cursor: pointer;
   padding: 10px 12px; border-bottom: 1px solid var(--line);
@@ -173,11 +173,6 @@ body:has(#demo-root), body:has(#a2ui-root) { overflow-x: auto; }
 }
 .patient-row:hover { background: var(--surface-2); }
 .patient-row.active { background: #eef2ff; box-shadow: inset 3px 0 0 var(--accent); }
-.risk-dot { grid-area: dot; width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
-.risk-low { background: var(--risk-low); }
-.risk-borderline { background: var(--risk-borderline); }
-.risk-high { background: var(--risk-high); }
-.risk-none { background: #d1d5db; }
 .patient-name { grid-area: name; font-weight: 600; font-size: 0.9rem; }
 .patient-age { grid-area: age; font-size: 0.75rem; color: var(--muted); }
 .patient-summary { grid-area: summary; font-size: 0.75rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -194,12 +189,6 @@ body:has(#demo-root), body:has(#a2ui-root) { overflow-x: auto; }
 .page-btn:hover:not(:disabled) { background: var(--surface-2); }
 .page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .page-info { font-size: 0.75rem; color: var(--muted); font-variant-numeric: tabular-nums; }
-
-.demo-rail-legend {
-  display: flex; gap: 10px; padding: 8px 12px; font-size: 0.7rem; color: var(--muted);
-  border-top: 1px solid var(--line); flex-wrap: wrap;
-}
-.demo-rail-legend span { display: inline-flex; align-items: center; gap: 5px; }
 
 /* ---------- panes (Screen 2) ---------- */
 .demo-main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); min-width: 0; }

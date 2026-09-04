@@ -60,24 +60,6 @@ def risk_for(hadm_id: int) -> dict | None:
     return _cohort_risk().get(str(hadm_id))
 
 
-def band_for(payload: dict | None) -> tuple[str | None, str]:
-    """(key, label) from a risk payload, derived from the operating threshold.
-
-    low = below threshold · borderline = threshold to threshold + 0.08 ·
-    high = above that. The threshold itself comes from the model, so a
-    recalibration reshapes the bands instead of hardcoding clinical cutoffs.
-    """
-    if not payload:
-        return None, ''
-    p = float(payload['probability'])
-    t = float(payload['threshold'])
-    if p < t:
-        return 'low', 'low risk'
-    if p < t + 0.08:
-        return 'borderline', 'borderline'
-    return 'high', 'high risk'
-
-
 @lru_cache(maxsize=1)
 def _captured_rag() -> dict[str, dict]:
     """query-key -> captured rag_search response (only the primary patient)."""

@@ -340,9 +340,7 @@ export function createDemoFlow({ root, askUrl, renderCanvas, onCite }) {
 
     const name = row.querySelector('.patient-name').textContent;
     const age = row.querySelector('.patient-age').textContent;
-    const band = row.dataset.band || 'none';
-    const prob = row.dataset.probability;
-    state.current = { hadmId, name, meta: `${age} · ${band}${prob ? ` · ${pct(prob)}` : ''}` };
+    state.current = { hadmId, name, meta: age };
 
     // Parity with the search box: selecting a patient isolates the rail to
     // them the same way typing their name would (and keeps them highlighted),

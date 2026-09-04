@@ -91,11 +91,7 @@ emitted (the trace element).
             {% for row in rows %}
             <button type="button"
                     class="patient-row"
-                    data-hadm-id="{{ row.patient.hadm_id }}"
-                    data-probability="{{ row.probability|default:'' }}"
-                    data-band="{{ row.band|default:'none' }}">
-              <span class="risk-dot risk-{{ row.band|default:'none' }}"
-                    title="{{ row.band_label|default:'no cached risk' }}"></span>
+                    data-hadm-id="{{ row.patient.hadm_id }}">
               <span class="patient-name">{{ row.patient.display_name }}</span>
               <span class="patient-age">{{ row.patient.age }}{{ row.patient.sex }}</span>
               <span class="patient-summary">{{ row.patient.summary }}</span>
@@ -111,12 +107,6 @@ emitted (the trace element).
             <span id="page-info" class="page-info"></span>
             <button id="page-next" class="page-btn" type="button"
                     aria-label="Next page"><i class="fa-solid fa-chevron-right"></i></button>
-          </div>
-          <div class="demo-rail-legend">
-            <span><i class="risk-dot risk-low"></i> low</span>
-            <span><i class="risk-dot risk-borderline"></i> borderline</span>
-            <span><i class="risk-dot risk-high"></i> high</span>
-            <span><i class="risk-dot risk-none"></i> unscored</span>
           </div>
         </aside>
 

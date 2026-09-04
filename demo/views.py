@@ -17,7 +17,7 @@ from .agent_client import AgentError, ask as ask_agent
 from .a2ui_canvas import (
     compose_risk_canvas, first_citation, intent_sections, renumber_citations,
 )
-from .fixtures import CHIPS, band_for, fixture_ask, risk_for
+from .fixtures import CHIPS, fixture_ask
 from .models import DemoPatient, DemoQuota
 
 logger = logging.getLogger(__name__)
@@ -84,20 +84,12 @@ def _question_for(payload):
 def a2ui_console(request):
     """The A2UI canvas demo: same enterprise shell + patient rail + thread as
     the custom demo, but the context canvas is composed as A2UI messages and
-    rendered by the vendored A2UI renderer (agent-composed UI)."""
-    rows = []
-    for p in DemoPatient.objects.all():
-        risk = risk_for(p.hadm_id)
-        band, band_label = band_for(risk)
-        rows.append({
-            'patient': p,
-            'risk': risk,
-            'band': band,
-            'band_label': band_label,
-            'probability': round(risk['probability'], 3) if risk else None,
-        })
+    rendered by the vendored A2UI renderer (agent-composed UI).
+
+    The patient rail carries no precomputed risk band — every patient is
+    unscored until a live assessment is run in the thread."""
     return render(request, 'demo/a2ui_console.html', {
-        'rows': rows,
+        'rows': [{'patient': p} for p in DemoPatient.objects.all()],
         'remaining': DemoQuota.remaining(request.user),
     })
 
