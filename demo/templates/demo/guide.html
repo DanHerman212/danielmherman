@@ -62,7 +62,7 @@ header and colors match the console exactly.{% endcomment %}
       Nothing here is stubbed.
     </p>
     <p class="guide-notes">
-      Four ways to explore, in the order a reviewer naturally goes.
+      Three ways to explore, in the order a reviewer naturally goes.
     </p>
   </header>
 
@@ -71,7 +71,6 @@ header and colors match the console exactly.{% endcomment %}
       <li><a href="#journey-risk">Assess a patient's readmission risk</a></li>
       <li><a href="#journey-ask">Ask the agent about a patient</a></li>
       <li><a href="#journey-verify">Verify the evidence</a></li>
-      <li><a href="#journey-compare">See the cohort spread</a></li>
     </ol>
   </nav>
 
@@ -90,7 +89,7 @@ header and colors match the console exactly.{% endcomment %}
     <div class="guide-body">
       <figure class="guide-shot">
         <img class="shot-img" src="{% static 'images/guide/risk-card.png' %}"
-             alt="The risk assessment card for Linda Okafor: 12.5% probability, borderline band, and the top contributing factors.">
+             alt="The risk assessment card for Alicia Cardoso: 11.6% probability, borderline band, and the top contributing factors.">
         <figcaption>
           The card shows the 30-day readmission <strong>probability</strong>, the
           band it falls in (low / borderline / high), and the model's
@@ -98,8 +97,8 @@ header and colors match the console exactly.{% endcomment %}
         </figcaption>
       </figure>
       <ol class="guide-points">
-        <li>Note the <strong>band</strong>: each patient is low (&lt; 12%), borderline
-          (12–20%), or high (&gt; 20%).</li>
+        <li>Note the <strong>band</strong>: each patient is low (&lt; 11%), borderline
+          (11–19%), or high (&gt; 19%).</li>
         <li>Read the <strong>top factors</strong> — they explain <em>why</em> the
           model says what it says, not just a number.</li>
         <li>Every factor is traceable: it comes from the note's own text where
@@ -123,7 +122,7 @@ header and colors match the console exactly.{% endcomment %}
     <div class="guide-body">
       <figure class="guide-shot">
         <img class="shot-img" src="{% static 'images/guide/agent-chat.png' %}"
-             alt="The agent's answer listing Linda Okafor's discharge medications with a citation marker.">
+             alt="The agent's answer listing Alicia Cardoso's discharge medications with a citation marker.">
         <figcaption>
           Ask <em>"what is this patient at risk for?"</em>, <em>"list the discharge
           medications"</em>, or <em>"summarize the hospital course"</em>. The answer
@@ -170,38 +169,6 @@ header and colors match the console exactly.{% endcomment %}
           agree, because the answer is grounded in it.</li>
         <li>Ask a follow-up that challenges a claim; the agent re-grounds on the
           same note.</li>
-      </ol>
-    </div>
-  </section>
-
-  {# ---------------- Journey 4: compare the cohort ---------------- #}
-  <section id="journey-compare" class="guide-journey">
-    <div class="guide-journey-head">
-      <span class="guide-step">4</span>
-      <div>
-        <h2>See the cohort spread</h2>
-        <p class="guide-sub">
-          The rail spans all three bands, so you can compare a low-risk and a
-          high-risk patient side by side.
-        </p>
-      </div>
-    </div>
-    <div class="guide-body">
-      <figure class="guide-shot">
-        <img class="shot-img" src="{% static 'images/guide/cohort-rail.png' %}"
-             alt="The patient rail with color-coded risk dots for low, borderline, and high bands.">
-        <figcaption>
-          Each patient's dot is colored by band. Pick one from each band and the
-          difference in story, factors, and meds should be obvious.
-        </figcaption>
-      </figure>
-      <ol class="guide-points">
-        <li>A <strong>low</strong>-risk patient has few drivers and a light meds
-          list.</li>
-        <li>A <strong>high</strong>-risk patient's card is dominated by real
-          drivers (age, prior admissions, procedures, polypharmacy).</li>
-        <li>The same note ↔ feature ↔ risk coherence rule holds for every patient
-          in the rail.</li>
       </ol>
     </div>
   </section>

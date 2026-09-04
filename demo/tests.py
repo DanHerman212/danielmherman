@@ -68,14 +68,14 @@ class DemoAuthTests(TestCase):
         self.assertEqual(response.status_code, 200)
         body = response.content.decode()
         for anchor in (
-            'journey-risk', 'journey-ask', 'journey-verify', 'journey-compare',
+            'journey-risk', 'journey-ask', 'journey-verify',
         ):
             self.assertIn(f'id="{anchor}"', body)
         self.assertIn('Demo User Guide', body)
         # Every journey has a real live screenshot wired in (no "pending"
         # placeholder), so the guide shows the actual demo, not a stub.
         for img in ('images/guide/risk-card.png', 'images/guide/agent-chat.png',
-                    'images/guide/source-panel.png', 'images/guide/cohort-rail.png'):
+                    'images/guide/source-panel.png'):
             self.assertIn(f'images/guide/', body)
             self.assertIn(img, body)
         self.assertNotIn('Screenshot: ', body)
@@ -382,6 +382,16 @@ class A2uiCanvasTests(TestCase):
         self.assertEqual(
             renumber_citations('discharged on pain medication ^[1] ^[2] ^[3].'),
             'discharged on pain medication ^[1].')
+
+    def test_citation_remap_maps_renumbered_to_original(self):
+        from demo.a2ui_canvas import citation_remap
+        # 'A^[2] and B^[1] and C^[3]' renumbers to 1,2,3 in appearance order,
+        # so the map must translate the renumbered numbers back to the
+        # original passage positions (2,1,3).
+        self.assertEqual(
+            citation_remap('A^[2] and B^[1] and C^[3]'),
+            {'1': 2, '2': 1, '3': 3})
+        self.assertEqual(citation_remap('no citations here'), {})
 
     def test_extract_section_bounds_at_allergies_and_activity(self):
         """The meds source must not swallow trailing headers (Allergies,

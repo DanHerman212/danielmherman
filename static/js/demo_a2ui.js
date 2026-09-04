@@ -127,35 +127,48 @@ function unavailableText(section) {
 function envelopeForCite(turn, n) {
   if (!turn.a2ui) return null;
 
+  // The server renumbers ^[n] markers to first-appearance order, so a clicked
+  // number no longer matches the passage array index when the model cited
+  // passages out of array order. citation_map ({new: old}) undoes that.
+  const oldN = (turn.citationMap && turn.citationMap[n]) || n;
+
+  // Section-intent resolution is only valid for a SINGLE-citation answer: the
+  // model mis-numbers that one citation (a meds answer cites ^[1] while its
+  // supporting passage sits elsewhere). A multi-citation answer cites its
+  // passages in array order, so map n straight to the passage.
+  const multiCite = !!(turn.cited && turn.cited.size > 1);
+
   // Resolve which passage/section this footnote actually supports
   // (intent-section aware — the model mis-numbers citations).
   let passage = null;
   let intentBody = null;
   let matchedSection = null;
-  for (const sec of (turn.intentSections || [])) {
-    passage = (turn.passages || []).find((p) => p.section === sec) || null;
-    if (passage) { matchedSection = sec; break; }
-    // The index stores whole-note chunks, so a passage labeled with a
-    // different section still CONTAINS the target section. Extract it from
-    // the passage text instead of showing the wrong section.
-    for (const p of (turn.passages || [])) {
-      const body = extractSection(p.text, sec);
-      if (body) { passage = p; intentBody = body; matchedSection = sec; break; }
+  if (!multiCite) {
+    for (const sec of (turn.intentSections || [])) {
+      passage = (turn.passages || []).find((p) => p.section === sec) || null;
+      if (passage) { matchedSection = sec; break; }
+      // The index stores whole-note chunks, so a passage labeled with a
+      // different section still CONTAINS the target section. Extract it from
+      // the passage text instead of showing the wrong section.
+      for (const p of (turn.passages || [])) {
+        const body = extractSection(p.text, sec);
+        if (body) { passage = p; intentBody = body; matchedSection = sec; break; }
+      }
+      if (passage) break;
     }
-    if (passage) break;
   }
 
   // Decide the SourceCard's section label + body text.
   let sectionLabel;
   let bodyText;
-  if (!passage && (turn.intentSections || []).length) {
+  if (!multiCite && !passage && (turn.intentSections || []).length) {
     // The note has NONE of the targeted sections. The deterministic answer
     // is "not available", not a passage mined from unrelated narrative.
     sectionLabel = 'not available';
     bodyText = unavailableText(turn.intentSections[0]);
   } else {
-    if (!passage && turn.passages && turn.passages[n - 1]) {
-      passage = turn.passages[n - 1];
+    if (!passage && turn.passages && turn.passages[oldN - 1]) {
+      passage = turn.passages[oldN - 1];
     }
     if (!passage) return turn.a2ui;
     const extracted = intentBody || extractSection(passage.text, passage.section) || null;

@@ -221,26 +221,18 @@ def _expand_citations(inner: str) -> list[int]:
     return [int(x.strip()) for x in inner.split(",") if x.strip()]
 
 
-def renumber_citations(answer: str) -> str:
-    """Renumber ^[n] markers to first-appearance order (1, 2, 3, ...).
+def _renumber_citations(answer: str) -> tuple[str, dict[int, int]]:
+    """Renumber ^[n] markers to first-appearance order.
 
-    The model numbers citations by the tool's array position: a meds-only
-    answer cites ^[3] because discharge_medications is the THIRD section in
-    rag_search_sections order. In a meds-only turn that reads illogically —
-    the first (and only) citation should be ^[1]. Renumber deterministically
-    so citations always start at 1 in order of appearance; the canvas's
-    section-intent resolution keeps the passage mapping correct regardless.
-
-    Also collapses STACKED citations (^[1]^[2]^[3]... with only whitespace
-    between them — the model dumping every returned passage onto one claim) to
-    a single marker, since a row of citations on one claim has no per-claim
-    granularity to preserve.
+    Returns (renumbered_answer, old_to_new) where old_to_new maps the model's
+    original citation number (the tool's array position) to its renumbered
+    number (first-appearance order, 1-based).
     """
     if not answer:
-        return answer
+        return answer, {}
     markers = list(_CITATION_RE.finditer(answer))
     if not markers:
-        return answer
+        return answer, {}
     # Group markers separated only by whitespace into one cluster.
     clusters: list[list[re.Match]] = [[markers[0]]]
     for m in markers[1:]:
@@ -267,7 +259,38 @@ def renumber_citations(answer: str) -> str:
         out.append(f"^[{old_to_new[first]}]")
         last = cl[-1].end()
     out.append(answer[last:])
-    return "".join(out)
+    return "".join(out), old_to_new
+
+
+def renumber_citations(answer: str) -> str:
+    """Renumber ^[n] markers to first-appearance order (1, 2, 3, ...).
+
+    The model numbers citations by the tool's array position: a meds-only
+    answer cites ^[3] because discharge_medications is the THIRD section in
+    rag_search_sections order. In a meds-only turn that reads illogically —
+    the first (and only) citation should be ^[1]. Renumber deterministically
+    so citations always start at 1 in order of appearance; the canvas's
+    section-intent resolution keeps the passage mapping correct regardless.
+
+    Also collapses STACKED citations (^[1]^[2]^[3]... with only whitespace
+    between them — the model dumping every returned passage onto one claim) to
+    a single marker, since a row of citations on one claim has no per-claim
+    granularity to preserve.
+    """
+    return _renumber_citations(answer)[0]
+
+
+def citation_remap(answer: str) -> dict[str, int]:
+    """{renumbered citation number: original passage number} for the client.
+
+    `renumber_citations` rewrites the model's ^[n] markers to first-appearance
+    order, so a clicked (renumbered) number no longer matches the passage
+    array index when the model cited passages out of array order. The client
+    uses this map to translate a clicked ^[n] back to the original passage.
+    Keys are strings for JSON.
+    """
+    _, old_to_new = _renumber_citations(answer)
+    return {str(new): old for old, new in old_to_new.items()}
 
 
 def _unavailable_text(section: str) -> str:

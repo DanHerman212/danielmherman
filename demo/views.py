@@ -15,7 +15,8 @@ from django.views.decorators.http import require_POST
 
 from .agent_client import AgentError, ask as ask_agent
 from .a2ui_canvas import (
-    compose_risk_canvas, first_citation, intent_sections, renumber_citations,
+    citation_remap, compose_risk_canvas, first_citation, intent_sections,
+    renumber_citations,
 )
 from .fixtures import CHIPS, fixture_ask
 from .models import DemoPatient, DemoQuota
@@ -208,7 +209,12 @@ def a2ui_ask(request):
     # canvas's section-intent resolution keeps the passage mapping correct
     # regardless of the number.
     if result.get('answer'):
-        result['answer'] = renumber_citations(result['answer'])
+        original = result['answer']
+        result['answer'] = renumber_citations(original)
+        # The client maps a clicked (renumbered) ^[n] back to the original
+        # passage number, so a multi-citation answer's later footnotes show
+        # their own passage instead of collapsing onto the first intent section.
+        result['citation_map'] = citation_remap(original)
     result['a2ui'] = compose_risk_canvas(
         _tool_response(result, 'predict_readmission'),
         _rag_response(result),

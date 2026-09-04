@@ -703,6 +703,7 @@ export function createDemoFlow({ root, askUrl, renderCanvas, onCite }) {
       passages: (rag?.response?.passages) || [],
       query: (rag?.response?.query) || null,
       intentSections: data.intent_sections || null,
+      citationMap: data.citation_map || null,
       cited: citedNumbers(data.answer || ''),
       // The A2UI canvas renders a per-turn envelope, so a footnote click in an
       // older turn can re-draw that turn's composed canvas.
