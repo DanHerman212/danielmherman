@@ -20,12 +20,6 @@ from .agent_client import AgentError
 from .a2ui_canvas import compose_risk_canvas
 from .models import DemoPatient, DemoQuota
 
-AGENT_REPLY = {
-    'question': 'Assess the 30-day readmission risk for admission 90000009.',
-    'answer': 'Probability 0.154016, above the 0.12 threshold.',
-    'tool_calls': [{'name': 'predict_readmission'}],
-}
-
 # A live agent reply shaped like the real /ask response: tool_calls carry the
 # response payloads the A2UI canvas composer needs (predict + rag).
 A2UI_AGENT_REPLY = {
@@ -54,11 +48,6 @@ A2UI_AGENT_REPLY = {
 
 
 class DemoAuthTests(TestCase):
-    def test_console_requires_login(self):
-        response = self.client.get(reverse('demo:console'))
-        self.assertEqual(response.status_code, 302)
-        self.assertIn('/accounts/login/', response['Location'])
-
     def test_guide_requires_login(self):
         response = self.client.get(reverse('demo:guide'))
         self.assertEqual(response.status_code, 302)
@@ -91,12 +80,6 @@ class DemoAuthTests(TestCase):
             self.assertIn(img, body)
         self.assertNotIn('Screenshot: ', body)
         self.assertNotIn('(pending)', body)
-
-    def test_ask_requires_login(self):
-        response = self.client.post(
-            reverse('demo:ask'), data='{}', content_type='application/json'
-        )
-        self.assertEqual(response.status_code, 302)
 
     def test_no_signup_route_exists(self):
         """Accounts are issued. A signup URL would quietly undo that."""
@@ -178,166 +161,6 @@ class QuotaTests(TestCase):
     def test_consume_creates_a_quota_on_first_use(self):
         self.assertTrue(DemoQuota.consume(self.user))
         self.assertTrue(DemoQuota.objects.filter(user=self.user).exists())
-
-
-@override_settings(DEMO_FIXTURE_MODE=False)
-class AskEndpointTests(TestCase):
-    # The live-agent path (the production default). Pinned explicitly so the
-    # mocked agent proxy is exercised regardless of the local env.
-    def setUp(self):
-        self.user = User.objects.create_user('demo', password='x')
-        self.client.force_login(self.user)
-        DemoPatient.objects.create(
-            hadm_id=90000009, display_name='Test Patient', age=63,
-            sex='F', summary='63F · urgent admission', split_name='test',
-        )
-
-    def _post(self, payload):
-        return self.client.post(
-            reverse('demo:ask'),
-            data=json.dumps(payload),
-            content_type='application/json',
-        )
-
-    @patch('demo.views.ask_agent', return_value=dict(AGENT_REPLY))
-    def test_happy_path(self, mocked):
-        response = self._post({'hadm_id': 90000009})
-        self.assertEqual(response.status_code, 200)
-        body = response.json()
-        self.assertIn('0.154016', body['answer'])
-        self.assertEqual(body['remaining'], 9)
-        # The question is composed server-side so phrasing cannot be edited
-        # into something leading.
-        self.assertIn('90000009', mocked.call_args.args[0])
-
-    @patch('demo.views.ask_agent', return_value=dict(AGENT_REPLY))
-    def test_free_text_question_is_accepted(self, mocked):
-        response = self._post({'question': 'Why was this patient flagged?'})
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(mocked.call_args.args[0], 'Why was this patient flagged?')
-
-    @patch('demo.views.ask_agent')
-    def test_quota_exhaustion_returns_429_without_calling_the_agent(self, mocked):
-        DemoQuota.objects.create(user=self.user, daily_limit=0)
-        response = self._post({'hadm_id': 90000009})
-        self.assertEqual(response.status_code, 429)
-        mocked.assert_not_called()
-
-    @patch('demo.views.ask_agent', side_effect=AgentError('boom'))
-    def test_agent_failure_refunds_the_credit(self, mocked):
-        DemoQuota.objects.create(user=self.user, daily_limit=5)
-        response = self._post({'hadm_id': 90000009})
-        self.assertEqual(response.status_code, 502)
-        self.assertEqual(DemoQuota.remaining(self.user), 5)
-
-    @patch('demo.views.ask_agent')
-    def test_bad_input_is_rejected_before_the_quota_is_touched(self, mocked):
-        DemoQuota.objects.create(user=self.user, daily_limit=5)
-        for payload in ({}, {'hadm_id': 'abc'}, {'hadm_id': -1}, {'question': '   '}):
-            with self.subTest(payload=payload):
-                self.assertEqual(self._post(payload).status_code, 400)
-        self.assertEqual(DemoQuota.remaining(self.user), 5)
-        mocked.assert_not_called()
-
-    @patch('demo.views.ask_agent')
-    def test_unknown_admission_is_rejected_before_the_quota_is_touched(self, mocked):
-        """Ids outside the demo cohort must never reach the agent (S1-09):
-        a nonexistent admission is a guaranteed downstream tool error that
-        would be refunded every time — an unmetered spend loop."""
-        DemoQuota.objects.create(user=self.user, daily_limit=5)
-        response = self._post({'hadm_id': 12345678})
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(DemoQuota.remaining(self.user), 5)
-        mocked.assert_not_called()
-
-    def test_malformed_agent_responses_raise_agent_error(self):
-        """Malformed agent bodies must surface as AgentError so the views'
-        existing refund path runs (S1-11), instead of a 500 after the credit
-        was consumed."""
-        from .agent_client import _validated
-        for bad in (['not', 'a', 'dict'], 'text', None,
-                    {'answer': 'x', 'tool_calls': 'nope'},
-                    {'answer': 'x', 'tool_calls': ['nope']},
-                    {'answer': 'x', 'tool_calls': [{'name': 't', 'response': 'nope'}]}):
-            with self.subTest(bad=bad):
-                with self.assertRaises(AgentError):
-                    _validated(bad)
-        # Well-formed shapes pass through untouched.
-        good = {'answer': 'x', 'tool_calls': [{'name': 't', 'response': {'ok': 1}}]}
-        self.assertIs(_validated(good), good)
-
-    def test_malformed_json_is_rejected(self):
-        response = self.client.post(
-            reverse('demo:ask'), data='not json', content_type='application/json'
-        )
-        self.assertEqual(response.status_code, 400)
-
-    def test_get_is_not_allowed(self):
-        self.assertEqual(self.client.get(reverse('demo:ask')).status_code, 405)
-
-    @patch('demo.views.ask_agent', side_effect=AgentError('https://agent-internal/ask 403'))
-    def test_agent_internals_are_not_leaked_in_the_main_message(self, mocked):
-        response = self._post({'hadm_id': 90000009})
-        body = response.json()
-        self.assertNotIn('agent-internal', body['error'])
-        # S1-03: exception text (private agent URL, upstream status detail) is
-        # logged server-side, never echoed to the client in ANY field.
-        self.assertNotIn('detail', body)
-        self.assertNotIn('agent-internal', json.dumps(body))
-
-
-@override_settings(DEMO_FIXTURE_MODE=True)
-class FixtureModeTests(TestCase):
-    """The fixture path serves real captured payloads (dev scaffolding only)."""
-
-    def setUp(self):
-        self.user = User.objects.create_user('demo', password='x')
-        self.client.force_login(self.user)
-
-    def _post(self, payload):
-        return self.client.post(
-            reverse('demo:ask'),
-            data=json.dumps(payload),
-            content_type='application/json',
-        )
-
-    def test_risk_chip_returns_real_predict_and_rag(self):
-        """Risk + citations come from the hybrid predict and rag fixtures
-        captured from the live hybrid index for the primary patient."""
-        response = self._post({'hadm_id': 90000009, 'chip': 'risk'})
-        self.assertEqual(response.status_code, 200)
-        body = response.json()
-        self.assertEqual(body['source'], 'fixture')
-        names = [tc['name'] for tc in body['tool_calls']]
-        self.assertEqual(names, ['predict_readmission', 'rag_search'])
-        # 90000009's hybrid probability after the gender-encoding correction
-        # (female note 1568 scored as female, 0.125356).
-        self.assertIn('12.5%', body['answer'])
-        self.assertIn('^[1]', body['answer'])
-        rag = next(tc['response'] for tc in body['tool_calls']
-                   if tc['name'] == 'rag_search')
-        self.assertEqual(rag['returned'], 5)
-
-    def test_meds_chip_without_captured_passages_is_honest_empty(self):
-        # A hybrid patient with a real risk payload but no captured rag
-        # passages, so retrieval must be the honest empty (returned: 0), never
-        # fabricated.
-        response = self._post({'hadm_id': 90000017, 'chip': 'meds'})
-        self.assertEqual(response.status_code, 200)
-        body = response.json()
-        rag = body['tool_calls'][0]['response']
-        self.assertEqual(rag['returned'], 0)
-        self.assertIn('No supporting note passage', body['answer'])
-
-    def test_unknown_patient_is_structured_error(self):
-        response = self._post({'hadm_id': 999999, 'chip': 'risk'})
-        self.assertEqual(response.status_code, 404)
-        self.assertEqual(response.json()['error'], 'unknown_patient')
-
-    def test_free_text_is_rejected_in_fixture_mode(self):
-        response = self._post({'question': 'Why was this patient flagged?'})
-        self.assertEqual(response.status_code, 404)
-        self.assertEqual(response.json()['error'], 'unsupported_in_fixture_mode')
 
 
 @override_settings(DEMO_FIXTURE_MODE=True)
@@ -672,7 +495,7 @@ class A2uiCanvasTests(TestCase):
         # Cache-busted stylesheet + module links so the shell CSS and the A2UI
         # component module are never stale in the browser.
         self.assertContains(response, 'demo_splitpane.css?v=6')
-        self.assertContains(response, 'demo_a2ui.js?v=10')
+        self.assertContains(response, 'demo_a2ui.js?v=11')
 
 
 @override_settings(DEMO_FIXTURE_MODE=False)
@@ -818,39 +641,3 @@ class A2uiAskLiveTests(TestCase):
             reverse('demo:a2ui_ask'), data='not json', content_type='application/json'
         )
         self.assertEqual(response.status_code, 400)
-
-
-class ConsoleTests(TestCase):
-    # The page references a static file through {% static %}, and the project
-    # serves static assets with a *manifest* storage backend, which raises for
-    # any file collectstatic has not hashed yet. That is correct in production
-    # and useless in a test, where no collectstatic has run — so the test uses
-    # the plain backend and asserts on the markup rather than on the pipeline.
-    @override_settings(
-        STORAGES={
-            **settings.STORAGES,
-            "staticfiles": {
-                "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"
-            },
-        }
-    )
-    def test_console_lists_patients_and_labels_names_as_synthetic(self):
-        user = User.objects.create_user('demo', password='x')
-        self.client.force_login(user)
-        DemoPatient.objects.create(
-            hadm_id=1, display_name='Test Patient', age=71,
-            sex='F', summary='71F', split_name='test',
-        )
-        response = self.client.get(reverse('demo:console'))
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Test Patient')
-        # The enterprise shell: brand, sidebar nav, and the split-pane surface.
-        self.assertContains(response, 'id="demo-root"')
-        self.assertContains(response, 'ECC')
-        self.assertContains(response, 'Readmission Risk')
-        self.assertContains(response, 'id="thread"')
-        self.assertContains(response, 'id="canvas"')
-        # Risk dots on the patient rows + pagination.
-        self.assertContains(response, 'patient-row')
-        self.assertContains(response, 'risk-dot')
-        self.assertContains(response, 'page-next')

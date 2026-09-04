@@ -159,13 +159,16 @@ function envelopeForCite(turn, n) {
     }
     if (!passage) return turn.a2ui;
     const extracted = intentBody || extractSection(passage.text, passage.section) || null;
+    const knownSection = matchedSection || passage.section;
     if (extracted === null) {
-      // S7-17(b): extraction failed — the body is the whole note, so label it
-      // honestly instead of claiming the matched section.
-      sectionLabel = 'note';
+      // Extraction failed. A deterministic rag_search_sections passage is just
+      // the section body without its header, so extractSection can't find the
+      // anchor — but we still KNOW the section. Keep it and show the body.
+      // Only fall back to 'note' when the section is genuinely unknown.
+      sectionLabel = (knownSection && knownSection !== 'note') ? knownSection : 'note';
       bodyText = passage.text;
     } else {
-      sectionLabel = matchedSection || passage.section;
+      sectionLabel = knownSection || 'note';
       bodyText = extracted;
     }
   }

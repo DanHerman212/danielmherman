@@ -1,11 +1,12 @@
-{% extends "demo/console.html" %}
+{% extends "content/base.html" %}
 {% load static %}
 {% comment %}
 Demo User Guide — journey-structured walkthrough of the Enterprise Clinical
 Copilot demo.
 
-Extends console.html so the shell (header + sidebar + footer) is identical to
-the app the reviewer is being taught to use; only the main view is replaced.
+Extends the site base directly (console.html was removed with the legacy
+custom demo); only the header classes + demo_splitpane.css are reused so the
+guide reads as part of the product.
 Sections are organised by user journey (assess → ask → verify → compare), each
 with a screenshot + short caption. Screenshots are live captures of the
 production demo (real agent, real notes, real model).
@@ -16,7 +17,7 @@ Route: demo/guide  (login required, like the rest of the demo)
 {% block title %}Demo User Guide · Enterprise Clinical Copilot{% endblock %}
 
 {% block extra_css %}
-  {{ block.super }}
+  <link rel="stylesheet" href="{% static 'css/demo_splitpane.css' %}?v=6">
   <link rel="stylesheet" href="{% static 'css/demo_guide.css' %}?v=1">
 {% endblock %}
 

@@ -123,7 +123,7 @@ if IS_PRODUCTION and DEMO_FIXTURE_MODE:
     )
 
 LOGIN_URL = 'login'
-LOGIN_REDIRECT_URL = 'demo:console'
+LOGIN_REDIRECT_URL = 'demo:a2ui_console'
 LOGOUT_REDIRECT_URL = 'home'
 
 # Admin lives off the default path (S1-05): /admin/ is the first thing a

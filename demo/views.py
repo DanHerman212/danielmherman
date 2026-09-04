@@ -1,4 +1,4 @@
-"""The demo's two endpoints: a console page and an ask proxy.
+"""The demo's endpoints: the A2UI console page and its ask proxy.
 
 Both require a login. Accounts are issued, not self-registered — there is no
 signup route anywhere in this app, by design.
@@ -23,31 +23,6 @@ from .models import DemoPatient, DemoQuota
 logger = logging.getLogger(__name__)
 
 MAX_QUESTION_CHARS = 2000
-
-
-@login_required
-def console(request):
-    """The demo console: patient list with risk dots + split-pane thread.
-
-    Each row carries the patient plus their real risk payload (or None when
-    the patient has no cached risk), so the template can draw the dot and the
-    threshold band server-side.
-    """
-    rows = []
-    for p in DemoPatient.objects.all():
-        risk = risk_for(p.hadm_id)
-        band, band_label = band_for(risk)
-        rows.append({
-            'patient': p,
-            'risk': risk,
-            'band': band,
-            'band_label': band_label,
-            'probability': round(risk['probability'], 3) if risk else None,
-        })
-    return render(request, 'demo/console.html', {
-        'rows': rows,
-        'remaining': DemoQuota.remaining(request.user),
-    })
 
 
 def _question_for(payload):
@@ -99,74 +74,10 @@ def _question_for(payload):
     return question.strip(), None
 
 
-@login_required
-@require_POST
-def ask(request):
-    try:
-        payload = json.loads(request.body)
-    except ValueError:
-        return JsonResponse({'error': 'Request body must be JSON.'}, status=400)
-
-    if not isinstance(payload, dict):
-        return JsonResponse({'error': 'Request body must be a JSON object.'}, status=400)
-
-    # Fixture mode answers the starter chips from captured real payloads while
-    # the Vertex endpoints are down. Same response shape as the live agent.
-    if settings.DEMO_FIXTURE_MODE:
-        result = fixture_ask(payload)
-        if result.get('error'):
-            status = 400 if result['error'] == 'bad_request' else 404
-            return JsonResponse(result, status=status)
-        result['remaining'] = DemoQuota.remaining(request.user)
-        return JsonResponse(result)
-
-    question, error = _question_for(payload)
-    if error:
-        return JsonResponse({'error': error}, status=400)
-
-    # Claim the credit before spending anything. Checking the quota after the
-    # call would let a burst of concurrent requests all pass the check and all
-    # bill. `period` is the claim token a refund must present (S1-07).
-    period = DemoQuota.consume(request.user)
-    if not period:
-        return JsonResponse({
-            'error': 'Daily demo limit reached.',
-            'remaining': 0,
-        }, status=429)
-
-    try:
-        result = ask_agent(question)
-    except AgentError as exc:
-        # Give the credit back — freely if provably nothing was billed,
-        # under the daily refund cap otherwise (S1-09). The exception text can
-        # embed the private agent URL / upstream error detail, so it is logged
-        # server-side and never returned to the client (S1-03).
-        logger.error('ask: agent call failed: %s', exc)
-        DemoQuota.refund(request.user, period, spent=exc.spent)
-        return JsonResponse({
-            'error': 'The clinical copilot is unavailable. Please try again.',
-            'remaining': DemoQuota.remaining(request.user),
-        }, status=502)
-
-    # The agent surfaces downstream (endpoint) failures as graceful tool error
-    # payloads with HTTP 200 (e.g. predict_readmission -> {"error": ...} when
-    # the Vertex endpoint is down). That is a failure for quota purposes too:
-    # a credit was spent and no real answer came back, so refund + 502.
-    if _tools_errored(result):
-        DemoQuota.refund(request.user, period)
-        return JsonResponse({
-            'error': 'The clinical copilot is unavailable. Please try again.',
-            'remaining': DemoQuota.remaining(request.user),
-        }, status=502)
-
-    result['remaining'] = DemoQuota.remaining(request.user)
-    return JsonResponse(result)
-
-
 # --------------------------------------------------------------------------- #
-# A2UI — the same canvas, composed as A2UI messages and rendered by the
-# vendored A2UI renderer. Fixture mode is the default (same real payloads as
-# the custom demo); the live branch mirrors `ask` once the agent is deployed.
+# A2UI — the canvas composed as A2UI messages and rendered by the vendored
+# A2UI renderer. Fixture mode is the default (same real payloads); the live
+# branch runs the real agent once the endpoint is deployed.
 # --------------------------------------------------------------------------- #
 
 @login_required
@@ -229,10 +140,9 @@ def _tools_errored(result) -> bool:
 def a2ui_ask(request):
     """Run a risk assessment and return the composed A2UI canvas messages.
 
-    Mirrors the custom `ask` view: fixture mode answers the starter chips from
-    captured payloads; live mode runs the real agent (quota, refund on
-    failure). The canvas is then composed from whichever branch produced the
-    tool calls — the same `compose_risk_canvas(predict, rag)` in both.
+    Fixture mode answers the starter chips from captured payloads; live mode
+    runs the real agent (quota, refund on failure). The canvas is composed
+    from whichever branch produced the tool calls.
     """
     try:
         payload = json.loads(request.body)
