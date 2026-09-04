@@ -144,8 +144,9 @@ def split_sections(content_html: str) -> list:
             title = html.unescape(strip_tags(part["html"])).replace("\xa0", " ").strip() or "Section"
             pending = {"level": part["level"], "title": title,
                        "slug": section_slug(title), "body": ""}
-            if section_slug(title) == "overview":
-                # A real Overview heading absorbs the pre-heading intro.
+            if "overview" in section_slug(title):
+                # A real overview heading ("Overview", "Project Overview")
+                # absorbs the pre-heading intro — no synthetic Overview card.
                 _flush_lead(pending)
             elif "".join(lead).strip():
                 # Surface the pre-heading content as a synthetic Overview card
