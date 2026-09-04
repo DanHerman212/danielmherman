@@ -71,6 +71,16 @@ body:has(#demo-root), body:has(#a2ui-root) { overflow-x: auto; }
 }
 .demo-guide-link:hover { background: var(--surface-2); color: var(--accent); }
 .demo-guide-link i { font-size: 0.95rem; color: var(--accent); }
+.demo-logout { display: inline-flex; align-items: center; }
+.demo-logout button {
+  display: inline-flex; align-items: center; gap: 7px;
+  height: 38px; padding: 0 14px; border-radius: 9px;
+  border: 1px solid var(--line); background: var(--surface); color: var(--text);
+  font: inherit; font-size: 0.82rem; font-weight: 600;
+  cursor: pointer; white-space: nowrap;
+}
+.demo-logout button:hover { background: var(--surface-2); color: var(--accent); }
+.demo-logout button i { font-size: 0.95rem; color: var(--accent); }
 .demo-user-avatar {
   width: 36px; height: 36px; border-radius: 50%; background: #1f2937; color: #fff;
   display: inline-flex; align-items: center; justify-content: center;

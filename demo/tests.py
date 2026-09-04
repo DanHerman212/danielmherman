@@ -72,6 +72,7 @@ class DemoAuthTests(TestCase):
         ):
             self.assertIn(f'id="{anchor}"', body)
         self.assertIn('Demo User Guide', body)
+        self.assertIn(f'action="{reverse("logout")}"', body)
         # Every journey has a real live screenshot wired in (no "pending"
         # placeholder), so the guide shows the actual demo, not a stub.
         for img in ('images/guide/risk-card.png', 'images/guide/agent-chat.png',
@@ -502,9 +503,12 @@ class A2uiCanvasTests(TestCase):
         # The production demo (A2UI) header carries the Demo User Guide link.
         self.assertContains(response, 'Demo User Guide')
         self.assertContains(response, reverse('demo:guide'))
+        # And a POST logout control next to the signed-in identity.
+        self.assertContains(response, 'action="%s"' % reverse('logout'))
+        self.assertContains(response, 'name="csrfmiddlewaretoken"')
         # Cache-busted stylesheet + module links so the shell CSS and the A2UI
         # component module are never stale in the browser.
-        self.assertContains(response, 'demo_splitpane.css?v=6')
+        self.assertContains(response, 'demo_splitpane.css?v=7')
         self.assertContains(response, 'demo_a2ui.js?v=11')
 
 

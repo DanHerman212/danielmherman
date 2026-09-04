@@ -15,7 +15,7 @@ emitted (the trace element).
 {% block title %}Enterprise Clinical Copilot · A2UI{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'css/demo_splitpane.css' %}?v=6">
+<link rel="stylesheet" href="{% static 'css/demo_splitpane.css' %}?v=7">
 {% endblock %}
 
 {% block content %}
@@ -52,6 +52,13 @@ emitted (the trace element).
         <span class="demo-user-avatar" aria-hidden="true">LO</span>
         <span class="demo-user-name">Dr. Lena Ortiz</span>
       </div>
+      <form method="post" action="{% url 'logout' %}" class="demo-logout">
+        {% csrf_token %}
+        <button type="submit" aria-label="Log out" title="Log out">
+          <i class="fa-solid fa-right-from-bracket"></i>
+          <span>Log out</span>
+        </button>
+      </form>
     </div>
   </header>
 

@@ -17,7 +17,7 @@ Route: demo/guide  (login required, like the rest of the demo)
 {% block title %}Demo User Guide · Enterprise Clinical Copilot{% endblock %}
 
 {% block extra_css %}
-  <link rel="stylesheet" href="{% static 'css/demo_splitpane.css' %}?v=6">
+  <link rel="stylesheet" href="{% static 'css/demo_splitpane.css' %}?v=7">
   <link rel="stylesheet" href="{% static 'css/demo_guide.css' %}?v=1">
 {% endblock %}
 
@@ -46,6 +46,13 @@ header and colors match the console exactly.{% endcomment %}
       <i class="fa-solid fa-arrow-left"></i>
       <span>Back to demo</span>
     </a>
+    <form method="post" action="{% url 'logout' %}" class="demo-logout">
+      {% csrf_token %}
+      <button type="submit" aria-label="Log out" title="Log out">
+        <i class="fa-solid fa-right-from-bracket"></i>
+        <span>Log out</span>
+      </button>
+    </form>
   </div>
 </header>
 
