@@ -17,11 +17,12 @@ from django.urls import reverse
 from django.utils import timezone
 
 from .agent_client import AgentError
-from .a2ui_canvas import compose_risk_canvas
 from .models import DemoPatient, DemoQuota
 
-# A live agent reply shaped like the real /ask response: tool_calls carry the
-# response payloads the A2UI canvas composer needs (predict + rag).
+# A live agent reply shaped like the real /ask response: the agent composes
+# the full presentation contract (a2ui, citation_map, intent_sections) and
+# Django is a pass-through. The mock carries a minimal-but-real envelope so
+# the view proves it forwards rather than recomposes.
 A2UI_AGENT_REPLY = {
     'question': 'Assess the 30-day readmission risk for admission 90000009.',
     'answer': ('Estimated 30-day unplanned readmission risk is 0.1540 (15.4%), '
@@ -44,6 +45,31 @@ A2UI_AGENT_REPLY = {
                            'text': 'Discharge Medications:\nwarfarin 4 mg QD',
                            'score': 0.2}]}},
     ],
+    'a2ui': {
+        'surface_id': 'risk-canvas',
+        'audience': ['user'],
+        'messages': [
+            {'version': 'v0.9', 'createSurface': {
+                'surfaceId': 'risk-canvas',
+                'catalogId': 'https://example.com/catalogs/readmission-risk-v1.json'}},
+            {'version': 'v0.9', 'updateComponents': {
+                'surfaceId': 'risk-canvas',
+                'components': [
+                    {'id': 'root', 'component': 'Card', 'child': 'body'},
+                    {'id': 'body', 'component': 'Column',
+                     'children': ['risk', 'factors', 'source']},
+                    {'id': 'risk', 'component': 'RiskBar',
+                     'probability': 0.154016, 'threshold': 0.12, 'band': 'borderline'},
+                    {'id': 'factors', 'component': 'FactorBars', 'factors': []},
+                    {'id': 'source', 'component': 'SourceCard', 'cite': 1,
+                     'section': 'discharge_medications',
+                     'text': 'warfarin 4 mg QD', 'query': 'medications'},
+                ]}},
+        ],
+        'fallback_text': 'Admission 90000009: 15.4% 30-day readmission probability.',
+    },
+    'citation_map': {'1': 1},
+    'intent_sections': ['discharge_medications', 'discharge_instructions'],
 }
 
 
@@ -77,7 +103,7 @@ class DemoAuthTests(TestCase):
         # placeholder), so the guide shows the actual demo, not a stub.
         for img in ('images/guide/risk-card.png', 'images/guide/agent-chat.png',
                     'images/guide/source-panel.png'):
-            self.assertIn(f'images/guide/', body)
+            self.assertIn('images/guide/', body)
             self.assertIn(img, body)
         self.assertNotIn('Screenshot: ', body)
         self.assertNotIn('(pending)', body)
@@ -165,286 +191,20 @@ class QuotaTests(TestCase):
 
 
 @override_settings(DEMO_FIXTURE_MODE=True)
-class A2uiCanvasTests(TestCase):
-    """The A2UI spike: server composes the canvas as A2UI messages."""
+class A2uiFixtureContractTests(TestCase):
+    """Fixture mode must emit the agent's full presentation contract.
+
+    The canvas/citation unit tests moved to the agent repo
+    (tests/agent/test_a2ui.py, test_citations.py) with the logic itself; what
+    needs proving HERE is only that fixture mode returns the same contract the
+    live agent returns, so the browser cannot tell the difference.
+    """
 
     def setUp(self):
         self.user = User.objects.create_user('demo', password='x')
         self.client.force_login(self.user)
 
-    def test_compose_emits_custom_components(self):
-        predict = {
-            'hadm_id': 90000017, 'probability': 0.299359, 'threshold': 0.12,
-            'decision': 1, 'base_value': -1.3, 'model_version': 'readmission-final-x',
-            'feature_source': 'synthetic',
-            'top_factors': [{'feature': 'oncology_flag', 'contribution': 0.2894,
-                             'direction': 'increases'}],
-        }
-        rag = {'passages': [{'id': 'x_brief_hospital_course_1',
-                             'section': 'brief_hospital_course',
-                             'text': 'Brief Hospital Course:\nsome course text',
-                             'score': 0.2}]}
-        env = compose_risk_canvas(predict, rag)
-        self.assertEqual(env['surface_id'], 'risk-canvas')
-        self.assertTrue(env['fallback_text'])
-        comps = env['messages'][1]['updateComponents']['components']
-        types = {c['component'] for c in comps}
-        self.assertIn('RiskBar', types)
-        self.assertIn('FactorBars', types)
-        # The surface must point at the combined catalog the front-end registers.
-        self.assertEqual(
-            env['messages'][0]['createSurface']['catalogId'],
-            'https://example.com/catalogs/readmission-risk-v1.json')
-
-    def test_compose_without_predict_does_not_crash(self):
-        """A non-risk question (no predict payload) still composes a canvas."""
-        rag = {'passages': [{'id': 'x_medications_1',
-                             'section': 'discharge_medications',
-                             'text': 'Discharge Medications:\nwarfarin 4 mg QD',
-                             'score': 0.2}]}
-        env = compose_risk_canvas(None, rag)
-        self.assertEqual(env['surface_id'], 'risk-canvas')
-        comps = env['messages'][1]['updateComponents']['components']
-        types = {c['component'] for c in comps}
-        self.assertIn('SourceCard', types)
-        self.assertNotIn('RiskBar', types)
-        self.assertTrue(env['fallback_text'])
-        # No bare-dash provenance: a non-risk question says plainly there is
-        # no estimate rather than rendering "Model — · features from —".
-        prov = next(c for c in comps if c.get('id') == 'prov')
-        self.assertNotIn('Model —', prov['text'])
-        self.assertIn('no readmission estimate was requested', prov['text'])
-        # The cited source card carries the actual section, not the query.
-        source = next(c for c in comps if c.get('component') == 'SourceCard')
-        self.assertEqual(source['section'], 'discharge_medications')
-        self.assertEqual(source['cite'], 1)
-
-    def test_intent_section_maps_chips_and_free_text(self):
-        from demo.a2ui_canvas import intent_sections
-        self.assertEqual(
-            intent_sections('What medications was this patient discharged on?'),
-            ('discharge_medications', 'discharge_instructions'))
-        self.assertEqual(
-            intent_sections('What were her discharge instructions? '
-                           'For admission 90000015.'),
-            ('discharge_instructions',))
-        self.assertEqual(
-            intent_sections('list her diagnoses'), ('discharge_diagnosis',))
-        self.assertEqual(
-            intent_sections('summarize the hospital course'),
-            ('brief_hospital_course',))
-        # Summarize/risk questions have no single-section intent: their
-        # citation-by-number behavior stays as-is.
-        self.assertEqual(intent_sections(
-            'Summarize the recent discharge notes for this patient.'), ())
-        self.assertEqual(intent_sections(
-            'Assess the 30-day readmission risk for this patient.'), ())
-
-    def test_compose_resolves_cited_passage_by_section(self):
-        """The citation-links fix: the SourceCard resolves the passage by the
-        question's target section, not by the (unreliable) citation number.
-        A meds answer cites ^[1] while the meds passage sits at index 2 —
-        the canvas must still show discharge_medications."""
-        rag = {'passages': [
-            {'id': 'n_bhc_1', 'section': 'brief_hospital_course',
-             'text': 'Hospital Course: recovered.', 'score': 0.3},
-            {'id': 'n_dx_1', 'section': 'discharge_diagnosis',
-             'text': 'Discharge Diagnoses: TKA.', 'score': 0.2},
-            {'id': 'n_meds_1', 'section': 'discharge_medications',
-             'text': 'Discharge Medications: Celebrex 200 mg daily.',
-             'score': 0.1},
-        ], 'query': 'discharge notes'}
-        env = compose_risk_canvas(
-            None, rag, cite=1, sections=('discharge_medications',))
-        comps = env['messages'][1]['updateComponents']['components']
-        source = next(c for c in comps if c.get('component') == 'SourceCard')
-        self.assertEqual(source['section'], 'discharge_medications')
-        self.assertIn('Celebrex', source['text'])
-        # Badge mirrors the thread's citation number, not the array position.
-        self.assertEqual(source['cite'], 1)
-
-        # Without a section hint the number mapping is unchanged.
-        env = compose_risk_canvas(None, rag, cite=1)
-        comps = env['messages'][1]['updateComponents']['components']
-        source = next(c for c in comps if c.get('component') == 'SourceCard')
-        self.assertEqual(source['section'], 'brief_hospital_course')
-
-        # A section hint the note does not have is a deterministic
-        # "not available" card — never a fallback to the wrong section.
-        env = compose_risk_canvas(
-            None, rag, cite=2, sections=('discharge_instructions',))
-        comps = env['messages'][1]['updateComponents']['components']
-        source = next(c for c in comps if c.get('component') == 'SourceCard')
-        self.assertEqual(source['section'], 'not available')
-        self.assertIn('instruction', source['text'])
-
-    def test_compose_extracts_intent_section_from_whole_note_chunks(self):
-        """The index stores whole-note chunks, so the intent-labeled passage
-        can miss the returned list entirely. The canvas must then pull the
-        intent section's body OUT of any returned chunk's text — never show
-        the wrong section (the live meds-chip failure)."""
-        whole_note = (
-            'CHIEF COMPLAINT: Knee pain.\n\n'
-            'HOSPITAL COURSE: She underwent a right TKA and recovered.\n\n'
-            'DISCHARGE DIAGNOSES: 1. S/p right TKA.\n\n'
-            'MEDICATIONS: Celebrex 200 mg daily.'
-        )
-        rag = {'passages': [
-            {'id': 'n_bhc_1', 'section': 'brief_hospital_course',
-             'text': whole_note, 'score': 0.3},
-            {'id': 'n_dx_1', 'section': 'discharge_diagnosis',
-             'text': whole_note, 'score': 0.2},
-        ], 'query': 'discharge notes'}
-        env = compose_risk_canvas(
-            None, rag, cite=1, sections=('discharge_medications',))
-        comps = env['messages'][1]['updateComponents']['components']
-        source = next(c for c in comps if c.get('component') == 'SourceCard')
-        self.assertEqual(source['section'], 'discharge_medications')
-        self.assertIn('Celebrex', source['text'])
-        self.assertNotIn('HOSPITAL COURSE', source['text'])
-        self.assertEqual(source['cite'], 1)
-
-    def test_compose_resolves_meds_to_instructions_when_no_meds_section(self):
-        """Alan Marchetti (90000005): the note has NO medications section —
-        the meds claim's supporting text is in DISCHARGE INSTRUCTIONS. The
-        meds intent set must resolve there, never to brief_hospital_course."""
-        note = (
-            'DISCHARGE DIAGNOSES: Cellulitis.\n\n'
-            'DISCHARGE INSTRUCTIONS: The patient would be discharged on his '
-            'usual Valium 10-20 mg at bedtime for spasticity, Flomax 0.4 mg '
-            'daily, cefazolin 500 mg q.i.d., and Lotrimin cream between toes.\n\n'
-            'HOSPITAL COURSE: The patient was admitted to the General Medical '
-            'floor and treated with intravenous ceftriaxone and topical '
-            'Lotrimin.'
-        )
-        rag = {'passages': [
-            {'id': 'n_bhc_1', 'section': 'brief_hospital_course',
-             'text': note, 'score': 0.3},
-            {'id': 'n_dx_1', 'section': 'discharge_diagnosis',
-             'text': note, 'score': 0.2},
-            {'id': 'n_ins_1', 'section': 'discharge_instructions',
-             'text': note, 'score': 0.1},
-        ], 'query': 'discharge notes'}
-        env = compose_risk_canvas(
-            None, rag, cite=1,
-            sections=('discharge_medications', 'discharge_instructions'))
-        comps = env['messages'][1]['updateComponents']['components']
-        source = next(c for c in comps if c.get('component') == 'SourceCard')
-        self.assertEqual(source['section'], 'discharge_instructions')
-        self.assertIn('Valium', source['text'])
-        self.assertNotIn('HOSPITAL COURSE', source['text'])
-        self.assertEqual(source['cite'], 1)
-
-    def test_compose_unavailable_when_note_lacks_meds_sections(self):
-        """Eleanor Whitfield (90000035): no meds AND no instructions section —
-        the note mentions meds only inside the hospital course. The
-        deterministic answer is 'not available', never a meds sentence mined
-        from the hospital course narrative."""
-        note = (
-            'ADMISSION DIAGNOSIS: Symptomatic thyroid goiter.\n\n'
-            'HOSPITAL COURSE: The patient underwent total thyroidectomy on '
-            '09/22/08, which she tolerated very well. She was given '
-            'prescription for Vicodin for pain and Synthroid thyroid hormone.'
-        )
-        rag = {'passages': [
-            {'id': 'n_bhc_1', 'section': 'brief_hospital_course',
-             'text': note, 'score': 0.3},
-            {'id': 'n_dx_1', 'section': 'discharge_diagnosis',
-             'text': note, 'score': 0.2},
-        ], 'query': 'discharge notes'}
-        env = compose_risk_canvas(
-            None, rag, cite=1,
-            sections=('discharge_medications', 'discharge_instructions'))
-        comps = env['messages'][1]['updateComponents']['components']
-        source = next(c for c in comps if c.get('component') == 'SourceCard')
-        self.assertEqual(source['section'], 'not available')
-        self.assertIn('No discharge medication information', source['text'])
-        self.assertNotIn('Vicodin', source['text'])
-        self.assertEqual(source['cite'], 1)
-
-    def test_renumber_citations_first_appearance_order(self):
-        from demo.a2ui_canvas import renumber_citations
-        # A meds-only answer cites ^[3] (discharge_medications is the 3rd
-        # section in rag_search_sections order) — it must read as ^[1].
-        self.assertEqual(
-            renumber_citations(
-                'The patient was discharged on the following medications^[3]:'),
-            'The patient was discharged on the following medications^[1]:')
-        # Multi-citation: renumber by order of first appearance.
-        self.assertEqual(
-            renumber_citations('A^[2] and B^[1] and C^[3]'),
-            'A^[1] and B^[2] and C^[3]')
-        self.assertEqual(renumber_citations('no citations here'),
-                         'no citations here')
-        # Stacked citations on one claim collapse to a single marker.
-        self.assertEqual(
-            renumber_citations('discharged on pain medication ^[1]^[2]^[3]^[4]^[5].'),
-            'discharged on pain medication ^[1].')
-        self.assertEqual(
-            renumber_citations('discharged on pain medication ^[1] ^[2] ^[3].'),
-            'discharged on pain medication ^[1].')
-
-    def test_citation_remap_maps_renumbered_to_original(self):
-        from demo.a2ui_canvas import citation_remap
-        # 'A^[2] and B^[1] and C^[3]' renumbers to 1,2,3 in appearance order,
-        # so the map must translate the renumbered numbers back to the
-        # original passage positions (2,1,3).
-        self.assertEqual(
-            citation_remap('A^[2] and B^[1] and C^[3]'),
-            {'1': 2, '2': 1, '3': 3})
-        self.assertEqual(citation_remap('no citations here'), {})
-
-    def test_extract_section_bounds_at_allergies_and_activity(self):
-        """The meds source must not swallow trailing headers (Allergies,
-        Activity) that the site alias list previously did not recognize."""
-        from demo.a2ui_canvas import _extract_section
-        note = ('DISCHARGE MEDICATIONS: Tylenol 650 mg q.6h., Lasix 80 mg '
-                'daily.\n\n'
-                'ALLERGIES: None.\n\n'
-                'ACTIVITY: Per PT.\n\n'
-                'FOLLOWUP INSTRUCTIONS: Call the office.')
-        meds = _extract_section(note, 'discharge_medications')
-        self.assertIn('Tylenol', meds)
-        self.assertNotIn('ALLERGIES', meds)
-        self.assertNotIn('ACTIVITY', meds)
-
-    def test_extract_section_handles_mtsamples_headers(self):
-        """Alias-aware extraction: MTSamples notes use different headers than
-        MIMIC canon ("HOSPITAL COURSE:", "DISCHARGE DIAGNOSES:"), and the
-        SourceCard body must come from the cited section — not the whole note.
-        This is the citation-links fix."""
-        from demo.a2ui_canvas import _extract_section
-        note = (
-            "CHIEF COMPLAINT: Knee pain.\n\n"
-            "HISTORY OF PRESENT ILLNESS: The patient is a 61-year-old female.\n\n"
-            "HOSPITAL COURSE: She underwent a right total knee replacement and "
-            "recovered well.\n\n"
-            "DISCHARGE DIAGNOSES: 1. S/p right TKA.\n\n"
-            "MEDICATIONS: Celebrex 200 mg daily.\n\n"
-            "INSTRUCTIONS GIVEN TO THE PATIENT AT THE TIME OF DISCHARGE: "
-            "Continue Celebrex for one month."
-        )
-        course = _extract_section(note, 'brief_hospital_course')
-        self.assertIsNotNone(course)
-        self.assertIn('right total knee replacement', course)
-        self.assertNotIn('CHIEF COMPLAINT', course)
-        self.assertNotIn('DISCHARGE DIAGNOSES', course)
-
-        dx = _extract_section(note, 'discharge_diagnosis')
-        self.assertIsNotNone(dx)
-        self.assertIn('S/p right TKA', dx)
-        self.assertNotIn('HOSPITAL COURSE', dx)
-
-        meds = _extract_section(note, 'discharge_medications')
-        self.assertIsNotNone(meds)
-        self.assertIn('Celebrex', meds)
-
-        instr = _extract_section(note, 'discharge_instructions')
-        self.assertIsNotNone(instr)
-        self.assertIn('for one month', instr)
-        self.assertNotIn('Celebrex 200 mg daily.', instr[:len('MEDICATIONS: Celebrex 200 mg daily.')])
-
-    def test_a2ui_ask_returns_messages_from_fixture(self):
+    def test_a2ui_ask_returns_the_full_contract_from_fixture(self):
         response = self.client.post(
             reverse('demo:a2ui_ask'),
             data=json.dumps({'hadm_id': 90000017, 'chip': 'risk'}),
@@ -452,10 +212,29 @@ class A2uiCanvasTests(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         body = response.json()
-        self.assertIn('a2ui', body)
+        # The canvas comes pre-composed by the agent's own composer.
         self.assertEqual(
             body['a2ui']['messages'][0]['createSurface']['surfaceId'],
             'risk-canvas')
+        comps = body['a2ui']['messages'][1]['updateComponents']['components']
+        types = {c['component'] for c in comps}
+        self.assertIn('RiskBar', types)
+        self.assertIn('SourceCard', types)
+        # Citation metadata is attached by the agent, not recomposed here.
+        self.assertIn('citation_map', body)
+        self.assertIn('intent_sections', body)
+        # Fixture honesty markers survive.
+        self.assertEqual(body['source'], 'fixture')
+        self.assertIn('remaining', body)
+
+
+@override_settings(DEMO_FIXTURE_MODE=True)
+class A2uiConsolePageTests(TestCase):
+    """The A2UI console page renders the shell the canvas mounts into."""
+
+    def setUp(self):
+        self.user = User.objects.create_user('demo', password='x')
+        self.client.force_login(self.user)
 
     def test_a2ui_ask_free_text_gets_the_live_agent_message(self):
         """Screen 4 §4.1 — free text in fixture mode gets the clear message,
@@ -514,12 +293,9 @@ class A2uiCanvasTests(TestCase):
 
 @override_settings(DEMO_FIXTURE_MODE=False)
 class A2uiAskLiveTests(TestCase):
-    """The A2UI live branch (Phase 3) — mirrors the custom `ask` live path.
-
-    The agent is mocked; what needs proving here is that the A2UI endpoint
-    does the same quota/refund/error dance as `ask`, and that the canvas is
-    composed from the LIVE tool_calls, not the fixtures.
-    """
+    """The A2UI live branch — the agent is mocked; what needs proving here is
+    that the endpoint does the quota/refund/error dance correctly and forwards
+    the agent's presentation contract unchanged."""
 
     def setUp(self):
         self.user = User.objects.create_user('demo', password='x')
@@ -529,6 +305,14 @@ class A2uiAskLiveTests(TestCase):
             sex='F', summary='63F · urgent admission', split_name='test',
         )
 
+    def test_retired_presentation_modules_are_gone(self):
+        """The citation/canvas logic moved to the agent — these must not
+        reappear as a second interpretation layer in the BFF."""
+        import importlib
+        for module in ('demo.a2ui_canvas', 'demo.feature_labels'):
+            with self.assertRaises(ModuleNotFoundError):
+                importlib.import_module(module)
+
     def _post(self, payload):
         return self.client.post(
             reverse('demo:a2ui_ask'),
@@ -537,16 +321,20 @@ class A2uiAskLiveTests(TestCase):
         )
 
     @patch('demo.views.ask_agent', return_value=dict(A2UI_AGENT_REPLY))
-    def test_live_branch_composes_canvas_and_consumes_quota(self, mocked):
+    def test_live_branch_passes_the_agent_contract_through(self, mocked):
         response = self._post({'hadm_id': 90000009, 'chip': 'risk'})
         self.assertEqual(response.status_code, 200)
         body = response.json()
         self.assertEqual(body['remaining'], 9)
         # The question is composed server-side so phrasing cannot be edited
-        # into something leading (same as `ask`).
+        # into something leading.
         self.assertIn('90000009', mocked.call_args.args[0])
-        # The canvas is composed from the LIVE tool_calls.
-        self.assertIn('a2ui', body)
+        # The presentation contract arrives from the agent pre-composed;
+        # Django must forward it byte-for-byte, not recompose it.
+        self.assertEqual(body['a2ui'], A2UI_AGENT_REPLY['a2ui'])
+        self.assertEqual(body['citation_map'], A2UI_AGENT_REPLY['citation_map'])
+        self.assertEqual(body['intent_sections'],
+                         A2UI_AGENT_REPLY['intent_sections'])
         comps = body['a2ui']['messages'][1]['updateComponents']['components']
         types = {c['component'] for c in comps}
         self.assertIn('RiskBar', types)
@@ -608,9 +396,7 @@ class A2uiAskLiveTests(TestCase):
     @patch('demo.views.ask_agent')
     def test_errored_predict_tool_refunds_and_returns_502(self, mocked):
         """A predict tool that errored (e.g. the endpoint is down) must refund
-        the credit and return 502. The agent surfaced the failure as a graceful
-        tool error payload (HTTP 200), which must not silently eat a credit —
-        and it is a deliberate 502, not a server 500."""
+        the credit and return 502 — a deliberate 502, not a server 500."""
         reply = dict(A2UI_AGENT_REPLY)
         reply['tool_calls'] = [
             {'name': 'predict_readmission',

@@ -11,25 +11,39 @@ chips from captured payloads in demo/data/demo_fixtures/:
     from the synthetic index once deployed. Until then, patients fall back to
     the honest-empty path below.
 
-The response shape is identical to the live agent's /ask response
-({question, answer, tool_calls, ...}), so the front-end cannot tell the
-difference and the switch to live is zero-change.
+The response shape is identical to the live agent's /ask response — including
+the full presentation contract (`a2ui`, `citation_map`, `intent_sections`) —
+which is composed by the AGENT's own modules (imported lazily from the sibling
+enterprise_clinical_copilot repo) so fixture and live paths can never drift.
+The front-end cannot tell the difference and the switch to live is zero-change.
 
 Honesty rule: patients without captured rag passages return an EMPTY result
-(returned: 0) — the same empty-is-a-real-answer contract as the live tool. The
-live synthetic index covers the full synthetic cohort, so every demo patient
-has real passages once the endpoints are redeployed.
+(returned: 0) — the same empty-is-a-real-answer contract as the live tool.
 """
 
 import json
+import sys
 from functools import lru_cache
-
-from .feature_labels import label_for
 from pathlib import Path
 
-from django.conf import settings
-
 FIXTURES_DIR = Path(__file__).resolve().parent / 'data' / 'demo_fixtures'
+
+# The agent lives in the sibling enterprise_clinical_copilot repo (both repos
+# sit side by side under the same parent directory); add it to the path lazily
+# so the site still boots when the repo is absent (fixture mode is dev
+# scaffolding and is rejected in production).
+_ECC_ROOT = Path(__file__).resolve().parents[2] / 'enterprise_clinical_copilot'
+if _ECC_ROOT.is_dir() and str(_ECC_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ECC_ROOT))
+
+
+@lru_cache(maxsize=1)
+def _agent_presentation():
+    """(compose_presentation, label_for) imported from the agent repo."""
+    from services.agent.a2ui import compose_presentation
+    from services.agent.feature_labels import label_for
+    return compose_presentation, label_for
+
 
 # The chips the demo UI can send; each maps to a composed question and a set
 # of tool calls to simulate.
@@ -96,6 +110,7 @@ def _passages_of(tool_calls: list[dict]) -> list[dict]:
 
 def _compose_answer(chip: str, tool_calls: list[dict]) -> str:
     """Deterministic, cited prose composed from the tool payloads."""
+    _, label_for = _agent_presentation()
     pred = next((tc['response'] for tc in tool_calls
                  if tc['name'] == 'predict_readmission'), None)
     passages = _passages_of(tool_calls)
@@ -126,7 +141,6 @@ def _compose_answer(chip: str, tool_calls: list[dict]) -> str:
 
     if chip in ('meds', 'summarize'):
         if passages:
-            sec = passages[0]['section'].replace('_', ' ')
             if chip == 'meds':
                 lead = ('The patient was discharged on the medications listed '
                         'in the discharge note')
@@ -137,7 +151,7 @@ def _compose_answer(chip: str, tool_calls: list[dict]) -> str:
                 f"{p['section'].replace('_', ' ')}^[{i + 1}]"
                 for i, p in enumerate(passages[:4]))
             return f"{lead}: {labels}."
-        return ('No supporting note passage was found for this question.')
+        return 'No supporting note passage was found for this question.'
 
     if chip == 'compare' and pred and pred.get('probability') is not None:
         p = float(pred['probability'])
@@ -190,10 +204,18 @@ def fixture_ask(payload: dict) -> dict:
             'rag_search', {'hadm_id': hadm_id, 'query': query, 'top_k': 5},
             _rag_response(hadm_id, query)))
 
+    question = CHIPS[chip]
+    answer = _compose_answer(chip, tool_calls)
+    compose_presentation, _ = _agent_presentation()
+    presentation = compose_presentation(question, answer, tool_calls)
+
     return {
-        'question': CHIPS[chip],
-        'answer': _compose_answer(chip, tool_calls),
+        'question': question,
+        'answer': presentation['answer'],
         'tool_calls': tool_calls,
+        'a2ui': presentation['a2ui'],
+        'citation_map': presentation['citation_map'],
+        'intent_sections': presentation['intent_sections'],
         'source': 'fixture',
         'model': 'fixture-mode (real captured payloads)',
         'fixture_note': (

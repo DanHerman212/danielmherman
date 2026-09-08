@@ -14,10 +14,6 @@ from django.shortcuts import render
 from django.views.decorators.http import require_POST
 
 from .agent_client import AgentError, ask as ask_agent
-from .a2ui_canvas import (
-    citation_remap, compose_risk_canvas, first_citation, intent_sections,
-    renumber_citations,
-)
 from .fixtures import CHIPS, fixture_ask
 from .models import DemoPatient, DemoQuota
 
@@ -76,16 +72,15 @@ def _question_for(payload):
 
 
 # --------------------------------------------------------------------------- #
-# A2UI — the canvas composed as A2UI messages and rendered by the vendored
-# A2UI renderer. Fixture mode is the default (same real payloads); the live
-# branch runs the real agent once the endpoint is deployed.
+# A2UI — the canvas composed as A2UI messages by the AGENT and rendered by the
+# vendored A2UI renderer. Fixture mode is the default (same real payloads); the
+# live branch runs the real agent once the endpoint is deployed.
 # --------------------------------------------------------------------------- #
 
 @login_required
 def a2ui_console(request):
-    """The A2UI canvas demo: same enterprise shell + patient rail + thread as
-    the custom demo, but the context canvas is composed as A2UI messages and
-    rendered by the vendored A2UI renderer (agent-composed UI).
+    """The A2UI canvas demo: enterprise shell + patient rail + thread, with the
+    context canvas rendered from agent-composed A2UI messages.
 
     The patient rail carries no precomputed risk band — every patient is
     unscored until a live assessment is run in the thread."""
@@ -93,25 +88,6 @@ def a2ui_console(request):
         'rows': [{'patient': p} for p in DemoPatient.objects.all()],
         'remaining': DemoQuota.remaining(request.user),
     })
-
-
-def _tool_response(result, name):
-    """The response payload for one named tool call, or None."""
-    return next(
-        (tc.get('response') for tc in result.get('tool_calls', [])
-         if tc.get('name') == name),
-        None)
-
-
-def _rag_response(result):
-    """The rag passages from either retrieval tool — the free-text
-    `rag_search` or the deterministic `rag_search_sections` used for
-    summaries — so the canvas source card is drawn for both paths."""
-    for name in ('rag_search', 'rag_search_sections'):
-        rag = _tool_response(result, name)
-        if rag is not None:
-            return rag
-    return None
 
 
 def _tools_errored(result) -> bool:
@@ -131,11 +107,11 @@ def _tools_errored(result) -> bool:
 @login_required
 @require_POST
 def a2ui_ask(request):
-    """Run a risk assessment and return the composed A2UI canvas messages.
+    """Proxy one question to the agent and return its presentation contract.
 
     Fixture mode answers the starter chips from captured payloads; live mode
-    runs the real agent (quota, refund on failure). The canvas is composed
-    from whichever branch produced the tool calls.
+    runs the real agent (quota, refund on failure). Either way the response
+    arrives with the canvas and citation metadata already composed.
     """
     try:
         payload = json.loads(request.body)
@@ -192,34 +168,9 @@ def a2ui_ask(request):
                 'remaining': DemoQuota.remaining(request.user),
             }, status=502)
 
-    # Deterministic citation resolution: the canvas SourceCard is resolved by
-    # the SECTION(s) the question targets, not by the model's ^[n] numbers.
-    # The model mis-numbers citations (a meds answer cites ^[1] while its
-    # supporting passage sits elsewhere in the array), so the canvas must not
-    # trust them. The citation number stays as the fallback for questions
-    # without a clear section intent (summarize, risk).
-    if settings.DEMO_FIXTURE_MODE:
-        intent = intent_sections(CHIPS.get(payload.get('chip')))
-    else:
-        intent = intent_sections(question)
-    # Citation numbers the model emits reflect the tool's array position (a
-    # meds-only answer cites ^[3] because discharge_medications is the 3rd
-    # section in rag_search_sections order), which reads illogically. Renumber
-    # to order of first appearance so the first citation is always ^[1]. The
-    # canvas's section-intent resolution keeps the passage mapping correct
-    # regardless of the number.
-    if result.get('answer'):
-        original = result['answer']
-        result['answer'] = renumber_citations(original)
-        # The client maps a clicked (renumbered) ^[n] back to the original
-        # passage number, so a multi-citation answer's later footnotes show
-        # their own passage instead of collapsing onto the first intent section.
-        result['citation_map'] = citation_remap(original)
-    result['a2ui'] = compose_risk_canvas(
-        _tool_response(result, 'predict_readmission'),
-        _rag_response(result),
-        cite=first_citation(result.get('answer') or ''),
-        sections=intent)
-    result['intent_sections'] = list(intent)
+    # The presentation contract (renumbered answer, citation_map,
+    # intent_sections, a2ui) is composed in the AGENT — the layer where the
+    # guardrails ran and the tool evidence is visible. Django is a pass-through
+    # for it; only the web-specific `remaining` quota is added here.
     result['remaining'] = DemoQuota.remaining(request.user)
     return JsonResponse(result)

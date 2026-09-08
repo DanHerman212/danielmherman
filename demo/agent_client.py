@@ -17,6 +17,8 @@ import threading
 import requests
 from django.conf import settings
 
+from .agent_contract import AgentResponseError, validate_agent_response
+
 logger = logging.getLogger(__name__)
 
 
@@ -87,17 +89,10 @@ def _validated(result):
     was consumed, on a path the refund handling does not cover. Raising
     AgentError here routes it through the existing refund path instead.
     """
-    if not isinstance(result, dict):
-        raise AgentError('Agent returned a malformed response.')
-    tool_calls = result.get('tool_calls')
-    if tool_calls is not None:
-        if not isinstance(tool_calls, list) or not all(
-            isinstance(tc, dict)
-            and (tc.get('response') is None or isinstance(tc.get('response'), dict))
-            for tc in tool_calls
-        ):
-            raise AgentError('Agent returned malformed tool calls.')
-    return result
+    try:
+        return validate_agent_response(result)
+    except AgentResponseError as exc:
+        raise AgentError(str(exc)) from exc
 
 
 def ask(question):
