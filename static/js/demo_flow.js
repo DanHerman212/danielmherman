@@ -19,8 +19,8 @@
  * onCite(episode, turnIndex, n, api) handles citation clicks in the agent
  * prose (defaults to re-rendering the canvas).
  *
- * The pure helpers (esc, pct, bandOf, bandColor, extractSection, citedNumbers)
- * are also exported so the per-demo canvas renderers can reuse them.
+ * The pure helpers (esc, pct, bandOf, bandColor, citedNumbers) are also
+ * exported so the per-demo canvas renderers can reuse them.
  *
  * R8: every surface has a text fallback — the demo never renders nothing.
  */
@@ -32,105 +32,6 @@ const CHIPS = [
 ];
 
 const PAGE_SIZE = 10;
-
-/* Section header aliases per canonical section — mirrors the harness
-   rag/sections.py KNOWN_HEADINGS (MTSamples discharge summaries use these
-   variants, e.g. "Hospital Course:", "Discharge Diagnoses:", "Medications:").
-   Extraction uses these BOTH to locate a section's start and to bound its end
-   (the next known header), so a citation click shows the cited section's body
-   instead of the whole note.
-
-   S7-02: this is a hand-maintained copy of the server-side vocabulary (the
-   canonical source lives in the ECC repo: rag/sections.py KNOWN_HEADINGS and
-   rag/chunking.py INDEX_SECTIONS). The two repos can't import each other, so
-   consolidation (server-emitted JSON) is sequenced with the semantic-layer
-   cleanup — Step 8 of the implementation runbook. If a header is added there,
-   mirror it here. */
-const SECTION_ALIASES = {
-  name: ['Name'],
-  unit_no: ['Unit No', 'Unit No.', 'Medical Record Number', 'MRN'],
-  admission_date: ['Admission Date', 'Date of Admission'],
-  discharge_date: ['Discharge Date', 'Date of Discharge'],
-  date_of_birth: ['Date of Birth', 'DOB'],
-  sex: ['Sex'],
-  service: ['Service'],
-  attending: ['Attending'],
-  allergies: ['Allergies', 'Allergy', 'Allergies to'],
-  activity: ['Activity'],
-  chief_complaint: ['Chief Complaint', 'Reason for Admission'],
-  major_procedure: [
-    'Major Surgical or Invasive Procedure', 'Major Surgical or Invasive Procedures',
-    'Procedure', 'Procedures', 'Procedures Performed', 'Operations Performed',
-    'Principal Procedure', 'Principal Procedures',
-    'Procedure Performed During This Hospitalization',
-    'Procedures During This Hospitalization', 'Procedures During Hospitalization',
-    'Operations and Procedures',
-  ],
-  history_of_present_illness: [
-    'History of Present Illness', 'HPI', 'History', 'History of Illness',
-    'Brief History', 'Brief History of Present Illness', 'Current History',
-  ],
-  review_of_systems: ['Review of Systems', 'ROS'],
-  past_medical_history: [
-    'Past Medical History', 'PMH', 'Past History',
-    'Past Medical/Family/Social History', 'Past Medical, Family, Social History',
-  ],
-  past_surgical_history: ['Past Surgical History', 'Surgical History'],
-  social_history: ['Social History'],
-  family_history: ['Family History'],
-  physical_exam: [
-    'Physical Exam', 'Physical Examination', 'Admission Exam',
-    'Admission Physical Exam', 'Discharge Exam', 'Discharge Physical Exam',
-    'Discharge Physical Examination', 'Physical Examination at the Time of Discharge',
-    'Physical Examination on Discharge',
-  ],
-  pertinent_results: [
-    'Pertinent Results', 'Pertinent Labs', 'Laboratory Data', 'Laboratory Studies',
-    'Laboratory', 'Pertinent Laboratories', 'Discharge Labs',
-    'Laboratories on Admission', 'Significant Labs and X-Rays',
-    'Additional Laboratory Studies',
-  ],
-  brief_hospital_course: [
-    'Brief Hospital Course', 'Hospital Course', 'Course in the Hospital',
-    'History and Hospital Course', 'Brief Hospital Course Summary',
-    'Brief Summary of Hospital Course', 'Course on Admission',
-  ],
-  medications_on_admission: ['Medications on Admission'],
-  discharge_medications: [
-    'Discharge Medications', 'Medications', 'Medications on Discharge',
-    'Home Medications', 'New Medications', 'Current Medications',
-    'Medications and Advice on Discharge', 'Discharge Medications/Instructions',
-  ],
-  discharge_disposition: ['Discharge Disposition', 'Disposition'],
-  discharge_diagnosis: [
-    'Discharge Diagnosis', 'Discharge Diagnoses', 'Admission Diagnosis',
-    'Admission Diagnoses', 'Admitting Diagnosis', 'Admitting Diagnoses',
-    'Secondary Diagnosis', 'Secondary Diagnoses', 'Diagnoses on Admission',
-    'Diagnoses on Discharge', 'Primary Diagnoses', 'Final Diagnosis',
-    'Final Diagnoses', 'Diagnosis at Admission', 'Diagnoses',
-  ],
-  discharge_condition: [
-    'Discharge Condition', 'Condition', 'Condition on Discharge',
-    'Conditions on Discharge', 'Condition Upon Discharge', 'Condition at Discharge',
-    'Condition of Patient on Discharge', 'Condition of the Patient at Discharge',
-  ],
-  discharge_instructions: [
-    'Discharge Instructions', 'Discharge Plan', 'Additional Instructions',
-    'Special Instructions', 'Instructions to Patient', 'Discharge Diet',
-    'Discharge Activities', 'Physical Activity', 'Recommendations',
-    'Discharge Instructions/Medications',
-    'Instructions Given to the Patient at the Time of Discharge',
-  ],
-  discharge_summary: ['Discharge Summary', 'Discharge Summaries'],
-  followup_instructions: [
-    'Followup Instructions', 'Follow-up Instructions', 'Followup', 'Follow Up',
-    'Follow-Up', 'Followup Appointments', 'Instructions for Followup',
-  ],
-  facility: ['Facility'],
-};
-
-/* Every known header, flattened — bounds the end of an extracted section. */
-const SECTION_HEADERS = Object.values(SECTION_ALIASES).flat();
 
 /* ------------------------------------------------------------------ */
 /* shared helpers (also used by the per-demo canvas renderers)         */
@@ -161,47 +62,6 @@ export function bandOf(probability, threshold) {
 
 export function bandColor(band) {
   return { low: 'var(--risk-low)', borderline: 'var(--risk-borderline)', high: 'var(--risk-high)' }[band] || 'var(--muted)';
-}
-
-export function escapeRegex(s) {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-/** Extract a named section's body from a full note, or null if not found.
-    Alias-aware: matches MTSamples header variants (e.g. "Hospital Course:"
-    for brief_hospital_course), then bounds the body at the next known header. */
-export function extractSection(noteText, section) {
-  if (!noteText) return null;
-  const aliases = SECTION_ALIASES[section] || [String(section || '').replace(/_/g, ' ')];
-  if (!aliases[0]) return null;
-  let start = -1;
-  let matched = '';
-  for (const alias of aliases) {
-    // S7-12: anchor the start to a line start (^ or \n), consistent with the
-    // end bound, so generic aliases (History, Condition, Medications…) can't
-    // match mid-sentence and truncate the wrong body.
-    const re = new RegExp(`(^|\\n)\\s*${escapeRegex(alias)}\\b\\s*:`, 'i');
-    const m = re.exec(noteText);
-    if (m) {
-      const anchor = m[1];
-      const rest = m[0].slice(anchor.length);
-      const ws = rest.length - rest.trimStart().length;
-      start = m.index + anchor.length + ws;
-      matched = rest.slice(ws);
-      break;
-    }
-  }
-  if (start < 0 || !matched) return null;
-  let end = noteText.length;
-  for (const h of SECTION_HEADERS) {
-    const re = new RegExp(`\\n\\s*${escapeRegex(h)}\\s*:`, 'i');
-    const hm = re.exec(noteText.slice(start + matched.length));
-    if (hm) {
-      const candidate = start + matched.length + hm.index;
-      if (candidate < end) end = candidate;
-    }
-  }
-  return noteText.slice(start, end).trim();
 }
 
 /** Parse citation markers in agent prose: ^[1], ^[1, 2], or ^[1-3].
@@ -702,9 +562,9 @@ export function createDemoFlow({ root, askUrl, renderCanvas, onCite }) {
       toolCalls: toolCalls,
       passages: (rag?.response?.passages) || [],
       query: (rag?.response?.query) || null,
-      intentSections: data.intent_sections || null,
-      citationMap: data.citation_map || null,
-      cited: citedNumbers(data.answer || ''),
+      // Resolved by the agent: one {cite, section, text, query} per ^[n] in
+      // the answer. A footnote click looks its number up here and renders it.
+      sources: Array.isArray(data.sources) ? data.sources : [],
       // The A2UI canvas renders a per-turn envelope, so a footnote click in an
       // older turn can re-draw that turn's composed canvas.
       a2ui: data.a2ui || null,
@@ -809,14 +669,12 @@ export function createDemoFlow({ root, askUrl, renderCanvas, onCite }) {
     if (predict && predict.response && predict.response.probability != null) {
       episode.assessments.push(predict.response);
     }
-    // Sources accumulate for the SOURCE widget (S7-09: keep intentSections so
-    // the canvas renderer can resolve citation numbering).
+    // Sources accumulate per episode for the SOURCE widget.
     if (turn.passages.length || turn.query) {
       episode.sources.push({
         query: turn.query,
         passages: turn.passages,
-        cited: turn.cited,
-        intentSections: turn.intentSections,
+        sources: turn.sources,
       });
     }
 

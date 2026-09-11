@@ -12,7 +12,7 @@
  * comparison.
  */
 
-import { createDemoFlow, extractSection } from './demo_flow.js?v=17';  // S7-13: keep in sync with demo_splitpane.js
+import { createDemoFlow } from './demo_flow.js?v=18';
 import { MessageProcessor } from '/static/vendor/a2ui/a2ui_web_core_0.10.5_v0_9_external_lit_zod.js';
 import { basicCatalog, Context } from '/static/vendor/a2ui/a2ui_lit_0.10.2_v0_9_external_lit_zod.js';
 import { ContextProvider } from '/static/vendor/a2ui/lit_context_1.1.6_external_lit.js';
@@ -108,89 +108,16 @@ function renderA2uiCanvas(episode, api, envelope) {
   renderEnvelope(target);
 }
 
-/** The deterministic message for a question whose target section the note
-    does not have. Never mines content from unrelated narrative. */
-function unavailableText(section) {
-  if (section === 'discharge_medications') {
-    return 'No discharge medication information is available for this patient.';
-  }
-  return `No ${String(section).replace(/_/g, ' ')} information is available for this patient.`;
-}
-
 /** Point the turn's envelope SourceCard at the cited passage (n is 1-based).
 
-    When the turn's question targeted note section(s) (intentSections), resolve
-    the citation to the first section found — by label or extracted from any
-    whole-note chunk — regardless of n. The model mis-numbers citations (a meds
-    answer cites ^[1] while its supporting passage sits elsewhere), so mapping
-    n straight into the passages array shows the wrong section. */
+    The agent resolves every citation before the response leaves it: each
+    entry in `turn.sources` is the finished {cite, section, text, query} for
+    one ^[n]. The browser looks the clicked number up and displays it — it
+    holds no section vocabulary and applies no heuristics. */
 function envelopeForCite(turn, n) {
   if (!turn.a2ui) return null;
-
-  // The server renumbers ^[n] markers to first-appearance order, so a clicked
-  // number no longer matches the passage array index when the model cited
-  // passages out of array order. citation_map ({new: old}) undoes that.
-  const oldN = (turn.citationMap && turn.citationMap[n]) || n;
-
-  // Section-intent resolution is only valid for a SINGLE-citation answer: the
-  // model mis-numbers that one citation (a meds answer cites ^[1] while its
-  // supporting passage sits elsewhere). A multi-citation answer cites its
-  // passages in array order, so map n straight to the passage.
-  const multiCite = !!(turn.cited && turn.cited.size > 1);
-
-  // Resolve which passage/section this footnote actually supports
-  // (intent-section aware — the model mis-numbers citations).
-  let passage = null;
-  let intentBody = null;
-  let matchedSection = null;
-  if (!multiCite) {
-    for (const sec of (turn.intentSections || [])) {
-      passage = (turn.passages || []).find((p) => p.section === sec) || null;
-      if (passage) { matchedSection = sec; break; }
-      // The index stores whole-note chunks, so a passage labeled with a
-      // different section still CONTAINS the target section. Extract it from
-      // the passage text instead of showing the wrong section.
-      for (const p of (turn.passages || [])) {
-        const body = extractSection(p.text, sec);
-        if (body) { passage = p; intentBody = body; matchedSection = sec; break; }
-      }
-      if (passage) break;
-    }
-  }
-
-  // Decide the SourceCard's section label + body text.
-  let sectionLabel;
-  let bodyText;
-  if (!multiCite && !passage && (turn.intentSections || []).length) {
-    // The note has NONE of the targeted sections. The deterministic answer
-    // is "not available", not a passage mined from unrelated narrative.
-    sectionLabel = 'not available';
-    bodyText = unavailableText(turn.intentSections[0]);
-  } else {
-    if (!passage && turn.passages && turn.passages[oldN - 1]) {
-      passage = turn.passages[oldN - 1];
-    }
-    if (!passage) return turn.a2ui;
-    const extracted = intentBody || extractSection(passage.text, passage.section) || null;
-    const knownSection = matchedSection || passage.section;
-    if (extracted === null) {
-      // Extraction failed. A deterministic rag_search_sections passage is just
-      // the section body without its header, so extractSection can't find the
-      // anchor — but we still KNOW the section. Keep it and show the body.
-      // Only fall back to 'note' when the section is genuinely unknown.
-      sectionLabel = (knownSection && knownSection !== 'note') ? knownSection : 'note';
-      bodyText = passage.text;
-    } else {
-      sectionLabel = knownSection || 'note';
-      bodyText = extracted;
-    }
-  }
-  const source = {
-    cite: n,
-    section: sectionLabel,
-    text: bodyText,
-    query: turn.query || 'discharge note',
-  };
+  const source = (turn.sources || []).find((s) => s.cite === n);
+  if (!source) return turn.a2ui;
 
   const env = JSON.parse(JSON.stringify(turn.a2ui));
   const update = env.messages.find((m) => m.updateComponents);
@@ -200,13 +127,13 @@ function envelopeForCite(turn, n) {
     Object.assign(card, source);
     return env;
   }
-  // S7-17(a): the envelope has no SourceCard to repoint — synthesize a minimal
+  // The envelope has no SourceCard to repoint — synthesize a minimal
   // source-only surface so the cite click still shows the passage.
   return sourceOnlyEnvelope(source);
 }
 
 /** A minimal single-SourceCard surface, used when a turn's composed envelope
-    has no SourceCard to repoint (S7-17). */
+    has no SourceCard to repoint. */
 function sourceOnlyEnvelope(source) {
   return {
     surface_id: 'risk-canvas',

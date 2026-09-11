@@ -14,6 +14,7 @@ class AgentSuccess(TypedDict, total=False):
     guardrail_flags: list[str]
     tool_calls: list[AgentToolCall]
     a2ui: dict[str, Any] | None
+    sources: list[dict[str, Any]]
     model: str
     mcp_transport: str
 
@@ -42,6 +43,14 @@ def validate_agent_response(result: Any) -> AgentSuccess:
     a2ui = result.get("a2ui")
     if a2ui is not None and not isinstance(a2ui, dict):
         raise AgentResponseError("Agent returned malformed A2UI data.")
+
+    sources = result.get("sources")
+    if sources is not None:
+        if not isinstance(sources, list) or not all(
+            isinstance(s, dict) and isinstance(s.get("cite"), int)
+            for s in sources
+        ):
+            raise AgentResponseError("Agent returned malformed sources.")
 
     tool_calls = result.get("tool_calls")
     if tool_calls is not None:

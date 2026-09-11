@@ -12,7 +12,7 @@ chips from captured payloads in demo/data/demo_fixtures/:
     the honest-empty path below.
 
 The response shape is identical to the live agent's /ask response — including
-the full presentation contract (`a2ui`, `citation_map`, `intent_sections`) —
+the full presentation contract (`a2ui`, `sources`) —
 which is composed by the AGENT's own modules (imported lazily from the sibling
 enterprise_clinical_copilot repo) so fixture and live paths can never drift.
 The front-end cannot tell the difference and the switch to live is zero-change.
@@ -214,8 +214,7 @@ def fixture_ask(payload: dict) -> dict:
         'answer': presentation['answer'],
         'tool_calls': tool_calls,
         'a2ui': presentation['a2ui'],
-        'citation_map': presentation['citation_map'],
-        'intent_sections': presentation['intent_sections'],
+        'sources': presentation['sources'],
         'source': 'fixture',
         'model': 'fixture-mode (real captured payloads)',
         'fixture_note': (

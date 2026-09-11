@@ -20,7 +20,7 @@ from .agent_client import AgentError
 from .models import DemoPatient, DemoQuota
 
 # A live agent reply shaped like the real /ask response: the agent composes
-# the full presentation contract (a2ui, citation_map, intent_sections) and
+# the full presentation contract (a2ui, sources) and
 # Django is a pass-through. The mock carries a minimal-but-real envelope so
 # the view proves it forwards rather than recomposes.
 A2UI_AGENT_REPLY = {
@@ -68,8 +68,8 @@ A2UI_AGENT_REPLY = {
         ],
         'fallback_text': 'Admission 90000009: 15.4% 30-day readmission probability.',
     },
-    'citation_map': {'1': 1},
-    'intent_sections': ['discharge_medications', 'discharge_instructions'],
+    'sources': [{'cite': 1, 'section': 'discharge_medications',
+                 'text': 'warfarin 4 mg QD', 'query': 'medications'}],
 }
 
 
@@ -220,9 +220,9 @@ class A2uiFixtureContractTests(TestCase):
         types = {c['component'] for c in comps}
         self.assertIn('RiskBar', types)
         self.assertIn('SourceCard', types)
-        # Citation metadata is attached by the agent, not recomposed here.
-        self.assertIn('citation_map', body)
-        self.assertIn('intent_sections', body)
+        # Resolved sources are attached by the agent, not recomposed here.
+        self.assertIn('sources', body)
+        self.assertIsInstance(body['sources'], list)
         # Fixture honesty markers survive.
         self.assertEqual(body['source'], 'fixture')
         self.assertIn('remaining', body)
@@ -288,7 +288,7 @@ class A2uiConsolePageTests(TestCase):
         # Cache-busted stylesheet + module links so the shell CSS and the A2UI
         # component module are never stale in the browser.
         self.assertContains(response, 'demo_splitpane.css?v=7')
-        self.assertContains(response, 'demo_a2ui.js?v=11')
+        self.assertContains(response, 'demo_a2ui.js?v=12')
 
 
 @override_settings(DEMO_FIXTURE_MODE=False)
@@ -332,9 +332,7 @@ class A2uiAskLiveTests(TestCase):
         # The presentation contract arrives from the agent pre-composed;
         # Django must forward it byte-for-byte, not recompose it.
         self.assertEqual(body['a2ui'], A2UI_AGENT_REPLY['a2ui'])
-        self.assertEqual(body['citation_map'], A2UI_AGENT_REPLY['citation_map'])
-        self.assertEqual(body['intent_sections'],
-                         A2UI_AGENT_REPLY['intent_sections'])
+        self.assertEqual(body['sources'], A2UI_AGENT_REPLY['sources'])
         comps = body['a2ui']['messages'][1]['updateComponents']['components']
         types = {c['component'] for c in comps}
         self.assertIn('RiskBar', types)

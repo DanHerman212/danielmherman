@@ -168,9 +168,9 @@ def a2ui_ask(request):
                 'remaining': DemoQuota.remaining(request.user),
             }, status=502)
 
-    # The presentation contract (renumbered answer, citation_map,
-    # intent_sections, a2ui) is composed in the AGENT — the layer where the
-    # guardrails ran and the tool evidence is visible. Django is a pass-through
-    # for it; only the web-specific `remaining` quota is added here.
+    # The presentation contract (renumbered answer, resolved sources, a2ui)
+    # is composed in the AGENT — the layer where the guardrails ran and the
+    # tool evidence is visible. Django is a pass-through for it; only the
+    # web-specific `remaining` quota is added here.
     result['remaining'] = DemoQuota.remaining(request.user)
     return JsonResponse(result)
