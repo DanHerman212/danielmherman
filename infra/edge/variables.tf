@@ -35,8 +35,14 @@ variable "edge_enabled" {
   default     = false
 }
 
-variable "rate_limit_per_minute" {
-  description = "Cloud Armor per-client-IP request threshold per 60 s before 429."
+variable "rate_limit_login_per_minute" {
+  description = "Per-client-IP limit on the sign-in path before 429 (credential stuffing)."
+  type        = number
+  default     = 30
+}
+
+variable "rate_limit_ask_per_minute" {
+  description = "Per-client-IP limit on the agent path before 429 (volumetric abuse)."
   type        = number
   default     = 60
 }
@@ -44,5 +50,5 @@ variable "rate_limit_per_minute" {
 variable "rate_limit_ban_seconds" {
   description = "How long a client that exceeds the threshold is banned."
   type        = number
-  default     = 300
+  default     = 60
 }
