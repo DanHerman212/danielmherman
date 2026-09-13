@@ -27,9 +27,26 @@ variable "cloud_run_service" {
 
 variable "edge_enabled" {
   description = <<-EOT
-    false: no load balancer; DNS points at the Cloud Run domain mapping.
-    true:  load balancer + Cloud Armor exist; DNS points at the LB IP.
-    The certificate and DNS authorization persist in both states.
+    Whether the load balancer, serverless NEG and Cloud Armor policy exist.
+    The certificate and its DNS authorizations exist in both states.
+  EOT
+  type        = bool
+  default     = false
+}
+
+variable "dns_points_at_edge" {
+  description = <<-EOT
+    Whether the public DNS records publish the load balancer address. Kept
+    separate from edge_enabled so a change of routing and the existence of the
+    load balancer can happen in two steps with a TTL wait between them. Both
+    directions use the same three states:
+
+      edge_enabled=true,  dns_points_at_edge=false   load balancer exists, DNS
+                                                     still on the domain mapping
+      edge_enabled=true,  dns_points_at_edge=true    live at the load balancer
+      edge_enabled=false, dns_points_at_edge=false   nothing running
+
+    dns_points_at_edge=true requires edge_enabled=true.
   EOT
   type        = bool
   default     = false

@@ -33,9 +33,11 @@ wait_ttl() {
 case "${1:-}" in
   up)
     terraform init -input=false >/dev/null
-    # Phase 1: build LB + flip DNS in one apply. Ingress is still "all", so the
-    # domain mapping keeps serving while resolvers pick up the new records.
-    terraform apply -input=false -auto-approve -var edge_enabled=true
+    # Phase 1: build the LB. DNS still publishes the domain mapping, so the
+    # site is untouched while the ten resources come up. Ingress stays "all"
+    # until the end, so both paths can serve at the same time.
+    terraform apply -input=false -auto-approve \
+      -var edge_enabled=true -var dns_points_at_edge=false
     IP=$(terraform output -raw edge_ip)
     echo "LB IP: $IP"
     # The forwarding rule takes about a minute to be programmed at the edge.
@@ -48,19 +50,29 @@ case "${1:-}" in
       sleep 5
     done
     echo "  https://$DOMAIN via $IP -> HTTP $code"
-    [[ "$code" == "200" ]] || { echo "LB not serving; leaving ingress open" >&2; exit 1; }
+    [[ "$code" == "200" ]] || { echo "LB not serving; DNS untouched, nothing to undo" >&2; exit 1; }
+    # Phase 2: now that the LB demonstrably serves, move DNS to it. Resolvers
+    # still holding the domain-mapping addresses keep being served.
+    terraform apply -input=false -auto-approve \
+      -var edge_enabled=true -var dns_points_at_edge=true
     wait_ttl
-    # Phase 2: only the LB may reach Cloud Run now.
+    # Phase 3: only the LB may reach Cloud Run now.
     ingress internal-and-cloud-load-balancing
     echo "edge is UP"
     ;;
   down)
     terraform init -input=false >/dev/null
-    # Phase 1: reopen ingress so the domain mapping can serve again.
+    # Phase 1: reopen ingress so the domain mapping can serve again the moment
+    # DNS moves. Nothing has moved yet.
     ingress all
-    # Phase 2: flip DNS back and destroy the LB in one apply. Resolvers still
-    # holding the LB IP get served by the LB until it is gone.
-    terraform apply -input=false -auto-approve -var edge_enabled=false
+    # Phase 2: move DNS back to the domain mapping while the LB still exists,
+    # so a resolver holding the LB address keeps working until it re-resolves.
+    terraform apply -input=false -auto-approve \
+      -var edge_enabled=true -var dns_points_at_edge=false
+    wait_ttl
+    # Phase 3: nothing points at the LB any more; destroy it.
+    terraform apply -input=false -auto-approve \
+      -var edge_enabled=false -var dns_points_at_edge=false
     echo "edge is DOWN (certificate, DNS zone, and domain mapping retained)"
     ;;
   status)
@@ -69,6 +81,8 @@ case "${1:-}" in
     printf "ingress: %s\n" "$(gcloud run services describe "$SERVICE" --region "$REGION" --project "$PROJECT" \
       --format='value(metadata.annotations["run.googleapis.com/ingress"])')"
     printf "live A:  %s\n" "$(dig +short "$DOMAIN" A | tr '\n' ' ')"
+    printf "lb up:   %s\n" "$(gcloud compute forwarding-rules list --global \
+      --filter="name~danielmherman" --format='value(name)' | tr '\n' ' ')"
     ;;
   *)
     echo "usage: $0 up|down|status" >&2

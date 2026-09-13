@@ -2,9 +2,14 @@ output "edge_enabled" {
   value = var.edge_enabled
 }
 
+output "dns_points_at_edge" {
+  description = "Whether the public records publish the load balancer address."
+  value       = var.dns_points_at_edge
+}
+
 output "edge_ip" {
-  description = "Load balancer IPv4 address (null when the edge is down)."
-  value       = var.edge_enabled ? google_compute_global_address.edge[0].address : null
+  description = "Load balancer IPv4 address (null when it does not exist)."
+  value       = local.lb_ip
 }
 
 output "certificate_state" {
