@@ -1,0 +1,22 @@
+; danielmherman.com — cleaned from GoDaddy export 2026-09-13.
+; SOA and apex NS removed: Cloud DNS generates its own.
+; Import: gcloud dns record-sets import danielmherman.com.zone --zone=danielmherman --zone-file-format
+$ORIGIN danielmherman.com.
+
+; Cloud Run domain mapping (ghs.googlehosted.com anycast)
+@	600	IN	A	216.239.32.21
+@	600	IN	A	216.239.34.21
+@	600	IN	A	216.239.36.21
+@	600	IN	A	216.239.38.21
+@	600	IN	AAAA	2001:4860:4802:32::15
+@	600	IN	AAAA	2001:4860:4802:34::15
+@	600	IN	AAAA	2001:4860:4802:36::15
+@	600	IN	AAAA	2001:4860:4802:38::15
+www	600	IN	CNAME	ghs.googlehosted.com.
+
+; Search Console verification + mail (ImprovMX forwarding)
+@	3600	IN	TXT	"google-site-verification=VJdM0LPYfMOC_lYdM1Du6fZ2Vcmfsw1rDB1bOvUjtD0"
+@	600	IN	TXT	"v=spf1 include:spf.improvmx.com ~all"
+_dmarc	3600	IN	TXT	"v=DMARC1; p=quarantine; adkim=r; aspf=r; rua=mailto:dmarc_rua@onsecureserver.net;"
+@	600	IN	MX	10	mx1.improvmx.com.
+@	600	IN	MX	20	mx2.improvmx.com.

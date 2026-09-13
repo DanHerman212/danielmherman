@@ -13,7 +13,7 @@ from django.http import JsonResponse
 from django.shortcuts import render
 from django.views.decorators.http import require_POST
 
-from .agent_client import AgentError, ask as ask_agent
+from .agent_client import AgentError, ask as ask_agent, trace_id
 from .fixtures import CHIPS, fixture_ask
 from .models import DemoPatient, DemoQuota
 
@@ -145,13 +145,17 @@ def a2ui_ask(request):
                 'remaining': 0,
             }, status=429)
 
+        trace = trace_id(request)
         try:
-            result = ask_agent(question)
+            result = ask_agent(question, trace=trace)
         except AgentError as exc:
             # Give the credit back — freely if provably nothing was billed,
             # under the daily refund cap otherwise (S1-09). Exception detail
             # is logged server-side, never returned to the client (S1-03).
-            logger.error('a2ui_ask: agent call failed: %s', exc)
+            # The trace id pairs this line with the agent's own log entry.
+            logger.error(
+                'a2ui_ask: agent call failed trace=%s: %s', trace or '-', exc
+            )
             DemoQuota.refund(request.user, period, spent=exc.spent)
             return JsonResponse({
                 'error': 'The clinical copilot is unavailable. Please try again.',

@@ -346,6 +346,26 @@ class A2uiAskLiveTests(TestCase):
         self.assertEqual(mocked.call_args.args[0], 'Why was this patient flagged?')
 
     @patch('demo.views.ask_agent', return_value=dict(A2UI_AGENT_REPLY))
+    def test_cloud_trace_id_is_forwarded_to_the_agent(self, mocked):
+        """Cloud Run stamps X-Cloud-Trace-Context on the inbound request; the
+        trace id (before the slash) is handed to the agent so both services'
+        logs carry the same id for one user action."""
+        self.client.post(
+            reverse('demo:a2ui_ask'),
+            data=json.dumps({'question': 'Why?'}),
+            content_type='application/json',
+            HTTP_X_CLOUD_TRACE_CONTEXT='105445aa7843bc8bf206b12000100000/1;o=1',
+        )
+        self.assertEqual(
+            mocked.call_args.kwargs['trace'], '105445aa7843bc8bf206b12000100000'
+        )
+
+    @patch('demo.views.ask_agent', return_value=dict(A2UI_AGENT_REPLY))
+    def test_missing_trace_header_forwards_an_empty_trace(self, mocked):
+        self._post({'question': 'Why?'})
+        self.assertEqual(mocked.call_args.kwargs['trace'], '')
+
+    @patch('demo.views.ask_agent', return_value=dict(A2UI_AGENT_REPLY))
     def test_live_free_text_embeds_the_selected_admission(self, mocked):
         """Free text sent alongside a selected patient must embed the admission
         (like the chips), so the agent never has to ask for the hadm_id."""

@@ -1,0 +1,14 @@
+@ A 216.239.32.21
+@ A 216.239.34.21
+@ A 216.239.36.21
+@ A 216.239.38.21
+@ AAAA 2001:4860:4802:32::15
+@ AAAA 2001:4860:4802:34::15
+@ AAAA 2001:4860:4802:36::15
+@ AAAA 2001:4860:4802:38::15
+@ TXT "google-site-verification=VJdM0LPYfMOC_lYdM1Du6fZ2Vcmfsw1rDB1bOvUjtD0"
+@ TXT "v=spf1 include:spf.improvmx.com ~all"
+@ MX 10 mx1.improvmx.com.
+@ MX 20 mx2.improvmx.com.
+www CNAME ghs.googlehosted.com.
+_dmarc TXT "v=DMARC1; p=quarantine; adkim=r; aspf=r; rua=mailto:dmarc_rua@onsecureserver.net;"

@@ -95,8 +95,24 @@ def _validated(result):
         raise AgentError(str(exc)) from exc
 
 
-def ask(question):
-    """Send a question to the agent and return its parsed JSON response."""
+def trace_id(request):
+    """The Cloud Trace id Cloud Run stamped on this inbound request.
+
+    Cloud Run adds `X-Cloud-Trace-Context: TRACE_ID/SPAN_ID;o=1` to every
+    request it delivers. Forwarding the header to the agent lets one user
+    action be followed across both services' logs by a single id. Empty when
+    the request did not come through Cloud Run (local development, tests).
+    """
+    header = request.META.get('HTTP_X_CLOUD_TRACE_CONTEXT', '')
+    return header.split('/', 1)[0]
+
+
+def ask(question, trace=''):
+    """Send a question to the agent and return its parsed JSON response.
+
+    `trace` is the inbound Cloud Trace id (see `trace_id`); it is forwarded so
+    the agent's log lines carry the same id as Django's.
+    """
     base = settings.DEMO_AGENT_URL.rstrip('/')
     if not base:
         raise AgentError('DEMO_AGENT_URL is not configured.', spent=False)
@@ -117,11 +133,14 @@ def ask(question):
                 f'Could not mint an identity token: {type(exc).__name__}',
                 spent=False,
             ) from exc
+        headers = {'Authorization': f'Bearer {token}'}
+        if trace:
+            headers['X-Cloud-Trace-Context'] = trace
         try:
             response = requests.post(
                 f'{base}/ask',
                 json={'question': question},
-                headers={'Authorization': f'Bearer {token}'},
+                headers=headers,
                 timeout=settings.DEMO_AGENT_TIMEOUT,
             )
         except requests.ConnectionError as exc:
@@ -138,7 +157,8 @@ def ask(question):
             # Log the body, return a generic message. The agent's errors can
             # quote internal URLs and service account names.
             logger.error(
-                'agent returned %s: %s', response.status_code, response.text[:2000]
+                'agent returned %s trace=%s: %s',
+                response.status_code, trace or '-', response.text[:2000],
             )
             raise AgentError(f'Agent returned HTTP {response.status_code}.')
 
