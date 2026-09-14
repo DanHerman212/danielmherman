@@ -37,26 +37,20 @@ resource "google_compute_security_policy" "edge" {
   # Two per-client-IP limits, each scoped to the path it protects. NOT a
   # blanket limit on every request: one load of the A2UI console pulls dozens
   # of ES modules out of /static/vendor/, so a limit that counts assets ends up
-  # banning a human who is simply using the demo. Volumetric attacks are a job
+  # rejecting a human who is simply using the demo. Volumetric attacks are a job
   # for Cloud Armor's always-on L3/L4 protection and Cloud Run's maxScale, not
   # for a request counter that cannot tell a stylesheet from a login attempt.
   #
   # throttle, NOT rate_based_ban: a ban is enforced against the client IP for
   # every path on the policy, so exceeding the limit on /accounts/login/ also
-  # denies /favicon.ico and the rest of the site to that address. That is the
+  # denied /favicon.ico and the rest of the site to that address. That is the
   # wrong instrument here — the demo is routinely used from one address by
   # several people, and the expensive behaviour behind it is already bounded by
   # django-axes (per username) and the per-user daily quota. Throttling caps the
   # rate on the protected path and leaves the rest of the site alone.
-  # throttle would be the calmer instrument, but the provider cannot clear
-  # ban_duration_sec on an existing policy (it is Optional+Computed, so the
-  # previous value is re-sent and the API rejects a ban duration on anything
-  # that is not rate_based_ban). Scoping the match is what actually fixed the
-  # false positives; the ban that remains is 60 s and, since it is only ever
-  # tripped by the paths below, does not touch ordinary browsing.
   rule {
     priority = 1000
-    action   = "rate_based_ban"
+    action   = "throttle"
     match {
       expr {
         expression = "request.path.startsWith('/accounts/login')"
@@ -70,14 +64,13 @@ resource "google_compute_security_policy" "edge" {
         count        = var.rate_limit_login_per_minute
         interval_sec = 60
       }
-      ban_duration_sec = var.rate_limit_ban_seconds
     }
     description = "Sign-in path: credential stuffing"
   }
 
   rule {
     priority = 1100
-    action   = "rate_based_ban"
+    action   = "throttle"
     match {
       expr {
         expression = "request.path.startsWith('/demo/a2ui/ask')"
@@ -91,7 +84,6 @@ resource "google_compute_security_policy" "edge" {
         count        = var.rate_limit_ask_per_minute
         interval_sec = 60
       }
-      ban_duration_sec = var.rate_limit_ban_seconds
     }
     description = "Agent path: volumetric abuse (the per-user daily quota is the real bound)"
   }

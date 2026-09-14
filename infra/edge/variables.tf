@@ -63,9 +63,3 @@ variable "rate_limit_ask_per_minute" {
   type        = number
   default     = 60
 }
-
-variable "rate_limit_ban_seconds" {
-  description = "How long a client that exceeds the threshold is banned."
-  type        = number
-  default     = 60
-}
