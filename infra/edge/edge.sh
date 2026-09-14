@@ -40,17 +40,33 @@ case "${1:-}" in
       -var edge_enabled=true -var dns_points_at_edge=false
     IP=$(terraform output -raw edge_ip)
     echo "LB IP: $IP"
-    # The forwarding rule takes about a minute to be programmed at the edge.
-    # --resolve (not -H Host) so TLS SNI matches the managed certificate.
-    echo "waiting for the LB to answer on $IP..."
-    for _ in $(seq 1 24); do
-      code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 \
-        --resolve "$DOMAIN:443:$IP" "https://$DOMAIN/" || true)
-      [[ "$code" == "200" ]] && break
-      sleep 5
-    done
-    echo "  https://$DOMAIN via $IP -> HTTP $code"
-    [[ "$code" == "200" ]] || { echo "LB not serving; DNS untouched, nothing to undo" >&2; exit 1; }
+    # Readiness has two stages because the two halves come up at different
+    # speeds, and waiting on the slower one first wastes the difference. The
+    # forwarding path answers first: an HTTP request returns the URL map's
+    # redirect, which needs no TLS. Only then is the certificate worth waiting
+    # for. --resolve (not -H Host) so the SNI matches the managed certificate.
+    ready_when() {  # port scheme expected-code attempts label
+      local code=000
+      for _ in $(seq 1 "$4"); do
+        code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 \
+          --resolve "$DOMAIN:$1:$IP" "$2://$DOMAIN/" || true)
+        [[ "$code" == "$3" ]] && break
+        sleep 5
+      done
+      echo "  $5 -> HTTP $code"
+      [[ "$code" == "$3" ]]
+    }
+
+    echo "waiting for the forwarding path on $IP..."
+    ready_when 80 http 301 60 "http://$DOMAIN" || {
+      echo "LB never answered on port 80; DNS untouched, nothing to undo" >&2
+      exit 1
+    }
+    echo "waiting for the certificate on $IP..."
+    ready_when 443 https 200 60 "https://$DOMAIN" || {
+      echo "LB answered but TLS is not ready; DNS untouched, nothing to undo" >&2
+      exit 1
+    }
     # Phase 2: now that the LB demonstrably serves, move DNS to it. Resolvers
     # still holding the domain-mapping addresses keep being served.
     terraform apply -input=false -auto-approve \
