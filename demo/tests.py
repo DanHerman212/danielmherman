@@ -291,7 +291,7 @@ class A2uiConsolePageTests(TestCase):
         # an asset change reaches a browser that already has the old file; the
         # assertion is deliberately exact so forgetting to bump fails here
         # rather than showing a stale page in production.
-        self.assertContains(response, 'demo_splitpane.css?v=8')
+        self.assertContains(response, 'demo_splitpane.css?v=9')
         self.assertContains(response, 'demo_a2ui.js?v=13')
 
 
@@ -572,10 +572,10 @@ class A2uiAskStreamTests(TestCase):
     @patch('demo.views.ask_agent_stream')
     def test_stages_are_relayed_then_the_answer_arrives_last(self, mocked):
         mocked.side_effect = self._stream(
-            ('planning', {'stage': 'planning', 'label': 'Reading The Question'}),
+            ('planning', {'stage': 'planning', 'label': 'Reading the Question'}),
             ('tool', {'stage': 'tool', 'label': 'Reading The Risk Model',
                       'tool': 'predict_readmission'}),
-            ('verify', {'stage': 'verify', 'label': 'Checking The Answer Against The Evidence'}),
+            ('verify', {'stage': 'verify', 'label': 'Checking the Answer Against the Evidence'}),
             ('answer', dict(A2UI_AGENT_REPLY)),
         )
 
@@ -649,7 +649,7 @@ class A2uiAskStreamTests(TestCase):
 
         def generator(question, trace=''):
             try:
-                yield ('planning', {'stage': 'planning', 'label': 'Reading The Question'})
+                yield ('planning', {'stage': 'planning', 'label': 'Reading the Question'})
                 yield ('answer', dict(A2UI_AGENT_REPLY))
             finally:
                 closed.append(True)
