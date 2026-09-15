@@ -20,7 +20,7 @@ from .agent_client import (
     ask_stream as ask_agent_stream,
     trace_id,
 )
-from .fixtures import CHIPS, fixture_ask
+from .fixtures import CHIP_NAMES, fixture_ask
 from .models import DemoPatient, DemoQuota
 
 logger = logging.getLogger(__name__)
@@ -38,14 +38,18 @@ UNAVAILABLE = 'The clinical copilot is unavailable. Please try again.'
 _EXHAUSTED = object()
 
 
-def _question_for(payload):
-    """Turn the request body into a question, or return (None, error).
+def _intent_for(payload):
+    """Turn the request body into what the agent is asked, or (None, error).
 
-    Three ways in: a starter chip (mapped to the chip's question so the live
-    agent answers the chosen intent — risk, medications, summarize — instead of
-    always the risk question), a picked patient id, or typed free text. Chips
-    and the picker send an id so the server embeds it in the wording — the
-    phrasing stays consistent and cannot be edited into a leading question.
+    Three ways in: a starter chip, a picked patient, or typed free text. The
+    *wording* is no longer built here. The agent owns the prompt — half of it
+    used to live in this repository, which meant a prompt change could ship
+    without touching the chain — so this sends intent (a chip name, or the text)
+    plus the admission, and the agent composes the question.
+
+    What stays on this side is the validation that must happen before a credit is
+    spent, and the one check only this side can make: the admission exists in the
+    demo cohort, which is the authorization boundary (S1-09).
     """
     hadm_id = payload.get('hadm_id')
     if hadm_id is not None:
@@ -65,26 +69,27 @@ def _question_for(payload):
 
         chip = payload.get('chip')
         if chip is not None:
-            question = CHIPS.get(chip)
-            if not question:
+            if chip not in CHIP_NAMES:
                 return None, 'unknown chip.'
-            return f'{question} For admission {hadm_id}.', None
-        # Free text sent alongside the selected patient: embed the admission so
-        # the live agent can ground the answer (same phrasing the chips use).
+            return {'chip': chip, 'hadm_id': hadm_id}, None
+        # Free text sent alongside the selected patient: the agent embeds the
+        # admission in the question so it can ground the answer.
         question = payload.get('question')
         if isinstance(question, str) and question.strip():
             q = question.strip()
             if len(q) > MAX_QUESTION_CHARS:
                 return None, f'Question exceeds {MAX_QUESTION_CHARS} characters.'
-            return f'{q} For admission {hadm_id}.', None
-        return f'Assess the 30-day readmission risk for admission {hadm_id}.', None
+            return {'question': q, 'hadm_id': hadm_id}, None
+        # Patient selected, nothing asked: the agent has a default question for
+        # exactly this case.
+        return {'hadm_id': hadm_id}, None
 
     question = payload.get('question')
     if not isinstance(question, str) or not question.strip():
         return None, 'Provide either hadm_id or a non-empty question.'
     if len(question) > MAX_QUESTION_CHARS:
         return None, f'Question exceeds {MAX_QUESTION_CHARS} characters.'
-    return question.strip(), None
+    return {'question': question.strip()}, None
 
 
 # --------------------------------------------------------------------------- #
@@ -264,7 +269,7 @@ def a2ui_ask(request):
         result['remaining'] = DemoQuota.remaining(request.user)
         return JsonResponse(result)
 
-    question, error = _question_for(payload)
+    intent, error = _intent_for(payload)
     if error:
         return JsonResponse({'error': error}, status=400)
 
@@ -280,10 +285,10 @@ def a2ui_ask(request):
 
     trace = trace_id(request)
     if 'text/event-stream' in request.headers.get('Accept', ''):
-        return _streaming_ask(request, question, trace, period)
+        return _streaming_ask(request, intent, trace, period)
 
     try:
-        result = ask_agent(question, trace=trace)
+        result = ask_agent(intent, trace=trace)
     except AgentError as exc:
         # Give the credit back — freely if provably nothing was billed,
         # under the daily refund cap otherwise (S1-09). Exception detail
@@ -316,7 +321,7 @@ def a2ui_ask(request):
     return JsonResponse(result)
 
 
-def _streaming_ask(request, question, trace, period):
+def _streaming_ask(request, intent, trace, period):
     """Start a streamed answer, or fail the way the blocking path fails.
 
     The first frame is pulled here, before the response is committed to being a
@@ -332,7 +337,7 @@ def _streaming_ask(request, question, trace, period):
         # generator today, so a failure surfaces on the first `next()`, but
         # nothing enforces that, and a raise from the call itself would
         # otherwise escape the view as a 500.
-        stream = ask_agent_stream(question, trace=trace)
+        stream = ask_agent_stream(intent, trace=trace)
         first = next(stream, None)
     except AgentError as exc:
         logger.error(

@@ -330,9 +330,10 @@ class A2uiAskLiveTests(TestCase):
         self.assertEqual(response.status_code, 200)
         body = response.json()
         self.assertEqual(body['remaining'], 9)
-        # The question is composed server-side so phrasing cannot be edited
-        # into something leading.
-        self.assertIn('90000009', mocked.call_args.args[0])
+        # Intent crosses this boundary, not prompt text: the wording lives with
+        # the chain, so a prompt change cannot ship from this repository.
+        self.assertEqual(mocked.call_args.args[0],
+                         {'chip': 'risk', 'hadm_id': 90000009})
         # The presentation contract arrives from the agent pre-composed;
         # Django must forward it byte-for-byte, not recompose it.
         self.assertEqual(body['a2ui'], A2UI_AGENT_REPLY['a2ui'])
@@ -347,7 +348,25 @@ class A2uiAskLiveTests(TestCase):
     def test_live_free_text_is_accepted(self, mocked):
         response = self._post({'question': 'Why was this patient flagged?'})
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(mocked.call_args.args[0], 'Why was this patient flagged?')
+        self.assertEqual(mocked.call_args.args[0],
+                         {'question': 'Why was this patient flagged?'})
+
+    @patch('demo.views.ask_agent', return_value=dict(A2UI_AGENT_REPLY))
+    def test_no_prompt_wording_crosses_the_boundary(self, mocked):
+        """Gap 2's whole point.
+
+        Half the prompt used to be composed here, which meant a change to it
+        could ship without touching the chain, its revision, or its review. The
+        request must now carry intent only — a chip *name*, not a sentence. If
+        wording ever reappears in this body, the chain artifact has leaked back
+        into the website.
+        """
+        self._post({'hadm_id': 90000009, 'chip': 'risk'})
+
+        intent = mocked.call_args.args[0]
+        self.assertEqual(set(intent), {'chip', 'hadm_id'})
+        # A chip name is one word; wording would be a sentence.
+        self.assertNotIn(' ', intent['chip'])
 
     @patch('demo.views.ask_agent', return_value=dict(A2UI_AGENT_REPLY))
     def test_cloud_trace_id_is_forwarded_to_the_agent(self, mocked):
@@ -370,28 +389,39 @@ class A2uiAskLiveTests(TestCase):
         self.assertEqual(mocked.call_args.kwargs['trace'], '')
 
     @patch('demo.views.ask_agent', return_value=dict(A2UI_AGENT_REPLY))
-    def test_live_free_text_embeds_the_selected_admission(self, mocked):
-        """Free text sent alongside a selected patient must embed the admission
-        (like the chips), so the agent never has to ask for the hadm_id."""
+    def test_live_free_text_carries_the_selected_admission(self, mocked):
+        """The admission travels alongside the text so the agent can embed it
+        and ground the answer, rather than having to ask for the hadm_id."""
         response = self._post({'hadm_id': 90000009,
                                'question': 'Why was this patient flagged?'})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(mocked.call_args.args[0],
-                         'Why was this patient flagged? For admission 90000009.')
+                         {'question': 'Why was this patient flagged?',
+                          'hadm_id': 90000009})
 
     @patch('demo.views.ask_agent', return_value=dict(A2UI_AGENT_REPLY))
-    def test_chip_maps_to_chip_question(self, mocked):
-        """The meds chip must send the medications question (not the risk
-        question), so the live agent actually calls rag_search and cites ^[n]."""
+    def test_a_chip_travels_as_a_name_not_as_wording(self, mocked):
+        """The meds chip must reach the agent as `meds`, so the agent asks the
+        medications question (and calls rag_search) rather than the risk one —
+        and so the wording stays on the agent's side of the boundary."""
         self._post({'hadm_id': 90000009, 'chip': 'meds'})
-        self.assertIn('medications', mocked.call_args.args[0])
-        self.assertIn('90000009', mocked.call_args.args[0])
+        self.assertEqual(mocked.call_args.args[0],
+                         {'chip': 'meds', 'hadm_id': 90000009})
 
     @patch('demo.views.ask_agent', return_value=dict(A2UI_AGENT_REPLY))
-    def test_summarize_chip_maps_to_summarize_question(self, mocked):
-        self._post({'hadm_id': 90000009, 'chip': 'summarize'})
-        self.assertIn('Summarize', mocked.call_args.args[0])
-        self.assertIn('90000009', mocked.call_args.args[0])
+    def test_every_chip_travels_unchanged(self, mocked):
+        for chip in ('risk', 'meds', 'summarize', 'compare'):
+            with self.subTest(chip=chip):
+                self._post({'hadm_id': 90000009, 'chip': chip})
+                self.assertEqual(mocked.call_args.args[0],
+                                 {'chip': chip, 'hadm_id': 90000009})
+
+    @patch('demo.views.ask_agent', return_value=dict(A2UI_AGENT_REPLY))
+    def test_a_patient_with_nothing_asked_sends_only_the_admission(self, mocked):
+        """No chip and no text is still a question — the agent has a default for
+        exactly this case, so no wording is invented here."""
+        self._post({'hadm_id': 90000009})
+        self.assertEqual(mocked.call_args.args[0], {'hadm_id': 90000009})
 
     @patch('demo.views.ask_agent')
     def test_unknown_chip_rejected_before_quota(self, mocked):

@@ -45,14 +45,20 @@ def _agent_presentation():
     return compose_presentation, label_for
 
 
-# The chips the demo UI can send; each maps to a composed question and a set
-# of tool calls to simulate.
+# The console's starter chips. FIXTURE-MODE DATA ONLY: fixture mode answers these
+# from captured payloads and has to write a `question` into the response, so the
+# wording is kept here for that. The LIVE path sends only the chip *name* and the
+# agent composes the wording — the prompt belongs with the chain (layer 3).
 CHIPS = {
     'risk': 'Assess the 30-day readmission risk for this patient.',
     'meds': 'What medications was this patient discharged on?',
     'summarize': 'Summarize the recent discharge notes for this patient.',
     'compare': 'Compare this assessment to the previous one for this patient.',
 }
+
+# Just the names, which is all the live path needs to reject an unknown chip
+# before a credit is spent. Kept derived from CHIPS so the two cannot drift.
+CHIP_NAMES = tuple(CHIPS)
 
 # A retrieval query per chip, used to ground the answer (matters when we have
 # captured rag passages; otherwise the honest empty path runs).

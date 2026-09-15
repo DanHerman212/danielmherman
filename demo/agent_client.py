@@ -108,8 +108,13 @@ def trace_id(request):
     return header.split('/', 1)[0]
 
 
-def ask(question, trace=''):
-    """Send a question to the agent and return its parsed JSON response.
+def ask(body, trace=''):
+    """Send one request to the agent and return its parsed JSON response.
+
+    `body` is the request intent — `{'chip': ..., 'hadm_id': ...}` or
+    `{'question': ..., 'hadm_id': ...}`. Django does not compose the question:
+    the agent owns the prompt's wording (layer 3, chain artifact), so what
+    crosses this boundary is intent rather than prompt text.
 
     `trace` is the inbound Cloud Trace id (see `trace_id`); it is forwarded so
     the agent's log lines carry the same id as Django's.
@@ -140,7 +145,7 @@ def ask(question, trace=''):
         try:
             response = requests.post(
                 f'{base}/ask',
-                json={'question': question},
+                json=body,
                 headers=headers,
                 timeout=settings.DEMO_AGENT_TIMEOUT,
             )
@@ -196,8 +201,10 @@ def _frames(lines):
         yield (event or 'message', '\n'.join(data))
 
 
-def ask_stream(question, trace=''):
-    """Send a question and yield the agent's frames as they arrive.
+def ask_stream(body, trace=''):
+    """Send a request and yield the agent's frames as they arrive.
+
+    `body` is the request intent, exactly as `ask` takes it.
 
     Yields (event, data) pairs: zero or more progress stages, then exactly one
     terminal frame — `answer` with the same validated payload `ask()` returns,
@@ -240,7 +247,7 @@ def ask_stream(question, trace=''):
         try:
             response = requests.post(
                 f'{base}/ask/stream',
-                json={'question': question},
+                json=body,
                 headers=headers,
                 stream=True,
                 # Applies per read, not to the request as a whole: the agent
