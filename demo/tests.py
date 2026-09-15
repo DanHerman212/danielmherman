@@ -531,10 +531,10 @@ class A2uiAskStreamTests(TestCase):
     @patch('demo.views.ask_agent_stream')
     def test_stages_are_relayed_then_the_answer_arrives_last(self, mocked):
         mocked.side_effect = self._stream(
-            ('planning', {'stage': 'planning', 'label': 'Reading the question'}),
-            ('tool', {'stage': 'tool', 'label': 'Reading the risk model',
+            ('planning', {'stage': 'planning', 'label': 'Reading The Question'}),
+            ('tool', {'stage': 'tool', 'label': 'Reading The Risk Model',
                       'tool': 'predict_readmission'}),
-            ('verify', {'stage': 'verify', 'label': 'Checking the answer against the evidence'}),
+            ('verify', {'stage': 'verify', 'label': 'Checking The Answer Against The Evidence'}),
             ('answer', dict(A2UI_AGENT_REPLY)),
         )
 
@@ -551,7 +551,9 @@ class A2uiAskStreamTests(TestCase):
         frames = self._frames(response)
         self.assertEqual([name for name, _ in frames],
                          ['planning', 'tool', 'verify', 'answer'])
-        self.assertEqual(frames[1][1]['label'], 'Reading the risk model')
+        # The label is relayed verbatim: the agent owns the wording, and the
+        # proxy must not reformat it on the way through.
+        self.assertEqual(frames[1][1]['label'], 'Reading The Risk Model')
 
         answer = frames[-1][1]
         # The presentation contract still arrives pre-composed from the agent.
@@ -606,7 +608,7 @@ class A2uiAskStreamTests(TestCase):
 
         def generator(question, trace=''):
             try:
-                yield ('planning', {'stage': 'planning', 'label': 'Reading the question'})
+                yield ('planning', {'stage': 'planning', 'label': 'Reading The Question'})
                 yield ('answer', dict(A2UI_AGENT_REPLY))
             finally:
                 closed.append(True)
@@ -697,7 +699,7 @@ class A2uiAskStreamTests(TestCase):
         """Once frames have been sent the status code is spent, so the failure
         has to arrive as an error frame — and it must still refund."""
         mocked.side_effect = self._stream(
-            ('tool', {'stage': 'tool', 'label': 'Reading the risk model'}),
+            ('tool', {'stage': 'tool', 'label': 'Reading The Risk Model'}),
             ('error', {'error': 'agent_failed', 'message': 'upstream died'}),
         )
         DemoQuota.objects.create(user=self.user, daily_limit=5)
