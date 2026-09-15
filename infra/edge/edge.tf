@@ -111,6 +111,19 @@ resource "google_compute_backend_service" "web" {
   security_policy       = google_compute_security_policy.edge[0].id
   enable_cdn            = false
 
+  # The load balancer's default backend timeout is 30s, which is SHORTER than
+  # the answer path it fronts: a tool call may take 100s, the chain is bounded
+  # at 110s and Django waits 120s. Left at the default, the LB would cut a slow
+  # answer before the application's own deadline fired — the user would see a
+  # dropped request instead of the agent's structured timeout, and a streamed
+  # response would be truncated mid-stream with no error at all.
+  #
+  # Raised to 300s so the LB is the LAST layer to give up, not the first:
+  #   tool 100s < chain 110s < Django 120s < LB 300s = Cloud Run 300s (default).
+  # Both Cloud Run services run on the 300s default (neither cloudbuild.yaml
+  # passes --timeout), so nothing above the application cuts the response early.
+  timeout_sec = 300
+
   backend {
     group = google_compute_region_network_endpoint_group.web[0].id
   }
