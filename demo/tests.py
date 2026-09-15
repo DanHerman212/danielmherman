@@ -410,7 +410,7 @@ class A2uiAskLiveTests(TestCase):
 
     @patch('demo.views.ask_agent', return_value=dict(A2UI_AGENT_REPLY))
     def test_every_chip_travels_unchanged(self, mocked):
-        for chip in ('risk', 'meds', 'summarize', 'compare'):
+        for chip in ('risk', 'meds', 'summarize'):
             with self.subTest(chip=chip):
                 self._post({'hadm_id': 90000009, 'chip': chip})
                 self.assertEqual(mocked.call_args.args[0],
@@ -422,6 +422,17 @@ class A2uiAskLiveTests(TestCase):
         exactly this case, so no wording is invented here."""
         self._post({'hadm_id': 90000009})
         self.assertEqual(mocked.call_args.args[0], {'hadm_id': 90000009})
+
+    @patch('demo.views.ask_agent')
+    def test_the_compare_chip_is_gone(self, mocked):
+        """It asked about a previous assessment the single-turn product has no
+        data for — a leftover from an earlier UX exercise, never offered in the
+        console. Refused before a credit is spent, not merely hidden."""
+        DemoQuota.objects.create(user=self.user, daily_limit=5)
+        response = self._post({'hadm_id': 90000009, 'chip': 'compare'})
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(DemoQuota.remaining(self.user), 5)
+        mocked.assert_not_called()
 
     @patch('demo.views.ask_agent')
     def test_unknown_chip_rejected_before_quota(self, mocked):

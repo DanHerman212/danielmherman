@@ -53,7 +53,6 @@ CHIPS = {
     'risk': 'Assess the 30-day readmission risk for this patient.',
     'meds': 'What medications was this patient discharged on?',
     'summarize': 'Summarize the recent discharge notes for this patient.',
-    'compare': 'Compare this assessment to the previous one for this patient.',
 }
 
 # Just the names, which is all the live path needs to reject an unknown chip
@@ -159,16 +158,6 @@ def _compose_answer(chip: str, tool_calls: list[dict]) -> str:
             return f"{lead}: {labels}."
         return 'No supporting note passage was found for this question.'
 
-    if chip == 'compare' and pred and pred.get('probability') is not None:
-        p = float(pred['probability'])
-        thr = float(pred.get('threshold', 0.5))
-        return (
-            f"Estimated 30-day unplanned readmission risk is {p:.3f} "
-            f"({p * 100:.1f}%), {thr:.2f} threshold. The canvas shows this "
-            'assessment beside the earlier one; the numbers are the same '
-            'because the underlying record has not changed.'
-        )
-
     return 'Ask a specific question, or use a starter chip.'
 
 
@@ -201,7 +190,7 @@ def fixture_ask(payload: dict) -> dict:
                 'message': f'No admission {hadm_id} in the demo cohort.'}
 
     tool_calls = []
-    if chip in ('risk', 'compare'):
+    if chip == 'risk':
         tool_calls.append(_tool_call(
             'predict_readmission', {'hadm_id': hadm_id}, pred))
     if chip in ('risk', 'meds', 'summarize'):
