@@ -10,6 +10,7 @@ import json
 from datetime import timedelta
 from unittest.mock import patch
 
+from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.test import Client, TestCase, override_settings
@@ -286,9 +287,12 @@ class A2uiConsolePageTests(TestCase):
         self.assertContains(response, 'action="%s"' % reverse('logout'))
         self.assertContains(response, 'name="csrfmiddlewaretoken"')
         # Cache-busted stylesheet + module links so the shell CSS and the A2UI
-        # component module are never stale in the browser.
-        self.assertContains(response, 'demo_splitpane.css?v=7')
-        self.assertContains(response, 'demo_a2ui.js?v=12')
+        # component module are never stale in the browser. Bumping these is how
+        # an asset change reaches a browser that already has the old file; the
+        # assertion is deliberately exact so forgetting to bump fails here
+        # rather than showing a stale page in production.
+        self.assertContains(response, 'demo_splitpane.css?v=8')
+        self.assertContains(response, 'demo_a2ui.js?v=13')
 
 
 @override_settings(DEMO_FIXTURE_MODE=False)
@@ -459,3 +463,269 @@ class A2uiAskLiveTests(TestCase):
             reverse('demo:a2ui_ask'), data='not json', content_type='application/json'
         )
         self.assertEqual(response.status_code, 400)
+
+
+class A2uiAskStreamTests(TestCase):
+    """The streamed progress path (Layer 3, Gap 1).
+
+    Only one thing is new here: frames are relayed while the chain works, and
+    the answer arrives as the last frame. Everything else — the quota claim,
+    the refund rules, the payload contract — is the blocking path's behaviour,
+    so the tests that matter most are the ones proving the streamed path
+    behaves the same way when things go wrong.
+    """
+
+    def setUp(self):
+        self.user = User.objects.create_user('demo', password='x')
+        self.client.force_login(self.user)
+        DemoPatient.objects.create(
+            hadm_id=90000009, display_name='Test Patient', age=63,
+            sex='F', summary='63F · urgent admission', split_name='test',
+        )
+
+    def _post(self, payload, accept=None):
+        headers = {'HTTP_ACCEPT': accept} if accept else {}
+        return self.client.post(
+            reverse('demo:a2ui_ask'),
+            data=json.dumps(payload),
+            content_type='application/json',
+            **headers,
+        )
+
+    def _body(self, response):
+        """Collect a streamed response's body.
+
+        Consumed as an async iterator, because that is what the view returns:
+        Django materializes a *synchronous* iterator, so a sync test would pass
+        happily while the live stream arrived in one lump at the end.
+        """
+        async def collect():
+            chunks = []
+            async for chunk in response.streaming_content:
+                chunks.append(chunk)
+            return b''.join(chunks)
+
+        return async_to_sync(collect)()
+
+    def _frames(self, response):
+        """The relayed frames, decoded and parsed, keepalives skipped."""
+        body = self._body(response).decode('utf-8')
+        frames = []
+        for block in body.strip().split('\n\n'):
+            lines = [l for l in block.split('\n') if l.strip() and not l.startswith(':')]
+            if not lines:
+                continue
+            name = next(l[len('event:'):].strip() for l in lines if l.startswith('event:'))
+            raw = next(l[len('data:'):].lstrip() for l in lines if l.startswith('data:'))
+            frames.append((name, json.loads(raw)))
+        return frames
+
+    def _stream(self, *frames):
+        """A stub for ask_stream: an iterable of (event, data) pairs."""
+        def generator(question, trace=''):
+            yield from frames
+        return generator
+
+    # --- the happy path ------------------------------------------------------
+
+    @patch('demo.views.ask_agent_stream')
+    def test_stages_are_relayed_then_the_answer_arrives_last(self, mocked):
+        mocked.side_effect = self._stream(
+            ('planning', {'stage': 'planning', 'label': 'Reading the question'}),
+            ('tool', {'stage': 'tool', 'label': 'Reading the risk model',
+                      'tool': 'predict_readmission'}),
+            ('verify', {'stage': 'verify', 'label': 'Checking the answer against the evidence'}),
+            ('answer', dict(A2UI_AGENT_REPLY)),
+        )
+
+        response = self._post(
+            {'hadm_id': 90000009, 'chip': 'risk'}, accept='text/event-stream'
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'text/event-stream')
+        # Every proxy between here and the browser must be told not to buffer,
+        # or the frames all arrive together at the end and streaming is a lie.
+        self.assertEqual(response['X-Accel-Buffering'], 'no')
+
+        frames = self._frames(response)
+        self.assertEqual([name for name, _ in frames],
+                         ['planning', 'tool', 'verify', 'answer'])
+        self.assertEqual(frames[1][1]['label'], 'Reading the risk model')
+
+        answer = frames[-1][1]
+        # The presentation contract still arrives pre-composed from the agent.
+        self.assertEqual(answer['a2ui'], A2UI_AGENT_REPLY['a2ui'])
+        self.assertEqual(answer['sources'], A2UI_AGENT_REPLY['sources'])
+        # Django adds exactly one thing: the quota figure, on the final frame,
+        # because it cannot be known before the answer exists.
+        self.assertEqual(answer['remaining'], 9)
+
+    @patch('demo.views.ask_agent_stream')
+    def test_the_stream_is_opt_in_by_accept_header(self, mocked):
+        """A caller that does not ask for a stream gets the JSON contract it
+        has always had — the new path cannot change existing behaviour."""
+        mocked.side_effect = self._stream(('answer', dict(A2UI_AGENT_REPLY)))
+        with patch('demo.views.ask_agent', return_value=dict(A2UI_AGENT_REPLY)):
+            response = self._post({'hadm_id': 90000009, 'chip': 'risk'})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'application/json')
+        self.assertEqual(response.json()['remaining'], 9)
+        mocked.assert_not_called()
+
+    @patch('demo.views.ask_agent_stream')
+    def test_the_response_is_async_so_django_does_not_buffer_it(self, mocked):
+        """The response must be an ASYNC iterator, and nothing else proves it.
+
+        Django's ASGI handler consumes a synchronous iterator with
+        `sync_to_async(list)` (`StreamingHttpResponse.__aiter__`), which
+        materializes the whole stream and sends every frame at the end. That
+        was measured live on this endpoint: all frames arrived at the same
+        millisecond, which is indistinguishable from not streaming at all. An
+        async iterator is consumed part by part, so each frame is flushed as it
+        is produced.
+        """
+        mocked.side_effect = self._stream(('answer', dict(A2UI_AGENT_REPLY)))
+
+        response = self._post(
+            {'hadm_id': 90000009, 'chip': 'risk'}, accept='text/event-stream'
+        )
+
+        self.assertTrue(
+            hasattr(response.streaming_content, '__aiter__'),
+            'a sync streaming response is buffered whole by Django under ASGI',
+        )
+
+    @patch('demo.views.ask_agent_stream')
+    def test_the_stream_survives_the_caller_disconnecting(self, mocked):
+        """Closing the stream early must release the agent slot: the browser
+        going away is the common case for a long answer, and leaking a slot per
+        abandoned request would eventually stall the whole site."""
+        closed = []
+
+        def generator(question, trace=''):
+            try:
+                yield ('planning', {'stage': 'planning', 'label': 'Reading the question'})
+                yield ('answer', dict(A2UI_AGENT_REPLY))
+            finally:
+                closed.append(True)
+
+        mocked.side_effect = generator
+        response = self._post(
+            {'hadm_id': 90000009, 'chip': 'risk'}, accept='text/event-stream'
+        )
+
+        async def read_one_then_abandon():
+            iterator = response.streaming_content.__aiter__()
+            await iterator.__anext__()
+            await iterator.aclose()
+
+        async_to_sync(read_one_then_abandon)()
+        self.assertEqual(closed, [True])
+
+    @patch('demo.views.ask_agent_stream')
+    def test_fixture_mode_never_streams(self, mocked):
+        """Captured payloads answer instantly: no chain runs, so there is
+        nothing to narrate."""
+        with override_settings(DEMO_FIXTURE_MODE=True):
+            response = self._post(
+                {'hadm_id': 90000009, 'chip': 'risk'}, accept='text/event-stream'
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'application/json')
+        mocked.assert_not_called()
+
+    # --- the failure paths --------------------------------------------------
+
+    @patch('demo.views.ask_agent_stream')
+    def test_a_failure_before_the_first_frame_is_still_a_502(self, mocked):
+        """A streamed request that fails before any frame exists can still be
+        refused with a real status code, so the browser's existing error
+        handling keeps working."""
+        mocked.side_effect = AgentError('boom')
+        DemoQuota.objects.create(user=self.user, daily_limit=5)
+
+        response = self._post(
+            {'hadm_id': 90000009, 'chip': 'risk'}, accept='text/event-stream'
+        )
+
+        self.assertEqual(response.status_code, 502)
+        self.assertEqual(response['Content-Type'], 'application/json')
+        self.assertEqual(DemoQuota.remaining(self.user), 5)
+
+    @patch('demo.views.ask_agent_stream')
+    def test_a_stream_with_no_frames_at_all_is_a_502(self, mocked):
+        mocked.side_effect = self._stream()
+        DemoQuota.objects.create(user=self.user, daily_limit=5)
+
+        response = self._post(
+            {'hadm_id': 90000009, 'chip': 'risk'}, accept='text/event-stream'
+        )
+
+        self.assertEqual(response.status_code, 502)
+        self.assertEqual(DemoQuota.remaining(self.user), 5)
+
+    @patch('demo.views.ask_agent_stream')
+    def test_a_tool_error_in_the_streamed_answer_refunds(self, mocked):
+        """A downstream failure arrives as a good-looking answer containing a
+        tool error. The credit must come back and the browser must be told,
+        exactly as on the blocking path."""
+        reply = dict(A2UI_AGENT_REPLY)
+        reply['tool_calls'] = [
+            {'name': 'predict_readmission',
+             'response': {'error': 'upstream 503', 'status': 'failed'}},
+        ]
+        mocked.side_effect = self._stream(('answer', reply))
+        DemoQuota.objects.create(user=self.user, daily_limit=5)
+
+        response = self._post(
+            {'hadm_id': 90000009, 'chip': 'risk'}, accept='text/event-stream'
+        )
+
+        frames = self._frames(response)
+        self.assertEqual([name for name, _ in frames], ['error'])
+        self.assertEqual(DemoQuota.remaining(self.user), 5)
+        # The frame is shaped like the blocking path's 502 body, so the browser
+        # renders both failures the same way.
+        self.assertIn('unavailable', frames[0][1]['error'])
+        self.assertEqual(frames[0][1]['remaining'], 5)
+
+    @patch('demo.views.ask_agent_stream')
+    def test_a_stream_failure_mid_answer_refunds_and_replaces_the_placeholder(self, mocked):
+        """Once frames have been sent the status code is spent, so the failure
+        has to arrive as an error frame — and it must still refund."""
+        mocked.side_effect = self._stream(
+            ('tool', {'stage': 'tool', 'label': 'Reading the risk model'}),
+            ('error', {'error': 'agent_failed', 'message': 'upstream died'}),
+        )
+        DemoQuota.objects.create(user=self.user, daily_limit=5)
+
+        response = self._post(
+            {'hadm_id': 90000009, 'chip': 'risk'}, accept='text/event-stream'
+        )
+
+        self.assertEqual(response.status_code, 200)
+        frames = self._frames(response)
+        self.assertEqual([name for name, _ in frames], ['tool', 'error'])
+        self.assertEqual(DemoQuota.remaining(self.user), 5)
+
+    @patch('demo.views.ask_agent_stream')
+    def test_a_streamed_failure_discloses_nothing_internal(self, mocked):
+        """The agent's error detail routinely embeds the private MCP URL and
+        service account names; the frame the browser sees must carry none of
+        it (S1-03)."""
+        mocked.side_effect = self._stream(
+            ('error', {'error': 'agent_failed',
+                       'message': 'https://secret-mcp-url/ask audience=projects/12345'}),
+        )
+
+        response = self._post(
+            {'hadm_id': 90000009, 'chip': 'risk'}, accept='text/event-stream'
+        )
+
+        body = self._body(response).decode('utf-8')
+        self.assertNotIn('secret-mcp-url', body)
+        self.assertNotIn('audience', body)
+        self.assertIn('unavailable', body)

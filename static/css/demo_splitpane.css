@@ -258,6 +258,11 @@ body:has(#demo-root), body:has(#a2ui-root) { overflow-x: auto; }
 }
 .turn-user .turn-text { background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 9px 12px; }
 .turn-meta { font-size: 0.7rem; color: var(--muted); }
+/* The live stage label relayed while the chain is running. It is read at a
+   glance by someone who is waiting, not skimmed after the answer has landed, so
+   it is larger than the small print it shares a slot with — and still smaller
+   than the answer body (0.88rem), which it must not compete with. */
+.turn-meta.turn-meta-live { font-size: 0.82rem; }
 .cite {
   cursor: pointer; color: var(--accent); font-weight: 700; margin: 0 1px;
   padding: 0 2px; border-radius: 4px;

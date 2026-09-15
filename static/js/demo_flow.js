@@ -442,7 +442,11 @@ export function createDemoFlow({ root, askUrl, renderCanvas, onCite }) {
 
     if (turn.meta) {
       const meta = document.createElement('div');
-      meta.className = 'turn-meta';
+      // A pending turn's meta is the live stage label from the agent's progress
+      // stream; a settled turn's is the small print reporting what the answer
+      // used. They share a slot but not a reading: the first is read while
+      // waiting, so it gets its own class and a larger size.
+      meta.className = turn.pending ? 'turn-meta turn-meta-live' : 'turn-meta';
       meta.textContent = turn.meta;
       block.appendChild(meta);
     }
@@ -587,6 +591,60 @@ export function createDemoFlow({ root, askUrl, renderCanvas, onCite }) {
 
   /* ---------- ask flow ---------- */
 
+  /* Parse one SSE frame. Returns null for a keepalive (a comment line, sent to
+     hold the connection open while a tool call runs) or anything unparseable:
+     a frame we cannot read is not worth breaking a turn for. */
+  function parseFrame(block) {
+    let event = null;
+    const data = [];
+    for (const line of block.split('\n')) {
+      if (!line.trim() || line.startsWith(':')) continue;
+      if (line.startsWith('event:')) event = line.slice(6).trim();
+      else if (line.startsWith('data:')) data.push(line.slice(5).replace(/^ /, ''));
+    }
+    if (!data.length) return null;
+    try {
+      return { event: event || 'message', data: JSON.parse(data.join('\n')) };
+    } catch (err) {
+      return null;
+    }
+  }
+
+  /* Read a streamed response and return its terminal payload.
+
+     Progress frames go to `onStage` as they arrive; the answer — or the error —
+     is the last frame and is what this resolves to. Returning only the terminal
+     payload is deliberate: the turn is built from an answer, never from a
+     stage, so unguarded progress text cannot leak into the answer body. */
+  async function readStream(res, onStage) {
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let terminal = null;
+
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      // Frames end with a blank line. Whatever follows the last blank line is
+      // a partial frame, so it stays in the buffer until its bytes arrive.
+      let split;
+      while ((split = buffer.indexOf('\n\n')) !== -1) {
+        const block = buffer.slice(0, split);
+        buffer = buffer.slice(split + 2);
+        const frame = parseFrame(block);
+        if (!frame) continue;
+        if (frame.event === 'answer' || frame.event === 'error') {
+          terminal = frame.data;
+        } else if (onStage) {
+          onStage(frame.event, frame.data);
+        }
+      }
+    }
+    return terminal;
+  }
+
   async function post(body, userText) {
     if (state.asking) return;                 // S7-06: one request at a time
     state.asking = true;
@@ -619,16 +677,50 @@ export function createDemoFlow({ root, askUrl, renderCanvas, onCite }) {
     try {
       const res = await fetch(state.askUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken() },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': csrfToken(),
+          // Ask for progress stages. Django answers with the same JSON body it
+          // always has when it cannot stream (fixture mode, or a failure
+          // before the stream opens), so this is a request, not a requirement.
+          Accept: 'text/event-stream',
+        },
         body: JSON.stringify(body),
       });
-      data = await res.json();
-      if (typeof data.remaining === 'number') els.remaining.textContent = data.remaining;
-      if (!res.ok) {
+
+      const streamed = (res.headers.get('content-type') || '')
+        .includes('text/event-stream');
+
+      if (res.ok && streamed) {
+        // The chain is running and telling us what it is doing. The stage text
+        // replaces "working" in the pending turn's meta line; the answer body
+        // stays a dotted placeholder, because the answer does not exist yet —
+        // the guardrails have not run, and what they remove is exactly the part
+        // a user must never see.
+        data = await readStream(res, (event, frame) => {
+          pending.meta = frame.label || 'working';
+          renderIfCurrent();
+        });
+      } else {
+        data = await res.json();
+      }
+
+      if (typeof data?.remaining === 'number') els.remaining.textContent = data.remaining;
+      // A stream that ends without a terminal frame is a cut connection, not an
+      // answer: `data` is null and the pending turn must still be replaced.
+      if (!res.ok || !data || data.error) {
+        const problem = data || {};
+        // A stream that ended early needs different words from an HTTP error:
+        // one is a connection that was cut, the other is a status code.
+        const fallback = streamed
+          ? 'The answer was cut off before it arrived. Please try again.'
+          : `HTTP ${res.status}`;
         replacePending({
           role: 'agent',
-          text: data.message || data.error || `HTTP ${res.status}`,
-          meta: data.error ? `error: ${data.error}` : '',
+          text: problem.message || problem.error || fallback,
+          meta: problem.error
+            ? `error: ${problem.error}`
+            : (streamed ? 'error: incomplete answer' : ''),
           passages: [], toolCalls: [],
         });
         renderIfCurrent();
