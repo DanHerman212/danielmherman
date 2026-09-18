@@ -123,6 +123,29 @@ class TurnStoreTests(_AskTestCase):
         self.assertIsNone(search['payload'], 'retrieval is resolved again')
         self.assertNotIn('text', json.dumps(stored))
 
+    @patch('demo.views.ask_agent')
+    def test_the_guardrails_that_fired_are_kept_by_name(self, mocked):
+        """The flag list is the only record of why a served answer differs from
+        what the model wrote.
+
+        It used to be dropped: the agent returned the names and this store kept
+        none of them, so an answer with a sentence rewritten could be traced to
+        "a guardrail acted" and no further — and the agent's log carried a count,
+        not a name. The answer and the reason have to live in the same place.
+        """
+        mocked.return_value = {
+            **AGENT_REPLY,
+            'guardrail_flags': ['risk_number_unsupported:0.14',
+                                'med_dose_mismatch:5 mg'],
+        }
+
+        self._post({'hadm_id': 90000009, 'chip': 'risk'})
+
+        stored = Turn.objects.get(conversation=self._conversation(),
+                                  role=Turn.Role.AGENT).guardrail_flags
+        self.assertEqual(stored, ['risk_number_unsupported:0.14',
+                                  'med_dose_mismatch:5 mg'])
+
     @patch('demo.views.ask_agent', return_value=dict(AGENT_REPLY))
     def test_the_answer_carries_the_id_the_browser_sends_back(self, _mocked):
         response = self._post({'hadm_id': 90000009, 'chip': 'risk'})

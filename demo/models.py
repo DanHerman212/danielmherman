@@ -298,6 +298,12 @@ class Turn(models.Model):
     # is kept only where it cannot be re-derived; retrieval results are left out
     # and resolved again on replay.
     tool_calls = models.JSONField(default=list, blank=True)
+    # The guardrails that fired on this answer, by name. The agent returns them
+    # and this store used to drop them, which left a guardrail's effect visible
+    # and its cause not: an answer with a number missing could be traced to "a
+    # guard acted" and no further. The names are not patient text — they are
+    # codes like `risk_number_unsupported:0.14` — so keeping them costs nothing.
+    guardrail_flags = models.JSONField(default=list, blank=True)
     error = models.CharField(max_length=200, blank=True, default='')
     created_at = models.DateTimeField(default=timezone.now)
 

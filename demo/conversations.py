@@ -83,8 +83,22 @@ def record_answer(conversation, result):
             code_revision=result.get('code_revision') or '',
             citations=_stored_citations(result.get('sources')),
             tool_calls=_stored_calls(result.get('tool_calls')),
+            guardrail_flags=_stored_flags(result.get('guardrail_flags')),
         )
     return turn
+
+
+def _stored_flags(flags):
+    """The guardrail flags as the agent named them.
+
+    Kept because the flag list is the only record of why a served answer differs
+    from what the model wrote: a guardrail that rewrote a sentence leaves the
+    answer and the reason in different places, and the agent's log is not
+    something a reviewer of this conversation can reach. Non-strings are dropped
+    rather than stored — the agent sends names, and anything else is a contract
+    violation that belongs in the log, not in this table.
+    """
+    return [flag for flag in flags or [] if isinstance(flag, str)]
 
 
 def _stored_citations(sources):

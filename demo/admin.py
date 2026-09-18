@@ -26,7 +26,7 @@ class TurnInline(admin.TabularInline):
     extra = 0
     can_delete = False
     fields = ('ordinal', 'role', 'question', 'answer', 'model', 'code_revision',
-              'error', 'created_at')
+              'guardrail_flags', 'error', 'created_at')
     readonly_fields = fields
 
     def has_add_permission(self, request, obj=None):
