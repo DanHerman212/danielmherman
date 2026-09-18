@@ -231,9 +231,28 @@ export function createDemoFlow({ root, askUrl, renderCanvas, onCite }) {
     paint(episodeFor(hadmId));
   }
 
+  /** Start a new conversation about the patient already in view.
+
+      The ceiling refuses a turn and names this as the way forward, so the
+      refusal carries a button that does it. The rendered thread is cleared
+      because it belongs to the conversation that has just ended — the site kept
+      that conversation and will not continue it, so leaving its turns on screen
+      would show a thread whose earlier half is a different stored conversation.
+      The next question opens a new one and spends the next credit; the composer
+      keeps its chips, so asking again is one click. */
+  function startNewConversation() {
+    if (!state.current) return;
+    const episode = episodeFor(state.current.hadmId);
+    episode.turns = [];
+    episode.conversationId = null;
+    episode.a2ui = null;
+    renderThread(episode);
+    paint(episode);
+    if (!els.input.disabled) els.input.focus();
+  }
+
   /** Deselect the current patient and reset to the starting state; history kept. */
-  function clearSelection() {
-    state.current = null;
+  function clearSelection() {    state.current = null;
     for (const el of allRows()) el.classList.remove('active');
     els.threadName.textContent = 'Select a patient';
     els.threadMeta.textContent = '';
@@ -476,6 +495,22 @@ export function createDemoFlow({ root, askUrl, renderCanvas, onCite }) {
       meta.className = turn.pending ? 'turn-meta turn-meta-live' : 'turn-meta';
       meta.textContent = turn.meta;
       block.appendChild(meta);
+    }
+
+    // A refusal that names a way forward has to offer it. The ceiling message
+    // says "start a new conversation"; without the control the user is told to
+    // do something the interface does not let them do, which is the one thing
+    // the ceiling decision said it would not do (layer 8, the turn ceiling).
+    if (turn.action) {
+      const row = document.createElement('div');
+      row.className = 'turn-action';
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'button-primary turn-action-button';
+      btn.textContent = turn.action.label;
+      btn.dataset.action = turn.action.kind;
+      row.appendChild(btn);
+      block.appendChild(row);
     }
     return block;
   }
@@ -760,6 +795,15 @@ export function createDemoFlow({ root, askUrl, renderCanvas, onCite }) {
           meta: problem.error
             ? `error: ${problem.error}`
             : (streamed ? 'error: incomplete answer' : ''),
+          // The ceiling is the one refusal with a way forward that the interface
+          // can take: the message names starting a new conversation, so the turn
+          // carries the control that does it. The conversation id is already
+          // forgotten above, so the next question opens a new one either way —
+          // this makes the advice something the user can act on rather than
+          // something they have to guess at.
+          action: problem.error === 'conversation_full'
+            ? { kind: 'new-conversation', label: 'Start a new conversation' }
+            : null,
           passages: [], toolCalls: [],
         });
         renderIfCurrent();
@@ -826,6 +870,13 @@ export function createDemoFlow({ root, askUrl, renderCanvas, onCite }) {
     els.composerChips.addEventListener('click', (event) => {
       const chip = event.target.closest('[data-chip]');
       if (chip) askChip(chip.dataset.chip);
+    });
+  }
+
+  if (els.thread) {
+    els.thread.addEventListener('click', (event) => {
+      const btn = event.target.closest('[data-action="new-conversation"]');
+      if (btn) startNewConversation();
     });
   }
 

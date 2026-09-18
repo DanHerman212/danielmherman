@@ -284,6 +284,17 @@ body:has(#demo-root), body:has(#a2ui-root) { overflow-x: auto; }
    darker than that small print, #374151 against --muted's #6b7280, for the same
    reason: it is read once, in passing, and a light grey is easy to miss. */
 .turn-meta.turn-meta-live { font-size: 0.82rem; color: #374151; }
+/* The control a refusal offers. The ceiling message says "start a new
+   conversation"; this is the button that does it, so it sits under the refusal
+   rather than in a toolbar the user has to find, and it is the accent button
+   because it is the one action the turn is asking for. */
+.turn-action { margin-top: 8px; }
+.turn-action-button {
+  font: inherit; font-size: 0.8rem; font-weight: 600; cursor: pointer;
+  padding: 7px 14px; border-radius: 999px;
+  border: 1px solid var(--accent); background: var(--accent); color: #fff;
+}
+.turn-action-button:hover { filter: brightness(1.06); }
 .cite {
   cursor: pointer; color: var(--accent); font-weight: 700; margin: 0 1px;
   padding: 0 2px; border-radius: 4px;

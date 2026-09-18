@@ -483,8 +483,8 @@ class A2uiConsolePageTests(TestCase):
         # an asset change reaches a browser that already has the old file; the
         # assertion is deliberately exact so forgetting to bump fails here
         # rather than showing a stale page in production.
-        self.assertContains(response, 'demo_splitpane.css?v=11')
-        self.assertContains(response, 'demo_a2ui.js?v=15')
+        self.assertContains(response, 'demo_splitpane.css?v=12')
+        self.assertContains(response, 'demo_a2ui.js?v=16')
 
 
 @override_settings(DEMO_FIXTURE_MODE=False)
