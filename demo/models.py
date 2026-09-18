@@ -10,6 +10,8 @@ names would change on every deploy, which breaks screenshots, a written demo
 script, and any bug report that refers to a patient by name.
 """
 
+from datetime import timedelta
+
 from django.conf import settings
 from django.db import models
 from django.db.models import F
@@ -161,3 +163,154 @@ class DemoQuota(models.Model):
         if quota.period_start < timezone.localdate():
             return quota.daily_limit
         return max(quota.daily_limit - quota.used, 0)
+
+
+# --------------------------------------------------------------------------- #
+# The conversation store (layer 8 — memory and session state).
+#
+# The policy these two models implement was settled on 2026-09-18 and is written
+# out in the harness at
+# docs/architecture/layer-08-memory-and-ux-strategy.md. In one paragraph:
+#
+#   * a conversation belongs to one account and one patient, and the patient is
+#     pinned when it opens and cannot be changed afterwards;
+#   * it lives for settings.DEMO_CONVERSATION_TTL_HOURS from the moment it is
+#     created, and a sweep deletes what has expired — the sweep is a job, not
+#     lazy expiry, because a row that is never read again is never swept by a
+#     reader;
+#   * a citation is stored as its identity (number, section, query) and not its
+#     passage text, which is re-derived from the note on demand, so no clinical
+#     note text accumulates in this database;
+#   * tool calls are stored as the tool name and arguments plus any payload that
+#     cannot be re-derived (the prediction scores). Retrieval payloads are
+#     re-derived, which is what keeps passage text out of the store;
+#   * deleting the account deletes its conversations, and the end of the
+#     demonstration is a purge rather than an archive.
+#
+# What a conversation therefore holds is a clinician's typed question, the answer
+# the agent produced, and references to the passages behind it — not the passages
+# themselves.
+# --------------------------------------------------------------------------- #
+
+
+class Conversation(models.Model):
+    """One working session between an account and one patient.
+
+    The patient is pinned deliberately. Every request carries its own admission
+    and isolation is enforced per request, so a conversation that could move
+    between patients would let a follow-up be answered about someone other than
+    the patient under discussion — a plausible answer about the wrong person.
+    Asking about a different patient starts a new conversation.
+    """
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='conversations',
+    )
+    patient = models.ForeignKey(
+        DemoPatient,
+        on_delete=models.CASCADE,
+        related_name='conversations',
+        help_text='Pinned at creation. Changing it is refused, not discouraged.',
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+    last_turn_at = models.DateTimeField(null=True, blank=True)
+    # A fixed window from creation rather than a sliding one: the retention
+    # promise is then about how long a conversation may exist, not about how long
+    # it may sit idle.
+    expires_at = models.DateTimeField(db_index=True)
+    turn_count = models.PositiveSmallIntegerField(
+        default=0,
+        help_text='User turns spent so far; the ceiling is a hard limit.',
+    )
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'conversation'
+        verbose_name_plural = 'conversations'
+
+    def __str__(self):
+        return (f'conversation {self.pk} — {self.user} with '
+                f'{self.patient.display_name}')
+
+    def save(self, *args, **kwargs):
+        if self.expires_at is None:
+            self.expires_at = self.created_at + timedelta(
+                hours=settings.DEMO_CONVERSATION_TTL_HOURS
+            )
+        if self.pk is not None:
+            pinned = type(self).objects.filter(pk=self.pk).values_list(
+                'patient_id', flat=True
+            ).first()
+            if pinned is not None and pinned != self.patient_id:
+                raise ValueError(
+                    'A conversation is pinned to the patient it opened with '
+                    f'({pinned}); start a new conversation to ask about another '
+                    'patient.'
+                )
+        super().save(*args, **kwargs)
+
+    @property
+    def is_expired(self):
+        return self.expires_at <= timezone.now()
+
+    @property
+    def has_capacity(self):
+        """False once the turn ceiling is reached.
+
+        The ceiling is a hard limit rather than a polite one: only the first
+        turn of a conversation spends a credit, so the ceiling is the only bound
+        on what one credit buys.
+        """
+        return self.turn_count < settings.DEMO_CONVERSATION_TURN_CEILING
+
+
+class Turn(models.Model):
+    """One question and the answer produced for it.
+
+    A failed turn is still a turn: it carries the error, and it does not spend a
+    turn from the ceiling unless the caller records one, so a conversation whose
+    first turn failed keeps its state and its credit.
+    """
+
+    class Role(models.TextChoices):
+        USER = 'user', 'User'
+        AGENT = 'agent', 'Agent'
+
+    conversation = models.ForeignKey(
+        Conversation,
+        on_delete=models.CASCADE,
+        related_name='turns',
+    )
+    ordinal = models.PositiveSmallIntegerField()
+    role = models.CharField(max_length=8, choices=Role.choices)
+    question = models.TextField(blank=True, default='')
+    answer = models.TextField(blank=True, default='')
+    # The model and the code revision that produced the answer, so a stored turn
+    # can be explained after the code has moved on.
+    model = models.CharField(max_length=64, blank=True, default='')
+    code_revision = models.CharField(max_length=64, blank=True, default='')
+    # Identities only: [{'cite': 1, 'section': 'hospital_course', 'query': '…'}].
+    # The passage behind each is re-derived from the note on demand.
+    citations = models.JSONField(default=list, blank=True)
+    # [{'name': 'predict_readmission', 'args': {…}, 'payload': {…}}]. The payload
+    # is kept only where it cannot be re-derived; retrieval results are left out
+    # and resolved again on replay.
+    tool_calls = models.JSONField(default=list, blank=True)
+    error = models.CharField(max_length=200, blank=True, default='')
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ['ordinal']
+        verbose_name = 'turn'
+        verbose_name_plural = 'turns'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['conversation', 'ordinal'],
+                name='unique_turn_ordinal_per_conversation',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.ordinal}. conversation {self.conversation_id} ({self.role})'

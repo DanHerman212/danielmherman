@@ -15,7 +15,7 @@ emitted (the trace element).
 {% block title %}Enterprise Clinical Copilot · A2UI{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'css/demo_splitpane.css' %}?v=9">
+<link rel="stylesheet" href="{% static 'css/demo_splitpane.css' %}?v=11">
 {% endblock %}
 
 {% block content %}
@@ -85,6 +85,19 @@ emitted (the trace element).
     {# ---------------- Risk view: the demo ---------------- #}
     <div class="demo-view demo-view-risk" id="risk-view">
 
+      {% if fixture_mode %}
+      {% comment %}
+        Offline scaffolding, and it says so. This mode answers captured payloads
+        and keeps no conversation: a follow-up here is a new question, not a
+        remembered one.
+      {% endcomment %}
+      <p class="demo-offline-note" role="note">
+        <i class="fa-solid fa-plug-circle-xmark" aria-hidden="true"></i>
+        Offline demonstration: answers come from captured payloads, one question
+        at a time. Follow-up questions need the live agent.
+      </p>
+      {% endif %}
+
       <div class="demo-layout">
 
         {# --- Screen 1: patient rail --- #}
@@ -128,6 +141,17 @@ emitted (the trace element).
               <span id="thread-patient-name">Select a patient</span>
               <span id="thread-patient-meta" class="pane-head-meta"></span>
             </div>
+
+            {% comment %}
+              The conversation lives in this page. Shown only once a conversation
+              is open (the flow unhides it with the id the site returns), so a
+              reload is understood rather than silent: the store keeps the turns
+              for another question, but this thread is the page's own.
+            {% endcomment %}
+            <p id="thread-session-note" class="thread-session-note" hidden>
+              This thread lives in this page. Reloading starts a new
+              conversation.
+            </p>
 
             <div class="thread" id="thread" aria-live="polite"></div>
 
@@ -187,5 +211,5 @@ emitted (the trace element).
   </div>
 </div>
 
-<script type="module" src="{% static 'js/demo_a2ui.js' %}?v=13"></script>
+<script type="module" src="{% static 'js/demo_a2ui.js' %}?v=15"></script>
 {% endblock %}

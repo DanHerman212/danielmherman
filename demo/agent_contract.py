@@ -5,7 +5,14 @@ from typing import Any, TypedDict
 
 class AgentToolCall(TypedDict, total=False):
     name: str
+    args: dict[str, Any]
     response: dict[str, Any] | None
+    # Whether the result can be obtained again by calling the tool again. The
+    # site stores a turn so a later turn can be replayed, and keeps the result
+    # only when it cannot: retrieval returns discharge-note text, and the store
+    # is not where note text lives. Absent means derivable — guessing the other
+    # way would put that text here.
+    derivable: bool
 
 
 class AgentSuccess(TypedDict, total=False):
@@ -16,6 +23,7 @@ class AgentSuccess(TypedDict, total=False):
     a2ui: dict[str, Any] | None
     sources: list[dict[str, Any]]
     model: str
+    code_revision: str
     mcp_transport: str
 
 
@@ -28,7 +36,7 @@ def validate_agent_response(result: Any) -> AgentSuccess:
     if not isinstance(result, dict):
         raise AgentResponseError("Agent returned a malformed response.")
 
-    for field in ("question", "answer", "model", "mcp_transport"):
+    for field in ("question", "answer", "model", "code_revision", "mcp_transport"):
         value = result.get(field)
         if value is not None and not isinstance(value, str):
             raise AgentResponseError(f"Agent returned an invalid {field} field.")
@@ -61,6 +69,11 @@ def validate_agent_response(result: Any) -> AgentSuccess:
                 raise AgentResponseError("Agent returned malformed tool calls.")
             response = call.get("response")
             if response is not None and not isinstance(response, dict):
+                raise AgentResponseError("Agent returned malformed tool calls.")
+            args = call.get("args")
+            if args is not None and not isinstance(args, dict):
+                raise AgentResponseError("Agent returned malformed tool calls.")
+            if "derivable" in call and not isinstance(call["derivable"], bool):
                 raise AgentResponseError("Agent returned malformed tool calls.")
 
     return result

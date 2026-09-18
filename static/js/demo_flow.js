@@ -33,6 +33,13 @@ const CHIPS = [
 
 const PAGE_SIZE = 10;
 
+/* A refusal that means the conversation cannot be continued: expired, swept, or
+ * out of turns. The next question then opens a new one, which is what the
+ * refusal tells the user to do. */
+const CONVERSATION_ENDED = [
+  'conversation_full', 'conversation_expired', 'unknown_conversation',
+];
+
 /* ------------------------------------------------------------------ */
 /* shared helpers (also used by the per-demo canvas renderers)         */
 /* ------------------------------------------------------------------ */
@@ -111,6 +118,7 @@ export function createDemoFlow({ root, askUrl, renderCanvas, onCite }) {
     search: document.getElementById('patient-search'),
     threadName: document.getElementById('thread-patient-name'),
     threadMeta: document.getElementById('thread-patient-meta'),
+    sessionNote: document.getElementById('thread-session-note'),
     thread: document.getElementById('thread'),
     input: document.getElementById('question-input'),
     askBtn: document.getElementById('ask-btn'),
@@ -149,6 +157,10 @@ export function createDemoFlow({ root, askUrl, renderCanvas, onCite }) {
         lastMode: null,
         lastFixtureNote: '',
         a2ui: null,
+        // Layer 8: the conversation this patient's thread continues. The site
+        // keeps the turns; this is the name of the thread to keep them in, and
+        // it is per patient, so a patient change starts a new one.
+        conversationId: null,
       });
     }
     return state.episodes.get(hadmId);
@@ -229,6 +241,7 @@ export function createDemoFlow({ root, askUrl, renderCanvas, onCite }) {
     els.input.disabled = true;
     els.askBtn.disabled = true;
     els.thread.replaceChildren();
+    syncSessionNote(null);
     if (els.composerChips) els.composerChips.hidden = true;
     paint(null);
     // Reset the left rail to its starting position too: clear the search and
@@ -312,6 +325,19 @@ export function createDemoFlow({ root, askUrl, renderCanvas, onCite }) {
     }
   }
 
+  /** Say where the thread lives, while it exists.
+
+      A conversation is the page's: the site stores its turns, but the rendered
+      thread is this document's memory, and a reload ends it. Saying so is the
+      difference between a boundary the user understands and one they discover
+      from a follow-up that was answered as a first question. Shown when the
+      site has given this thread a conversation, hidden again when the site
+      refuses to continue it. */
+  function syncSessionNote(episode) {
+    if (!els.sessionNote) return;
+    els.sessionNote.hidden = !(episode && episode.conversationId);
+  }
+
   /** Render the thread as chapters: turns grouped into [user, agent] pairs,
       older chapters collapsed under an "Earlier messages" toggle (Copilot-chat
       style), the latest chapter expanded. Chips live in the pinned composer,
@@ -319,6 +345,7 @@ export function createDemoFlow({ root, askUrl, renderCanvas, onCite }) {
   function renderThread(episode) {
     els.thread.replaceChildren();
     renderComposerChips(episode);
+    syncSessionNote(episode);
 
     if (episode.turns.length === 0) return;
 
@@ -653,6 +680,11 @@ export function createDemoFlow({ root, askUrl, renderCanvas, onCite }) {
     const episode = episodeFor(state.current.hadmId);
     const hadmId = state.current.hadmId;      // S7-07: capture at send time
 
+    // A follow-up names the conversation it continues. Without this the agent
+    // would answer every question on its own, which is what it does by design:
+    // it holds no conversation, and the caller is the one that remembers.
+    if (episode.conversationId) body.conversation_id = episode.conversationId;
+
     // Show the user turn immediately (asker's name pinned for S7-07).
     episode.turns.push({ role: 'user', text: userText, patientName: state.current.name });
     renderThread(episode);
@@ -710,6 +742,13 @@ export function createDemoFlow({ root, askUrl, renderCanvas, onCite }) {
       // answer: `data` is null and the pending turn must still be replaced.
       if (!res.ok || !data || data.error) {
         const problem = data || {};
+        // A conversation that has expired, been swept, or reached its ceiling
+        // cannot be continued. Forgetting it here is what makes the refusal's
+        // "start a new conversation" true of the next question rather than
+        // advice the user cannot act on.
+        if (problem.error && CONVERSATION_ENDED.includes(problem.error)) {
+          episode.conversationId = null;
+        }
         // A stream that ended early needs different words from an HTTP error:
         // one is a connection that was cut, the other is a status code.
         const fallback = streamed
@@ -753,6 +792,9 @@ export function createDemoFlow({ root, askUrl, renderCanvas, onCite }) {
     replacePending(turn);
     episode.lastMode = data.source || 'live';
     episode.lastFixtureNote = data.fixture_note || '';
+    // The id of the conversation this turn belongs to. The next question sends
+    // it back, which is what makes the next question a follow-up.
+    if (data.conversation_id) episode.conversationId = data.conversation_id;
     // The A2UI renderer reads this envelope to draw the agent-composed canvas.
     episode.a2ui = data.a2ui || null;
 

@@ -10,8 +10,10 @@ import logging
 from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
+from django.db.models import F
 from django.http import JsonResponse, StreamingHttpResponse
 from django.shortcuts import render
+from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from .agent_client import (
@@ -20,12 +22,50 @@ from .agent_client import (
     ask_stream as ask_agent_stream,
     trace_id,
 )
+from .conversations import record_answer, replay_turns
 from .fixtures import CHIP_NAMES, fixture_ask
-from .models import DemoPatient, DemoQuota
+from .models import Conversation, DemoPatient, DemoQuota
 
 logger = logging.getLogger(__name__)
 
 MAX_QUESTION_CHARS = 2000
+
+# The fields a request may carry, mirroring the agent's closed contract
+# (services/agent/contracts.py). An unknown field used to be ignored here, so a
+# caller that sent a history received an answer that had silently dropped it —
+# the failure the agent's own closure exists to prevent, sitting at the boundary
+# a browser can actually reach. Refusing is what keeps a single-turn demo honest
+# about being single-turn.
+APPROVED_REQUEST_FIELDS = frozenset(
+    {'question', 'hadm_id', 'chip', 'conversation_id'}
+)
+
+# Names a caller reaches for when it expects the copilot to remember the
+# conversation. None of them do anything, and the refusal says so rather than
+# leaving the caller to infer it from an answer that quietly lost its context.
+CONVERSATION_FIELDS = frozenset(
+    {'history', 'messages', 'session_id', 'context', 'turns'}
+)
+
+
+def _unsupported_field_error(payload):
+    """The message to refuse a payload with, or None when it is acceptable.
+
+    The same two-wording shape the agent uses, so the two boundaries explain the
+    refusal in the same terms: a conversation field is refused as a product
+    decision made visible, and any other unknown field is refused by naming what
+    the endpoint does accept.
+    """
+    unknown = sorted(set(payload) - APPROVED_REQUEST_FIELDS)
+    if not unknown:
+        return None
+    named = ', '.join(f"'{name}'" for name in unknown)
+    if CONVERSATION_FIELDS.intersection(unknown):
+        return (f'Unsupported field(s): {named}. This demonstration is '
+                'single-turn, so a conversation field is refused rather than '
+                'silently ignored.')
+    return (f'Unsupported field(s): {named}. Send a question, or a chip with an '
+            'admission.')
 
 # The one message the browser shows when the copilot cannot answer. Internal
 # detail is never returned to the client (S1-03); the trace id pairs this with
@@ -36,6 +76,100 @@ UNAVAILABLE = 'The clinical copilot is unavailable. Please try again.'
 # worker thread. A sentinel rather than catching StopIteration, because
 # StopIteration cannot cross a Future's boundary.
 _EXHAUSTED = object()
+
+# What a caller is told when a conversation has spent its turns. It names the way
+# forward rather than only the refusal: the ceiling exists to bound what one
+# credit buys, not to end the conversation for the user.
+CONVERSATION_FULL = (
+    'This conversation has reached its turn limit. Start a new conversation to '
+    'keep asking about this patient.'
+)
+
+
+def _resolve_conversation(request, payload, hadm_id):
+    """The conversation this request continues, or the one it opens.
+
+    Returns `(conversation, opening, error)`. `conversation` is None for a turn
+    that belongs to no conversation at all: a question asked with no admission
+    has no patient to pin, and every conversation is about exactly one patient.
+
+    The rules are the layer's, in one place: a conversation is pinned to the
+    patient it opened with, it is refused once it has passed its retention window
+    even if the sweep has not reached it yet, and it is refused once its turns
+    are spent. A conversation that belongs to somebody else is reported exactly
+    as one that does not exist, because the difference is not the caller's
+    business.
+    """
+    raw = payload.get('conversation_id')
+    if raw is None:
+        if hadm_id is None:
+            return None, False, None
+        return Conversation.objects.create(
+            user=request.user, patient_id=hadm_id), True, None
+
+    try:
+        pk = int(raw)
+    except (TypeError, ValueError):
+        return None, False, JsonResponse(
+            {'error': 'conversation_id must be an integer.'}, status=400)
+
+    conversation = Conversation.objects.filter(pk=pk, user=request.user).first()
+    if conversation is None:
+        return None, False, JsonResponse({
+            'error': 'unknown_conversation',
+            'message': 'That conversation does not exist. Start a new one.',
+        }, status=404)
+    if conversation.is_expired:
+        # Belt as well as braces: the sweep is the thing that removes expired
+        # conversations, and this is the check that makes the retention promise
+        # hold for a request that arrives before the next sweep runs.
+        return None, False, JsonResponse({
+            'error': 'conversation_expired',
+            'message': 'That conversation has expired. Start a new one.',
+        }, status=409)
+    if hadm_id is not None and conversation.patient_id != hadm_id:
+        return None, False, JsonResponse({
+            'error': 'conversation_patient_mismatch',
+            'message': 'That conversation is about another patient. Start a new '
+                       'one.',
+        }, status=409)
+    if not conversation.has_capacity:
+        return None, False, JsonResponse({
+            'error': 'conversation_full',
+            'message': CONVERSATION_FULL,
+        }, status=409)
+    return conversation, False, None
+
+
+def _record_turn(conversation):
+    """Count a turn that produced an answer.
+
+    Only a turn that produced an answer counts, which is what makes the ceiling
+    a limit on answers rather than on attempts: a failed first turn keeps its
+    credit and its place, and the retry is the first successful turn.
+    """
+    if conversation is None:
+        return
+    Conversation.objects.filter(pk=conversation.pk).update(
+        turn_count=F('turn_count') + 1, last_turn_at=timezone.now()
+    )
+
+
+def _with_replay(intent, conversation):
+    """The intent plus the earlier turns of this conversation, if there is one.
+
+    The agent holds nothing between requests (layer 8: it is stateless by
+    requirement), so continuity is something the caller supplies. This is the
+    caller: the site stores the turns and sends them back, which keeps the
+    agent free of a store and keeps the browser from being one.
+
+    Nothing is sent for a turn that stands alone — a question with no admission
+    has no conversation and no earlier turns — or for the first turn of one.
+    """
+    turns = replay_turns(conversation)
+    if turns:
+        intent['turns'] = turns
+    return intent
 
 
 def _intent_for(payload):
@@ -108,6 +242,10 @@ def a2ui_console(request):
     return render(request, 'demo/a2ui_console.html', {
         'rows': [{'patient': p} for p in DemoPatient.objects.all()],
         'remaining': DemoQuota.remaining(request.user),
+        # Fixture mode answers captured payloads one question at a time and keeps
+        # no conversation at all, so the page says so rather than letting a
+        # follow-up look like it was remembered.
+        'fixture_mode': settings.DEMO_FIXTURE_MODE,
     })
 
 
@@ -150,7 +288,7 @@ async def _remaining(user):
     return await sync_to_async(DemoQuota.remaining)(user)
 
 
-async def _stream_frames(user, trace, period, first, rest):
+async def _stream_frames(user, trace, period, first, rest, conversation=None):
     """Relay the agent's frames to the browser, then close.
 
     ASYNC on purpose, and this is not a style choice. A synchronous iterator
@@ -199,8 +337,14 @@ async def _stream_frames(user, trace, period, first, rest):
                     })
                     return
                 # The presentation contract is composed in the AGENT; Django
-                # adds only the web-specific quota figure.
+                # adds only the web-specific quota figure, counts the turn now
+                # that an answer exists, and stores it so the next question can
+                # be answered as a follow-up.
+                await sync_to_async(_record_turn)(conversation)
+                await sync_to_async(record_answer)(conversation, data)
                 data['remaining'] = await _remaining(user)
+                if conversation is not None:
+                    data['conversation_id'] = conversation.pk
                 yield _sse('answer', data)
                 return
 
@@ -255,6 +399,13 @@ def a2ui_ask(request):
     if not isinstance(payload, dict):
         return JsonResponse({'error': 'Request body must be a JSON object.'}, status=400)
 
+    # Refuse unknown fields before anything else, including before the fixture
+    # branch, so neither mode can answer a request whose extra fields it would
+    # have dropped in silence.
+    unsupported = _unsupported_field_error(payload)
+    if unsupported:
+        return JsonResponse({'error': unsupported}, status=400)
+
     # Fixture mode answers the starter chips from real captured payloads (same
     # response shape as the live agent /ask). Passing the payload straight
     # through means free text / unknown chips get the clear "use the live
@@ -273,19 +424,32 @@ def a2ui_ask(request):
     if error:
         return JsonResponse({'error': error}, status=400)
 
-    # Claim the credit before spending anything. Checking the quota after
-    # the call would let a burst of concurrent requests all pass the check
-    # and all bill. `period` is the claim token a refund must present.
-    period = DemoQuota.consume(request.user)
-    if not period:
-        return JsonResponse({
-            'error': 'Daily demo limit reached.',
-            'remaining': 0,
-        }, status=429)
+    conversation, opening, error = _resolve_conversation(
+        request, payload, intent.get('hadm_id'))
+    if error is not None:
+        return error
+
+    # Claim a credit before spending anything — but only when this request opens
+    # a conversation, or stands alone. A follow-up inside a conversation is
+    # already paid for; the ceiling is what bounds it. Checking the quota after
+    # the call would let a burst of concurrent requests all pass the check and
+    # all bill. `period` is the claim token a refund must present, and it stays
+    # None when no credit was claimed, which is what makes the refund path below
+    # a no-op rather than a second wrong debit.
+    if conversation is None or opening:
+        period = DemoQuota.consume(request.user)
+        if not period:
+            return JsonResponse({
+                'error': 'Daily demo limit reached.',
+                'remaining': 0,
+            }, status=429)
+    else:
+        period = None
 
     trace = trace_id(request)
+    _with_replay(intent, conversation)
     if 'text/event-stream' in request.headers.get('Accept', ''):
-        return _streaming_ask(request, intent, trace, period)
+        return _streaming_ask(request, intent, trace, period, conversation)
 
     try:
         result = ask_agent(intent, trace=trace)
@@ -317,11 +481,18 @@ def a2ui_ask(request):
     # is composed in the AGENT — the layer where the guardrails ran and the
     # tool evidence is visible. Django is a pass-through for it; only the
     # web-specific `remaining` quota is added here.
+    _record_turn(conversation)
+    record_answer(conversation, result)
     result['remaining'] = DemoQuota.remaining(request.user)
+    if conversation is not None:
+        # The browser keeps this and sends it back on the next question, which
+        # is what turns the next question into a follow-up rather than a new
+        # conversation (and therefore what keeps it from costing a credit).
+        result['conversation_id'] = conversation.pk
     return JsonResponse(result)
 
 
-def _streaming_ask(request, intent, trace, period):
+def _streaming_ask(request, intent, trace, period, conversation=None):
     """Start a streamed answer, or fail the way the blocking path fails.
 
     The first frame is pulled here, before the response is committed to being a
@@ -363,7 +534,7 @@ def _streaming_ask(request, intent, trace, period):
         }, status=502)
 
     response = StreamingHttpResponse(
-        _stream_frames(request.user, trace, period, first, stream),
+        _stream_frames(request.user, trace, period, first, stream, conversation),
         content_type='text/event-stream',
     )
     response['Cache-Control'] = 'no-cache'

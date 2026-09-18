@@ -133,7 +133,17 @@ body:has(#demo-root), body:has(#a2ui-root) { overflow-x: auto; }
 
 /* views */
 .demo-view { min-width: 0; }
-.demo-view-risk { height: 100%; }
+.demo-view-risk { height: 100%; display: flex; flex-direction: column; }
+/* The offline banner takes its own row when it is present, so the split pane
+ * keeps the rest of the height instead of being pushed past it. */
+.demo-view-risk > .demo-layout { flex: 1; min-height: 0; }
+.demo-offline-note {
+  display: flex; align-items: center; gap: 8px;
+  margin: 0; padding: 8px 14px;
+  font-size: 0.8rem; color: var(--muted);
+  background: rgba(148, 163, 184, 0.12);
+  border-bottom: 1px solid var(--line);
+}
 .demo-view-dashboard { height: 100%; }
 .dashboard-placeholder {
   height: 100%; display: flex; flex-direction: column; align-items: center;
@@ -210,6 +220,15 @@ body:has(#demo-root), body:has(#a2ui-root) { overflow-x: auto; }
   border-bottom: 1px solid var(--line); background: var(--surface-2);
 }
 .pane-head-meta { font-weight: 400; color: var(--muted); font-size: 0.72rem; }
+/* The page-lifetime notice: one quiet line under the pane head, shown only while
+ * a conversation is open. It answers "where did my thread go?" before the user
+ * asks it, and it is deliberately not a warning banner — nothing is wrong. */
+.thread-session-note {
+  margin: 0; padding: 6px 14px;
+  font-size: 0.72rem; color: var(--muted);
+  border-bottom: 1px solid var(--line);
+}
+.thread-session-note[hidden] { display: none; }
 .back-btn {
   flex: none; width: 28px; height: 28px; border-radius: 7px;
   border: 1px solid var(--line); background: var(--surface); color: var(--text);

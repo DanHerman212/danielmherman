@@ -100,6 +100,18 @@ DEMO_AGENT_URL = os.environ.get('DEMO_AGENT_URL', '')
 # the same request, and both scale to zero.
 DEMO_AGENT_TIMEOUT = int(os.environ.get('DEMO_AGENT_TIMEOUT', '120'))
 DEMO_DAILY_LIMIT = int(os.environ.get('DEMO_DAILY_LIMIT', '10'))
+# How long a conversation may exist, and how many user turns it may hold. Both
+# are policy decisions settled on 2026-09-18 (layer 8): the window is fixed from
+# creation so the retention promise is about the age of a conversation rather
+# than its idleness, and the ceiling is a hard limit because only the first turn
+# of a conversation spends a credit, which leaves the ceiling as the only bound
+# on what one credit buys.
+DEMO_CONVERSATION_TTL_HOURS = int(
+    os.environ.get('DEMO_CONVERSATION_TTL_HOURS', '24')
+)
+DEMO_CONVERSATION_TURN_CEILING = int(
+    os.environ.get('DEMO_CONVERSATION_TURN_CEILING', '6')
+)
 # Refunds for failures that DID incur model spend (agent timeouts, tool
 # errors) are capped per user per day, or a request engineered to always fail
 # downstream turns the refund loop into unmetered Gemini spend (S1-09).

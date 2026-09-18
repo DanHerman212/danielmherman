@@ -13,12 +13,14 @@ from unittest.mock import patch
 from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.core.management import call_command
+from django.db import IntegrityError
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
 from .agent_client import AgentError
-from .models import DemoPatient, DemoQuota
+from .models import Conversation, DemoPatient, DemoQuota, Turn
 
 # A live agent reply shaped like the real /ask response: the agent composes
 # the full presentation contract (a2ui, sources) and
@@ -229,6 +231,189 @@ class A2uiFixtureContractTests(TestCase):
         self.assertIn('remaining', body)
 
 
+class ConversationStoreTests(TestCase):
+    """The conversation store enforces the policy, not just the schema."""
+
+    def setUp(self):
+        self.user = User.objects.create_user('demo', password='x')
+        self.patient = DemoPatient.objects.create(
+            hadm_id=90000017, display_name='Eugene Sokolov', age=83,
+            sex='M', summary='83M', split_name='test',
+        )
+        self.other = DemoPatient.objects.create(
+            hadm_id=90000018, display_name='Other Patient', age=70,
+            sex='F', summary='70F', split_name='test',
+        )
+
+    def _conversation(self, patient=None):
+        return Conversation.objects.create(
+            user=self.user, patient=patient or self.patient)
+
+    def test_the_retention_window_is_set_at_creation(self):
+        conversation = self._conversation()
+
+        expected = conversation.created_at + timedelta(
+            hours=settings.DEMO_CONVERSATION_TTL_HOURS)
+        self.assertEqual(conversation.expires_at, expected)
+        self.assertFalse(conversation.is_expired)
+
+    def test_an_expired_conversation_reports_itself_as_expired(self):
+        conversation = self._conversation()
+        Conversation.objects.filter(pk=conversation.pk).update(
+            expires_at=timezone.now() - timedelta(seconds=1))
+
+        self.assertTrue(Conversation.objects.get(pk=conversation.pk).is_expired)
+
+    def test_the_patient_is_pinned(self):
+        """A conversation that could move between patients would let a
+        follow-up be answered about the wrong person."""
+        conversation = self._conversation()
+        conversation.patient = self.other
+
+        with self.assertRaises(ValueError):
+            conversation.save()
+        self.assertEqual(
+            Conversation.objects.get(pk=conversation.pk).patient_id,
+            self.patient.pk)
+
+    def test_capacity_stops_at_the_ceiling(self):
+        conversation = self._conversation()
+        self.assertTrue(conversation.has_capacity)
+
+        Conversation.objects.filter(pk=conversation.pk).update(
+            turn_count=settings.DEMO_CONVERSATION_TURN_CEILING)
+
+        self.assertFalse(
+            Conversation.objects.get(pk=conversation.pk).has_capacity)
+
+    def test_a_turn_records_identity_rather_than_passage_text(self):
+        conversation = self._conversation()
+        turn = Turn.objects.create(
+            conversation=conversation, ordinal=1, role=Turn.Role.AGENT,
+            question='Why was this patient flagged?', answer='She was flagged…',
+            model='gemini-3.1-flash-lite', code_revision='abc1234',
+            citations=[{'cite': 1, 'section': 'hospital_course',
+                        'query': 'why flagged'}],
+            tool_calls=[
+                {'name': 'predict_readmission', 'args': {'hadm_id': 90000017},
+                 'payload': {'probability': 0.31}},
+            ],
+        )
+
+        stored = Turn.objects.get(pk=turn.pk)
+        self.assertEqual(stored.citations[0]['section'], 'hospital_course')
+        self.assertNotIn('text', stored.citations[0])
+
+    def test_two_turns_cannot_share_an_ordinal(self):
+        conversation = self._conversation()
+        Turn.objects.create(conversation=conversation, ordinal=1,
+                            role=Turn.Role.USER, question='First?')
+
+        with self.assertRaises(IntegrityError):
+            Turn.objects.create(conversation=conversation, ordinal=1,
+                                role=Turn.Role.USER, question='Again?')
+
+
+class PurgeExpiredConversationsTests(TestCase):
+    """The sweep is a job: lazy expiry never touches a row nobody reads."""
+
+    def setUp(self):
+        self.user = User.objects.create_user('demo', password='x')
+        self.patient = DemoPatient.objects.create(
+            hadm_id=90000017, display_name='Eugene Sokolov', age=83,
+            sex='M', summary='83M', split_name='test',
+        )
+
+    def _conversation(self, *, expired):
+        conversation = Conversation.objects.create(
+            user=self.user, patient=self.patient)
+        if expired:
+            Conversation.objects.filter(pk=conversation.pk).update(
+                expires_at=timezone.now() - timedelta(minutes=1))
+        return conversation
+
+    def test_it_deletes_what_has_expired_and_keeps_what_has_not(self):
+        expired = self._conversation(expired=True)
+        Turn.objects.create(conversation=expired, ordinal=1,
+                            role=Turn.Role.USER, question='Abandoned?')
+        live = self._conversation(expired=False)
+
+        call_command('purge_expired_conversations')
+
+        self.assertFalse(Conversation.objects.filter(pk=expired.pk).exists())
+        self.assertEqual(Turn.objects.filter(conversation=expired).count(), 0)
+        self.assertTrue(Conversation.objects.filter(pk=live.pk).exists())
+
+    def test_a_dry_run_deletes_nothing(self):
+        expired = self._conversation(expired=True)
+
+        call_command('purge_expired_conversations', '--dry-run')
+
+        self.assertTrue(Conversation.objects.filter(pk=expired.pk).exists())
+
+    def test_an_account_deletion_takes_its_conversations_with_it(self):
+        conversation = self._conversation(expired=False)
+
+        self.user.delete()
+
+        self.assertFalse(Conversation.objects.filter(pk=conversation.pk).exists())
+
+
+@override_settings(DEMO_FIXTURE_MODE=True)
+class RequestBoundaryTests(TestCase):
+    """The site refuses unknown fields instead of dropping them in silence.
+
+    The agent's contract has been closed for some time: it refuses a field it
+    does not know rather than answering a question that quietly lost part of its
+    input. The site's proxy in front of it was open — it read three keys and
+    ignored every other key — so a browser that posted a history was answered as
+    though it had not, at the boundary a browser can actually reach. These tests
+    hold the two boundaries to the same behaviour, including in fixture mode,
+    which answers before the agent is ever called.
+    """
+
+    def setUp(self):
+        self.user = User.objects.create_user('demo', password='x')
+        self.client.force_login(self.user)
+        DemoPatient.objects.create(
+            hadm_id=90000017, display_name='Eugene Sokolov', age=83,
+            sex='M', summary='83M', split_name='test',
+        )
+
+    def _post(self, payload):
+        return self.client.post(
+            reverse('demo:a2ui_ask'),
+            data=json.dumps(payload),
+            content_type='application/json',
+        )
+
+    def test_a_conversation_field_is_refused_rather_than_dropped(self):
+        response = self._post(
+            {'hadm_id': 90000017, 'question': 'And the potassium?',
+             'history': [{'role': 'user', 'text': 'Why was this patient flagged?'}]}
+        )
+
+        self.assertEqual(response.status_code, 400)
+        error = response.json()['error']
+        self.assertIn("'history'", error)
+        self.assertIn('single-turn', error)
+
+    def test_an_unknown_field_is_refused_by_name(self):
+        response = self._post({'hadm_id': 90000017, 'chip': 'risk', 'foo': 1})
+
+        self.assertEqual(response.status_code, 400)
+        error = response.json()['error']
+        self.assertIn("'foo'", error)
+        self.assertIn('Send a question', error)
+
+    def test_the_known_fields_still_answer(self):
+        """The boundary must not refuse what the console actually sends."""
+        response = self._post({'hadm_id': 90000017, 'chip': 'risk'})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['source'], 'fixture')
+
+
 @override_settings(DEMO_FIXTURE_MODE=True)
 class A2uiConsolePageTests(TestCase):
     """The A2UI console page renders the shell the canvas mounts into."""
@@ -275,6 +460,13 @@ class A2uiConsolePageTests(TestCase):
         self.assertContains(response, 'id="a2ui-host"')
         self.assertContains(response, 'id="patient-list"')
         self.assertContains(response, 'id="thread"')
+        # The conversation's lifetime is stated in the interface, not left for the
+        # user to discover from a follow-up answered as a first question. It ships
+        # hidden: the flow shows it once the site has given the thread a
+        # conversation id.
+        self.assertContains(response, 'id="thread-session-note"')
+        self.assertContains(response, 'Reloading starts a new')
+        self.assertContains(response, 'id="thread-session-note" class="thread-session-note" hidden')
         self.assertContains(response, 'id="a2ui-toggle-msg"')
         self.assertContains(response, 'id="a2ui-messages"')
         # Screen 3: the trace toggle (top-right of the canvas pane) now drives
@@ -291,8 +483,8 @@ class A2uiConsolePageTests(TestCase):
         # an asset change reaches a browser that already has the old file; the
         # assertion is deliberately exact so forgetting to bump fails here
         # rather than showing a stale page in production.
-        self.assertContains(response, 'demo_splitpane.css?v=9')
-        self.assertContains(response, 'demo_a2ui.js?v=13')
+        self.assertContains(response, 'demo_splitpane.css?v=11')
+        self.assertContains(response, 'demo_a2ui.js?v=15')
 
 
 @override_settings(DEMO_FIXTURE_MODE=False)
