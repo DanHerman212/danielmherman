@@ -139,6 +139,43 @@ steps:
       - 'us-east1'
       - '--wait'
 
+  # The retention sweep, as a job: it is DEFINED here and not executed. Its
+  # schedule owns the execution (Cloud Scheduler calls jobs:run daily), and this
+  # step only guarantees the job exists and carries the current image and the
+  # fail-closed environment. Running it on every build would be harmless — it
+  # deletes only rows past their expiry — but it would put the sweep's effect in
+  # a deploy log where nobody looks for it, and the point of the schedule is that
+  # a retention promise is kept by something other than a person remembering.
+  #
+  # The command is the whole of the retention policy's enforcement: rows past
+  # DEMO_CONVERSATION_TTL_HOURS, with their turns. The window and the turn ceiling
+  # are read from settings, so the promise and its enforcement cannot drift.
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'jobs'
+      - 'update'
+      - 'purge-conversations'
+      - '--image'
+      - 'us-east1-docker.pkg.dev/$PROJECT_ID/danielmherman-repo/danielmherman:$COMMIT_SHA'
+      - '--region'
+      - 'us-east1'
+      # A job does not inherit the service's Cloud SQL attachment: without this
+      # the socket path does not exist and the sweep dies on
+      # `connection to server on socket "/cloudsql/.../.s.PGSQL.5432" failed`,
+      # which is how the first execution of this job failed (2026-09-18).
+      - '--set-cloudsql-instances'
+      - '$PROJECT_ID:us-east1:danielmherman-db'
+      - '--service-account'
+      - 'website-sa@$PROJECT_ID.iam.gserviceaccount.com'
+      - '--set-env-vars'
+      - '^@^ENVIRONMENT=production@GOOGLE_CLOUD_PROJECT=$PROJECT_ID@CLOUD_SQL_CONNECTION_NAME=$PROJECT_ID:us-east1:danielmherman-db@GS_BUCKET_NAME=danielmherman-media@ALLOWED_HOSTS=danielmherman.com,www.danielmherman.com,.run.app@CSRF_TRUSTED_ORIGINS=https://danielmherman.com,https://www.danielmherman.com@DEMO_AGENT_URL=https://agent-jamycsjjzq-ue.a.run.app'
+      - '--command'
+      - 'python'
+      - '--args'
+      - 'manage.py,purge_expired_conversations'
+
   # Promote the new revision ONLY after migrations and the cohort seed have
   # succeeded. Until this step runs, production still serves the old revision
   # (the --no-traffic revision above was created but never routed to).

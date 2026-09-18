@@ -8,10 +8,13 @@ the agent's answer in it, indefinitely. That is acceptable for the daily quota
 counter, whose stale value costs nothing and holds nothing, and it is not
 acceptable here.
 
-So the sweep is a job. In production this runs under `pg_cron` inside the
-Cloud SQL instance, or from a scheduler that runs this command; either way it is
-the only thing that removes an expired conversation, and it is safe to run as
-often as the schedule allows.
+So the sweep is a job. In production it runs as the Cloud Run job
+`purge-conversations` — defined in `cloudbuild.yaml`, attached to Cloud SQL,
+executing this command — and Cloud Scheduler's `purge-conversations-daily`
+executes it at 03:00 America/New_York with up to three retries. Either of those
+two places is where the schedule lives; this command is the only thing that
+removes an expired conversation, and it is safe to run as often as the schedule
+allows.
 
     python manage.py purge_expired_conversations [--batch-size 500] [--dry-run]
 """
