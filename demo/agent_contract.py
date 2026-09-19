@@ -24,6 +24,12 @@ class AgentSuccess(TypedDict, total=False):
     sources: list[dict[str, Any]]
     model: str
     code_revision: str
+    # The pointer to the run behind this answer. Optional here rather than
+    # required, unlike on the agent's side, because the two services deploy from
+    # separate triggers: a site revision that lands before an agent revision
+    # must keep answering, and a missing pointer is a lost convenience rather
+    # than a broken answer.
+    langfuse_trace_id: str
     mcp_transport: str
 
 
@@ -36,7 +42,8 @@ def validate_agent_response(result: Any) -> AgentSuccess:
     if not isinstance(result, dict):
         raise AgentResponseError("Agent returned a malformed response.")
 
-    for field in ("question", "answer", "model", "code_revision", "mcp_transport"):
+    for field in ("question", "answer", "model", "code_revision",
+                  "langfuse_trace_id", "mcp_transport"):
         value = result.get(field)
         if value is not None and not isinstance(value, str):
             raise AgentResponseError(f"Agent returned an invalid {field} field.")

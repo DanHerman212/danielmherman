@@ -122,6 +122,11 @@ DEMO_DAILY_REFUND_CAP = int(os.environ.get('DEMO_DAILY_REFUND_CAP', '3'))
 # Bounding them per instance keeps slow agent calls from exhausting the
 # thread pool and stalling the whole public site (S1-15).
 DEMO_AGENT_MAX_CONCURRENCY = int(os.environ.get('DEMO_AGENT_MAX_CONCURRENCY', '4'))
+# The observability UI, used by the staff console to link a stored turn to the
+# run behind it. Empty means no link is rendered, which is the right answer when
+# the stack is not up: a link to a host that does not answer reads as a broken
+# record rather than as an absent one.
+LANGFUSE_UI_URL = os.environ.get('LANGFUSE_UI_URL', '').rstrip('/')
 
 # Dev scaffolding only (S1-02): captured payloads used while building the UI.
 # Off by default and never allowed in production — the live site always calls

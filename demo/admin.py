@@ -1,4 +1,6 @@
+from django.conf import settings
 from django.contrib import admin
+from django.utils.html import format_html
 
 from .models import Conversation, DemoPatient, DemoQuota, Turn
 
@@ -26,11 +28,30 @@ class TurnInline(admin.TabularInline):
     extra = 0
     can_delete = False
     fields = ('ordinal', 'role', 'question', 'answer', 'model', 'code_revision',
-              'guardrail_flags', 'error', 'created_at')
+              'trace_link', 'guardrail_flags', 'error', 'created_at')
     readonly_fields = fields
 
     def has_add_permission(self, request, obj=None):
         return False
+
+    @admin.display(description='Langfuse trace')
+    def trace_link(self, obj):
+        """The run behind this answer, as a link, when there is one.
+
+        An operator reading a stored answer and asking "what did the model
+        actually do" needs to reach the run, and the trace id is the only bridge
+        between the two records. Rendered as text-without-a-link when either the
+        id or the configured UI is absent: a dead link in a clinical transcript
+        reads as an absent record, which is a worse failure than no link at all.
+        """
+        if not (settings.LANGFUSE_UI_URL and obj.langfuse_trace_id):
+            return '—'
+        return format_html(
+            '<a href="{}/trace/{}" target="_blank" rel="noopener">{}</a>',
+            settings.LANGFUSE_UI_URL,
+            obj.langfuse_trace_id,
+            obj.langfuse_trace_id,
+        )
 
 
 @admin.register(Conversation)

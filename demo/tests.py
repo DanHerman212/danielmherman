@@ -314,6 +314,76 @@ class ConversationStoreTests(TestCase):
                                 role=Turn.Role.USER, question='Again?')
 
 
+class StaffConsoleTraceLinkTests(TestCase):
+    """The staff console is where a stored turn is read, so it is where the
+    pointer has to work.
+
+    Tested through the admin page rather than by calling the inline method: the
+    method can be correct and still never appear, because a field missing from
+    the inline's `fields` renders nothing at all and no unit test of the method
+    would notice. What is asserted here is what an operator would see.
+    """
+
+    TRACE_ID = 'a84f7e9903ab13d86b6ee075f2a91f60'
+    UI = 'https://observability.example.test'
+
+    def setUp(self):
+        self.staff = User.objects.create_user(
+            'staff', password='x', is_staff=True, is_superuser=True)
+        self.user = User.objects.create_user('demo', password='x')
+        self.patient = DemoPatient.objects.create(
+            hadm_id=90000017, display_name='Eugene Sokolov', age=83,
+            sex='M', summary='83M', split_name='test',
+        )
+        self.conversation = Conversation.objects.create(
+            user=self.user, patient=self.patient)
+        self.client.force_login(self.staff)
+
+    def _turn(self, trace_id):
+        return Turn.objects.create(
+            conversation=self.conversation, ordinal=1, role=Turn.Role.AGENT,
+            question='Assess the 30-day readmission risk.',
+            answer='Estimated risk is 0.31.', code_revision='abc1234',
+            langfuse_trace_id=trace_id,
+        )
+
+    def _page(self):
+        return self.client.get(reverse(
+            'admin:demo_conversation_change', args=[self.conversation.pk]))
+
+    @override_settings(LANGFUSE_UI_URL=UI)
+    def test_a_stored_trace_id_is_a_working_link(self):
+        self._turn(self.TRACE_ID)
+
+        response = self._page()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, f'{self.UI}/trace/{self.TRACE_ID}')
+
+    @override_settings(LANGFUSE_UI_URL=UI)
+    def test_a_turn_answered_with_tracing_off_shows_no_link(self):
+        """Every turn has a row, and most have no trace to point at. A dead link
+        in a conversation reads as an absent record, so the empty case has to
+        render as nothing rather than as a link to nowhere."""
+        self._turn('')
+
+        response = self._page()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, f'{self.UI}/trace/')
+
+    @override_settings(LANGFUSE_UI_URL='')
+    def test_no_configured_ui_means_no_link(self):
+        """The setting is what keeps the domain out of the code: with it unset
+        the console shows the record and no address for it."""
+        self._turn(self.TRACE_ID)
+
+        response = self._page()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, '/trace/')
+
+
 class PurgeExpiredConversationsTests(TestCase):
     """The sweep is a job: lazy expiry never touches a row nobody reads."""
 

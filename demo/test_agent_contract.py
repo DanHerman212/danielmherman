@@ -32,6 +32,20 @@ class AgentContractTests(SimpleTestCase):
         with self.assertRaises(AgentResponseError):
             validate_agent_response({'code_revision': 1234})
 
+    def test_invalid_trace_id_is_rejected(self):
+        """The same rule as the revision, for the same reason: this value is
+        stored and then turned into a URL, so a non-string is refused at the
+        boundary rather than rendered as a broken link."""
+        with self.assertRaises(AgentResponseError):
+            validate_agent_response({'langfuse_trace_id': ['a84f7e99']})
+
+    def test_a_missing_trace_id_stays_compatible(self):
+        """Optional on this side, unlike on the agent's: the two deploy from
+        separate triggers, so a site revision that lands first must keep
+        answering. Losing the pointer loses a convenience, not an answer."""
+        self.assertEqual(validate_agent_response({'answer': 'ok'}),
+                         {'answer': 'ok'})
+
     def test_invalid_tool_call_name_is_rejected(self):
         with self.assertRaises(AgentResponseError):
             validate_agent_response({'tool_calls': [{'name': 123, 'response': {}}]})

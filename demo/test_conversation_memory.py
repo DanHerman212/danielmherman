@@ -51,6 +51,7 @@ AGENT_REPLY = {
     ],
     'model': 'gemini-3.1-flash-lite',
     'code_revision': 'abc1234',
+    'langfuse_trace_id': 'a84f7e9903ab13d86b6ee075f2a91f60',
     'mcp_transport': 'http',
 }
 
@@ -92,6 +93,45 @@ class TurnStoreTests(_AskTestCase):
         self.assertEqual(rows[1].answer, AGENT_REPLY['answer'])
         self.assertEqual(rows[1].model, 'gemini-3.1-flash-lite')
         self.assertEqual(rows[1].code_revision, 'abc1234')
+
+    @patch('demo.views.ask_agent', return_value=dict(AGENT_REPLY))
+    def test_the_turn_carries_the_pointer_to_its_run(self, _mocked):
+        """The trace id is stored with the turn, because the two records answer
+        different questions: the run says what the model was shown and which
+        tools ran, the row says what was answered after the tracing stack has
+        been swept. Without the id an operator matches the two by timestamp."""
+        self._post({'hadm_id': 90000009, 'chip': 'risk'})
+
+        stored = Turn.objects.get(conversation=self._conversation(),
+                                  role=Turn.Role.AGENT).langfuse_trace_id
+        self.assertEqual(stored, AGENT_REPLY['langfuse_trace_id'])
+
+    @patch('demo.views.ask_agent')
+    def test_a_turn_with_tracing_off_stores_no_pointer(self, mocked):
+        """Tracing is a sink, so a run with Langfuse unconfigured returns an
+        empty id and the turn stores the empty string. The answer is unaffected,
+        which is the point of the sink rule."""
+        mocked.return_value = {**AGENT_REPLY, 'langfuse_trace_id': ''}
+
+        response = self._post({'hadm_id': 90000009, 'chip': 'risk'})
+
+        self.assertEqual(response.status_code, 200)
+        stored = Turn.objects.get(conversation=self._conversation(),
+                                  role=Turn.Role.AGENT)
+        self.assertEqual(stored.langfuse_trace_id, '')
+
+    @patch('demo.views.ask_agent')
+    def test_a_pointer_that_is_not_a_string_is_not_stored(self, mocked):
+        """The column is read by the staff console to build a URL, so a value
+        that is not a string would put a broken link in front of an operator --
+        worse than no link, because it looks like evidence."""
+        mocked.return_value = {**AGENT_REPLY, 'langfuse_trace_id': 12345678}
+
+        self._post({'hadm_id': 90000009, 'chip': 'risk'})
+
+        stored = Turn.objects.get(conversation=self._conversation(),
+                                  role=Turn.Role.AGENT)
+        self.assertEqual(stored.langfuse_trace_id, '')
 
     @patch('demo.views.ask_agent', return_value=dict(AGENT_REPLY))
     def test_a_stored_citation_keeps_its_identity_and_not_its_passage(

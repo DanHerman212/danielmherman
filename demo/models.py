@@ -291,6 +291,18 @@ class Turn(models.Model):
     # can be explained after the code has moved on.
     model = models.CharField(max_length=64, blank=True, default='')
     code_revision = models.CharField(max_length=64, blank=True, default='')
+    # The pointer to the Langfuse trace behind this answer. The run is where the
+    # process is recorded — tool calls, timings, what the model was shown — and
+    # this row is where the answer survives a deploy, so an operator reading a
+    # conversation needs a way to reach the run instead of matching it by
+    # timestamp.
+    #
+    # Empty is the normal state, not an error: tracing is a sink and runs
+    # unconfigured, so the admin renders a link only when there is an id.
+    # The two records also expire on different clocks — a trace can be swept
+    # while its conversation is still inside its retention window — which makes
+    # this a convenience for the trace's lifetime and not an evidence link.
+    langfuse_trace_id = models.CharField(max_length=64, blank=True, default='')
     # Identities only: [{'cite': 1, 'section': 'hospital_course', 'query': '…'}].
     # The passage behind each is re-derived from the note on demand.
     citations = models.JSONField(default=list, blank=True)

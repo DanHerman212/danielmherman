@@ -81,6 +81,7 @@ def record_answer(conversation, result):
             answer=result.get('answer') or '',
             model=result.get('model') or '',
             code_revision=result.get('code_revision') or '',
+            langfuse_trace_id=_stored_trace_id(result.get('langfuse_trace_id')),
             citations=_stored_citations(result.get('sources')),
             tool_calls=_stored_calls(result.get('tool_calls')),
             guardrail_flags=_stored_flags(result.get('guardrail_flags')),
@@ -99,6 +100,24 @@ def _stored_flags(flags):
     violation that belongs in the log, not in this table.
     """
     return [flag for flag in flags or [] if isinstance(flag, str)]
+
+
+def _stored_trace_id(value):
+    """The pointer to the run, if it is a string that fits the column.
+
+    A pointer that is not a string is not a pointer, and this value is turned
+    into a URL by the admin, so storing a number or None would put a broken link
+    in front of an operator — worse than storing nothing, because it looks like
+    evidence. The agent's contract already refuses a non-string; this is the
+    second line for the fixture path, which composes responses without going
+    through the agent at all.
+
+    Truncated rather than trusted: the column is 64 characters and a Langfuse
+    trace id is 32, so anything longer is not an id this site can point at.
+    """
+    if not isinstance(value, str):
+        return ''
+    return value[:64]
 
 
 def _stored_citations(sources):
