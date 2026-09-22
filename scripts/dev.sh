@@ -1,24 +1,28 @@
 #!/bin/sh
 # Start the local dev server.
 #
-# The console page loads a BUILT JavaScript bundle (why: see
-# scripts/bundle_console_js.sh). The browser needs that file to exist on disk,
-# and there is no Docker build locally — so building it is part of STARTING the
-# server rather than a separate step. Nothing to remember, nothing that can be
-# stale, because the server will not start without it.
+# The console page loads a BUILT JavaScript bundle, produced by Vite from
+# static/js and the packages in package.json. The browser needs that file to
+# exist on disk, and there is no Docker build locally — so building it is part
+# of STARTING the server rather than a separate step. Nothing to remember,
+# nothing that can be stale, because the server will not start without it.
 #
-# Production does the same thing in the Dockerfile's jsbuild stage, so no human
-# runs this to ship a release.
+# Production builds the same bundle in the Dockerfile's jsbuild stage, so no
+# human runs this to ship a release.
 #
 #     sh scripts/dev.sh          # fixture mode: no agent, no ADC, no network
 #     sh scripts/dev.sh live     # the real agent (needs DEMO_AGENT_URL + ADC)
 #
 # Any further arguments go to uvicorn, e.g. `sh scripts/dev.sh --reload`.
+#
+# For rebuild-on-save instead of one build per start, run `npm run dev` in a
+# second terminal.
 set -e
 
 cd "$(dirname "$0")/.."
 
-sh scripts/bundle_console_js.sh
+[ -d node_modules ] || npm ci
+npm run build
 
 ENVIRONMENT=development
 export ENVIRONMENT

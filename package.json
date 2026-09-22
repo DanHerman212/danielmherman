@@ -1,0 +1,21 @@
+{
+  "name": "danielmherman",
+  "private": true,
+  "type": "module",
+  "description": "Front-end sources for danielmherman.com (the A2UI console page). Django serves the built output from static/js/bundled/.",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite build --watch"
+  },
+  "dependencies": {
+    "@a2ui/lit": "0.10.2",
+    "@a2ui/markdown-it": "0.1.0",
+    "@a2ui/web_core": "0.10.5",
+    "@lit/context": "1.1.6",
+    "lit": "3.2.1",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "vite": "8.3.0"
+  }
+}

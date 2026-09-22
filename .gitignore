@@ -15,12 +15,13 @@ local_settings.py
 staticfiles/
 media/
 
-# Build diagnostics (scripts/bundle_console_js.sh records the module graph here)
-a2ui_bundle.meta.json
+# Node dependencies — installed by `npm ci`, never committed.
+node_modules/
 
-# Built console JavaScript. Output, not source — `scripts/dev.sh` produces it
-# before starting the local server, and the Dockerfile's jsbuild stage produces
-# it for production. Never committed: a stored copy can go stale silently.
+# Built console JavaScript. Output, not source — `npm run build` produces it
+# locally (scripts/dev.sh runs it before starting the server) and the
+# Dockerfile's jsbuild stage produces it for production. Never committed: a
+# stored copy can go stale silently.
 static/js/bundled/
 
 # macOS

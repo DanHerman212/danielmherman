@@ -32,7 +32,7 @@ let scenePromise = null;
 
     Nothing on first paint needs it — the empty state is plain DOM — so this is
     called only on a path that is about to draw, or from the intent listener
-    below. The bundle it loads is one file (see scripts/bundle_console_js.sh). */
+    below. The bundle it loads is one file (see vite.config.js). */
 function scene() {
   if (!scenePromise) {
     const url = root.dataset.rendererUrl;

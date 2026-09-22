@@ -1,18 +1,21 @@
 # ---- console JavaScript bundle --------------------------------------------
-# The console page loads a bundle, not the raw module graph. Why: the A2UI
-# renderer is 385 ES modules, and a browser fetches an unbundled graph one
-# dependency layer at a time, so the page used to sit behind a spinner.
+# Builds the console page's JavaScript from static/js and the npm packages
+# declared in package.json. Why a bundle at all: an unbundled module graph is
+# fetched one dependency layer at a time, and the page used to wait on 385 of
+# them before it could paginate.
 #
-# Node lives ONLY in this stage. It is built from the same source the runtime
-# image ships, so the bundle cannot be stale; .dockerignore keeps any locally
+# Node lives ONLY in this stage. The bundle is built from the same source the
+# runtime image ships, so it cannot be stale; .dockerignore keeps any locally
 # generated copy out of the build context, so this is the only source of it.
-# See scripts/bundle_console_js.sh.
+#
+# `npm ci`, not `install`: it installs exactly what package-lock.json pins, so
+# the build is reproducible and cannot drift.
 FROM node:22-slim AS jsbuild
 WORKDIR /src
-COPY scripts/bundle_console_js.sh ./scripts/
+COPY package.json package-lock.json vite.config.js ./
+RUN npm ci
 COPY static/js ./static/js
-COPY static/vendor/a2ui ./static/vendor/a2ui
-RUN sh scripts/bundle_console_js.sh
+RUN npm run build
 
 # Use Python 3.12 slim image. Pinned by digest (multi-arch manifest list) so
 # rebuilds are reproducible: resolves linux/amd64 on Cloud Build and arm64 on
