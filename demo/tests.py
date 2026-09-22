@@ -314,6 +314,17 @@ class ConversationStoreTests(TestCase):
                                 role=Turn.Role.USER, question='Again?')
 
 
+# Plain storage: this class renders console-derived templates, which reference
+# static files by URL. The manifest is a build artifact, so resolving through it
+# makes the test fail on a checkout that has not run collectstatic.
+@override_settings(
+    STORAGES={
+        **settings.STORAGES,
+        "staticfiles": {
+            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"
+        },
+    }
+)
 class StaffConsoleTraceLinkTests(TestCase):
     """The staff console is where a stored turn is read, so it is where the
     pointer has to work.
@@ -554,7 +565,11 @@ class A2uiConsolePageTests(TestCase):
         # assertion is deliberately exact so forgetting to bump fails here
         # rather than showing a stale page in production.
         self.assertContains(response, 'demo_splitpane.css?v=12')
-        self.assertContains(response, 'demo_a2ui.js?v=16')
+        self.assertContains(response, 'js/bundled/demo_a2ui.js')
+        # The console script loads the A2UI renderer on demand from this URL. A
+        # missing attribute is a canvas that never draws and no error message,
+        # so it is pinned here rather than left to a browser test.
+        self.assertContains(response, 'data-renderer-url="')
 
 
 @override_settings(DEMO_FIXTURE_MODE=False)

@@ -42,6 +42,14 @@ steps:
       - 'us-east1'
       - '--platform'
       - 'managed'
+      # min-instances 0: scale to zero (reference architecture §5 — minimise
+      # billable resources). Stated explicitly rather than left unset so a
+      # deploy corrects the setting if it is ever flipped by hand. A warm
+      # instance removes the cold-start delay, but that is a deliberate, costed
+      # exception for a live window only: the site ran min-instances 1 from
+      # 2026-09-19 and returns to 0 with this change.
+      - '--min-instances'
+      - '0'
       - '--no-traffic'
       - '--service-account'
       - 'website-sa@$PROJECT_ID.iam.gserviceaccount.com'

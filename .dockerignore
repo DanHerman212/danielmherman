@@ -26,6 +26,12 @@ media/
 # Copying the local copy in bloats the image and can ship a stale manifest.
 staticfiles/
 
+# Console JavaScript bundles — the Dockerfile's jsbuild stage builds these from
+# static/js and static/vendor, so a locally generated copy must not enter the
+# context. Shipping one would risk serving bundles that do not match the source.
+static/js/bundled/
+a2ui_bundle.meta.json
+
 # Secrets and OS cruft
 .env
 .DS_Store

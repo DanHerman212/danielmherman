@@ -1,3 +1,19 @@
+# ---- console JavaScript bundle --------------------------------------------
+# The console page loads a bundle, not the raw module graph. Why: the A2UI
+# renderer is 385 ES modules, and a browser fetches an unbundled graph one
+# dependency layer at a time, so the page used to sit behind a spinner.
+#
+# Node lives ONLY in this stage. It is built from the same source the runtime
+# image ships, so the bundle cannot be stale; .dockerignore keeps any locally
+# generated copy out of the build context, so this is the only source of it.
+# See scripts/bundle_console_js.sh.
+FROM node:22-slim AS jsbuild
+WORKDIR /src
+COPY scripts/bundle_console_js.sh ./scripts/
+COPY static/js ./static/js
+COPY static/vendor/a2ui ./static/vendor/a2ui
+RUN sh scripts/bundle_console_js.sh
+
 # Use Python 3.12 slim image. Pinned by digest (multi-arch manifest list) so
 # rebuilds are reproducible: resolves linux/amd64 on Cloud Build and arm64 on
 # Apple Silicon. A floating tag would let the base drift under a stable build.
@@ -21,6 +37,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy project files
 COPY . .
+
+# The console JavaScript bundles, from the build stage above. Declared as its
+# own COPY so it is obvious where they come from: no bundle in the build
+# context (see .dockerignore), and no bundle committed to the repository.
+COPY --from=jsbuild /src/static/js/bundled ./static/js/bundled
 
 # Collect static files
 # NOTE: this must succeed. Do NOT suppress errors (e.g. `2>/dev/null || true`) —

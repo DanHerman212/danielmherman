@@ -19,7 +19,9 @@ emitted (the trace element).
 {% endblock %}
 
 {% block content %}
-<div id="a2ui-root" data-ask-url="{% url 'demo:a2ui_ask' %}">
+<div id="a2ui-root"
+     data-ask-url="{% url 'demo:a2ui_ask' %}"
+     data-renderer-url="{% static 'js/bundled/a2ui_renderer.js' %}?v=1">
 
   {# ---------------- Enterprise header ---------------- #}
   <header class="demo-header">
@@ -211,5 +213,5 @@ emitted (the trace element).
   </div>
 </div>
 
-<script type="module" src="{% static 'js/demo_a2ui.js' %}?v=16"></script>
+<script type="module" src="{% static 'js/bundled/demo_a2ui.js' %}?v=1"></script>
 {% endblock %}

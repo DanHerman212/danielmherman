@@ -15,6 +15,7 @@ nothing else. Two properties are tested as rules rather than as implementation:
 import json
 from unittest.mock import patch
 
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 from django.urls import reverse
@@ -337,6 +338,17 @@ class FixtureModeIsSingleTurnTests(_AskTestCase):
         self.assertEqual(Conversation.objects.count(), 0)
         self.assertEqual(Turn.objects.count(), 0)
 
+    # This test renders the console page, which references built static files.
+    # Plain storage keeps it independent of a collectstatic run: the manifest is
+    # a build artifact, and a test that needs one fails on a clean checkout.
+    @override_settings(
+        STORAGES={
+            **settings.STORAGES,
+            "staticfiles": {
+                "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"
+            },
+        }
+    )
     def test_the_console_says_so(self):
         response = self.client.get(reverse('demo:a2ui_console'))
         rendered = response.content.decode()
