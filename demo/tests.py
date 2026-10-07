@@ -548,11 +548,14 @@ class A2uiConsolePageTests(TestCase):
         self.assertContains(response, 'id="thread-session-note"')
         self.assertContains(response, 'Reloading starts a new')
         self.assertContains(response, 'id="thread-session-note" class="thread-session-note" hidden')
-        self.assertContains(response, 'id="a2ui-toggle-msg"')
         self.assertContains(response, 'id="a2ui-messages"')
-        # Screen 3: the trace toggle (top-right of the canvas pane) now drives
-        # the whole trace journey in the A2UI demo.
-        self.assertContains(response, 'id="trace-toggle"')
+        # The "Show trace" and "Show composed messages" controls were removed on
+        # 2026-10-07. They exposed the agent's plumbing to a viewer whose
+        # question is "is this advice trustworthy": what the canvas already
+        # shows, and what the trace link in the thread already reaches. Pinned
+        # as absent so reintroducing one is a deliberate act rather than a merge.
+        self.assertNotContains(response, 'id="trace-toggle"')
+        self.assertNotContains(response, 'id="a2ui-toggle-msg"')
         # The production demo (A2UI) header carries the Demo User Guide link.
         self.assertContains(response, 'Demo User Guide')
         self.assertContains(response, reverse('demo:guide'))
@@ -564,7 +567,7 @@ class A2uiConsolePageTests(TestCase):
         # an asset change reaches a browser that already has the old file; the
         # assertion is deliberately exact so forgetting to bump fails here
         # rather than showing a stale page in production.
-        self.assertContains(response, 'demo_splitpane.css?v=12')
+        self.assertContains(response, 'demo_splitpane.css?v=13')
         self.assertContains(response, 'js/bundled/demo_a2ui.js')
         # The console script loads the A2UI renderer on demand from this URL. A
         # missing attribute is a canvas that never draws and no error message,

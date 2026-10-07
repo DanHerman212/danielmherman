@@ -15,7 +15,7 @@ emitted (the trace element).
 {% block title %}Enterprise Clinical Copilot · A2UI{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'css/demo_splitpane.css' %}?v=12">
+<link rel="stylesheet" href="{% static 'css/demo_splitpane.css' %}?v=13">
 {% endblock %}
 
 {% block content %}
@@ -38,14 +38,6 @@ emitted (the trace element).
       </span>
     </div>
     <div class="demo-header-right">
-      <button class="demo-iconbtn" type="button" aria-label="Messages (3 new)">
-        <i class="fa-regular fa-envelope"></i>
-        <span class="notif-badge">3</span>
-      </button>
-      <button class="demo-iconbtn" type="button" aria-label="Alerts (2 new)">
-        <i class="fa-regular fa-bell"></i>
-        <span class="notif-badge">2</span>
-      </button>
       <a class="demo-guide-link" href="{% url 'demo:guide' %}">
         <i class="fa-regular fa-circle-question"></i>
         <span>Demo User Guide</span>
@@ -176,13 +168,6 @@ emitted (the trace element).
               <span>Context canvas</span>
               <span class="pane-head-actions">
                 <span id="canvas-mode" class="pane-head-meta"></span>
-                <button id="trace-toggle" type="button" class="demo-btn a2ui-toggle"
-                        aria-pressed="false" title="Show the raw tool calls behind the answer">
-                  <i class="fa-solid fa-microscope"></i> Show trace
-                </button>
-                <button id="a2ui-toggle-msg" type="button" class="demo-btn a2ui-toggle">
-                  Show composed messages
-                </button>
               </span>
             </div>
             <div class="canvas" id="a2ui-host">
@@ -213,5 +198,5 @@ emitted (the trace element).
   </div>
 </div>
 
-<script type="module" src="{% static 'js/bundled/demo_a2ui.js' %}?v=1"></script>
+<script type="module" src="{% static 'js/bundled/demo_a2ui.js' %}?v=2"></script>
 {% endblock %}

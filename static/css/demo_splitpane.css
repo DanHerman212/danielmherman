@@ -48,19 +48,6 @@ body:has(#demo-root), body:has(#a2ui-root) { overflow-x: auto; }
   letter-spacing: 0.01em; white-space: nowrap;
 }
 .demo-header-right { display: flex; align-items: center; gap: 10px; white-space: nowrap; }
-.demo-iconbtn {
-  position: relative; width: 38px; height: 38px; border-radius: 9px;
-  border: 1px solid var(--line); background: var(--surface); color: var(--text);
-  font-size: 1rem; cursor: pointer; display: inline-flex; align-items: center;
-  justify-content: center;
-}
-.demo-iconbtn:hover { background: var(--surface-2); }
-.notif-badge {
-  position: absolute; top: -5px; right: -5px; min-width: 17px; height: 17px;
-  border-radius: 999px; background: #dc2626; color: #fff;
-  font-size: 0.62rem; font-weight: 700; line-height: 17px; text-align: center;
-  padding: 0 4px; border: 2px solid var(--surface);
-}
 .demo-user { display: flex; align-items: center; gap: 9px; margin-left: 4px; }
 .demo-guide-link {
   display: inline-flex; align-items: center; gap: 7px;

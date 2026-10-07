@@ -22,7 +22,6 @@ import { createDemoFlow } from './demo_flow.js';
 const root = document.getElementById('a2ui-root');
 const host = document.getElementById('a2ui-host');
 const msgPre = document.getElementById('a2ui-messages');
-const toggleMsg = document.getElementById('a2ui-toggle-msg');
 
 // The renderer, resolved once. Two envelopes embed the catalog id, and both are
 // built on a render path that has already awaited `scene()`.
@@ -210,9 +209,4 @@ createDemoFlow({
       episode, api, turn && envelopeForCite(turn, n, renderer.catalog),
     ));
   },
-});
-
-toggleMsg.addEventListener('click', () => {
-  msgPre.hidden = !msgPre.hidden;
-  toggleMsg.textContent = msgPre.hidden ? 'Show composed messages' : 'Hide composed messages';
 });
