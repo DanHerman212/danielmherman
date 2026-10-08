@@ -1,37 +1,37 @@
 {
   "hadm_id": 90000023,
-  "probability": 0.326222,
-  "threshold": 0.12,
+  "probability": 0.114756,
+  "threshold": 0.11,
   "decision": 1,
-  "base_value": -1.33862,
+  "base_value": -1.767608,
   "top_factors": [
     {
-      "feature": "oncology_flag",
-      "contribution": 0.3436,
-      "direction": "increases"
+      "feature": "monocytes_min",
+      "contribution": -0.4762,
+      "direction": "decreases"
     },
     {
       "feature": "prior_inpatient_days",
-      "contribution": 0.2311,
+      "contribution": 0.2629,
       "direction": "increases"
     },
     {
-      "feature": "medication_count",
-      "contribution": 0.1506,
+      "feature": "oncology_flag",
+      "contribution": 0.2548,
       "direction": "increases"
     },
     {
       "feature": "rdw_max",
-      "contribution": -0.106,
+      "contribution": -0.1716,
       "direction": "decreases"
     },
     {
-      "feature": "gender",
-      "contribution": 0.0878,
-      "direction": "increases"
+      "feature": "medication_order_count",
+      "contribution": -0.0898,
+      "direction": "decreases"
     }
   ],
-  "model_version": "readmission-final-20260723172647",
+  "model_version": "readmission-final-20260917173317",
   "feature_source": "hybrid",
   "provenance": "HYBRID \u2014 local run of the serving predictor on hybrid cohort features (de-identified transcription samples, parsed/filled; 2026-08-21)"
 }
