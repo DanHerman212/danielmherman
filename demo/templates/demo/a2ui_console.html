@@ -37,11 +37,13 @@ emitted (the trace element).
         <span class="demo-brand-name">Enterprise Clinical<br/>Copilot</span>
       </span>
     </div>
+    {% comment %}
+    The header carries account actions only. The Demo User Guide sits at the
+    foot of the sidebar with the other demo-meta (the request quota): it is a
+    demo feature, not an account action, and as a pill up here it fought the
+    profile and Log out for the same corner.
+    {% endcomment %}
     <div class="demo-header-right">
-      <a class="demo-guide-link" href="{% url 'demo:guide' %}">
-        <i class="fa-regular fa-circle-question"></i>
-        <span>Demo User Guide</span>
-      </a>
       <div class="demo-user" title="Signed in as Dr. Lena Ortiz">
         <span class="demo-user-avatar" aria-hidden="true">LO</span>
         <span class="demo-user-name">Dr. Lena Ortiz</span>
@@ -71,6 +73,10 @@ emitted (the trace element).
         </button>
       </nav>
       <div class="demo-nav-footer">
+        <a class="demo-nav-guide" href="{% url 'demo:guide' %}">
+          <i class="fa-regular fa-circle-question"></i>
+          <span>Demo User Guide</span>
+        </a>
         <span class="demo-quota"><i class="fa-solid fa-bolt"></i> Requests left:
           <strong id="remaining">{{ remaining }}</strong></span>
       </div>

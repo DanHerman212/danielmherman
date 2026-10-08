@@ -107,6 +107,17 @@ body:has(#demo-root), body:has(#a2ui-root) { overflow-x: auto; }
   font-size: 0.72rem; color: #94a3b8;
 }
 .demo-quota { display: inline-flex; align-items: center; gap: 6px; }
+/* Demo User Guide, relocated to the sidebar foot. The header pill competed with
+   the profile and Log out for the same corner, and this is a demo feature
+   rather than an account action; down here it groups with the other demo-meta.
+   Minimum treatment on dark ground: icon and label only, no panel, no border. */
+.demo-nav-guide {
+  display: inline-flex; align-items: center; gap: 8px;
+  margin-bottom: 7px; font-size: 0.72rem; font-weight: 600;
+  color: #94a3b8; text-decoration: none;
+}
+.demo-nav-guide i { font-size: 0.85rem; }
+.demo-nav-guide:hover { color: #fff; }
 .demo-nav-list { display: flex; flex-direction: column; gap: 4px; }
 .demo-nav-item {
   display: flex; align-items: center; gap: 10px;
