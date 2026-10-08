@@ -113,8 +113,14 @@ emitted (the trace element).
                     class="patient-row"
                     data-hadm-id="{{ row.patient.hadm_id }}">
               <span class="patient-name">{{ row.patient.display_name }}</span>
+              {% comment %}
+              Age and sex only. The rest of the descriptor — admission type,
+              length of stay, discharge disposition — is parsed from the
+              features row and is NOT checked against the discharge note, so
+              the demo was asserting things it could not stand behind. Age and
+              sex ARE cross-checked against the note by coherence_scan.py.
+              {% endcomment %}
               <span class="patient-age">{{ row.patient.age }}{{ row.patient.sex }}</span>
-              <span class="patient-summary">{{ row.patient.summary }}</span>
             </button>
             {% empty %}
             <div class="demo-empty-list">No patients seeded. Run

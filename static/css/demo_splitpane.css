@@ -181,9 +181,7 @@ body:has(#demo-root), body:has(#a2ui-root) { overflow-x: auto; }
 .patient-row {
   display: grid;
   grid-template-columns: 1fr auto;
-  grid-template-areas:
-    "name age"
-    "summary summary";
+  grid-template-areas: "name age";
   align-items: center; column-gap: 8px;
   width: 100%; text-align: left; border: none; background: none; cursor: pointer;
   padding: 10px 12px; border-bottom: 1px solid var(--line);
@@ -193,7 +191,6 @@ body:has(#demo-root), body:has(#a2ui-root) { overflow-x: auto; }
 .patient-row.active { background: #eef2ff; box-shadow: inset 3px 0 0 var(--accent); }
 .patient-name { grid-area: name; font-weight: 600; font-size: 0.9rem; }
 .patient-age { grid-area: age; font-size: 0.75rem; color: var(--muted); }
-.patient-summary { grid-area: summary; font-size: 0.75rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .demo-rail-pagination {
   display: flex; align-items: center; justify-content: center; gap: 10px;
