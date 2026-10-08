@@ -177,11 +177,16 @@ body:has(#demo-root), body:has(#a2ui-root) { overflow-x: auto; }
 .demo-rail-search input {
   flex: 1; border: none; outline: none; font: inherit; font-size: 0.85rem; background: transparent;
 }
-.demo-rail-list { flex: 1; overflow-y: auto; }
+/* A column, so the rows can share the height between them. With the clinical
+   descriptor gone the rows were short and a full page of ten left a block of
+   empty rail below; growing the rows fills it. min-height is the floor for a
+   short viewport, and a part-full last page simply gets slightly taller rows. */
+.demo-rail-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
 .patient-row {
   display: grid;
   grid-template-columns: 1fr auto;
   grid-template-areas: "name age";
+  flex: 1 1 0; min-height: 48px;
   align-items: center; column-gap: 8px;
   width: 100%; text-align: left; border: none; background: none; cursor: pointer;
   padding: 10px 12px; border-bottom: 1px solid var(--line);
