@@ -247,6 +247,14 @@ customElements.define('a2ui-source-card', SourceCardElement);
  * them — that is the point of the widget. The clinician reads the summary in the
  * thread and checks it here.
  *
+ * They are COLLAPSED by default. Three full abstracts stacked is a wall of text
+ * that buries the titles, and the titles are what a clinician scans to decide
+ * whether to read on; the abstract is what they open once they have decided.
+ *
+ * They are COLLAPSED by default. Three full abstracts stacked is a wall of text
+ * that buries the titles, and the titles are what a clinician scans to decide
+ * whether to read on; the abstract is what they open once they have decided.
+ *
  * `degraded` is not decoration. A search that could not be run and a search that
  * found nothing look identical from the outside — both have no articles — and they
  * are different claims about the world. Saying "no matching literature" when
@@ -285,7 +293,12 @@ class LiteratureListElement extends A2uiLitElement {
     }
     .lit-badge:hover { background: #dbeafe; }
     .lit-journal { font-style: italic; }
-    .lit-abstract { font-size: 0.76rem; line-height: 1.5; color: #374151; margin: 0; }
+    .lit-abstract { font-size: 0.76rem; line-height: 1.5; color: #374151; margin: 7px 0 0; }
+    .lit-toggle {
+      font: inherit; font-size: 0.72rem; color: #2563eb; background: none;
+      border: none; cursor: pointer; padding: 0; margin-top: 7px;
+      text-decoration: underline;
+    }
     /* Subtle and non-blocking: the search is an enrichment, and this must not read
        as the answer having failed. */
     .lit-warning {
@@ -296,6 +309,18 @@ class LiteratureListElement extends A2uiLitElement {
 
   createController() {
     return new A2uiController(this, LiteratureListApi);
+  }
+
+  constructor() {
+    super();
+    this._open = new Set();
+  }
+
+  _toggle(pmid) {
+    const next = new Set(this._open);
+    if (next.has(pmid)) next.delete(pmid);
+    else next.add(pmid);
+    this._open = next;
   }
 
   render() {
@@ -313,7 +338,9 @@ class LiteratureListElement extends A2uiLitElement {
           ? (degraded
               ? nothing
               : html`<p class="widget-fallback">${props.note || 'No matching literature found.'}</p>`)
-          : articles.map((article) => html`
+          : articles.map((article) => {
+            const open = this._open.has(article.pmid);
+            return html`
             <div class="lit-item">
               <p class="lit-title">${article.title || 'Untitled record'}</p>
               <p class="lit-meta">
@@ -321,8 +348,18 @@ class LiteratureListElement extends A2uiLitElement {
                 ${article.journal ? html`<span class="lit-journal">${article.journal}</span>` : nothing}
                 ${article.pub_date ? html`<span>· ${article.pub_date}</span>` : nothing}
               </p>
-              ${article.abstract ? html`<p class="lit-abstract">${article.abstract}</p>` : nothing}
-            </div>`)}
+              ${article.abstract
+                ? html`<button type="button" class="lit-toggle"
+                              aria-expanded=${open ? 'true' : 'false'}
+                              @click=${() => this._toggle(article.pmid)}>
+                    ${open ? 'Hide abstract' : 'Show abstract'}
+                  </button>`
+                : nothing}
+              ${article.abstract && open
+                ? html`<p class="lit-abstract">${article.abstract}</p>`
+                : nothing}
+            </div>`;
+          })}
       </div>
     `;
   }

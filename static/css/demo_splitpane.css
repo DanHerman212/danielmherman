@@ -207,6 +207,17 @@ body:has(#demo-root), body:has(#a2ui-root) { overflow-x: auto; }
   border-bottom: 1px solid var(--line); background: var(--surface-2);
 }
 .pane-head-meta { font-weight: 400; color: var(--muted); font-size: 0.72rem; }
+/* Canvas view switcher. Segments, not per-turn tabs: the number of views is
+   fixed and small, so the control must not grow as the thread does. */
+.canvas-switch { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+.canvas-switch-btn {
+  font: inherit; font-size: 0.72rem; font-weight: 600; cursor: pointer;
+  padding: 3px 10px; border: none; background: none; color: var(--muted);
+}
+.canvas-switch-btn + .canvas-switch-btn { border-left: 1px solid var(--line); }
+.canvas-switch-btn[aria-pressed="true"] { background: var(--accent); color: #fff; }
+.canvas-switch-btn:disabled { opacity: 0.45; cursor: default; }
+.canvas-switch-btn:not(:disabled):not([aria-pressed="true"]):hover { background: var(--surface-2); }
 /* The page-lifetime notice: one quiet line under the pane head, shown only while
  * a conversation is open. It answers "where did my thread go?" before the user
  * asks it, and it is deliberately not a warning banner — nothing is wrong. */
@@ -263,6 +274,14 @@ body:has(#demo-root), body:has(#a2ui-root) { overflow-x: auto; }
   background: var(--surface-2); padding: 1px 4px; border-radius: 4px;
 }
 .turn-user .turn-text { background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 9px 12px; }
+/* The agent's answer is clinical prose read at length — several paragraphs a
+   clinician holds in their head at once — so it gets a larger size, generous
+   leading and real paragraph rhythm, and a measure that does not run the full
+   width of the pane. The user's own turn above stays compact: it is a chip's
+   worth of text, not something anyone reads twice. */
+.turn-agent .turn-text { font-size: 0.95rem; line-height: 1.65; max-width: 68ch; }
+.turn-agent .turn-text p { margin: 0 0 0.8em; }
+.turn-agent .turn-text p:last-child { margin-bottom: 0; }
 .turn-meta { font-size: 0.7rem; color: var(--muted); }
 /* The live stage label relayed while the chain is running. It is read at a
    glance by someone who is waiting, not skimmed after the answer has landed, so
@@ -287,6 +306,14 @@ body:has(#demo-root), body:has(#a2ui-root) { overflow-x: auto; }
   padding: 0 2px; border-radius: 4px;
 }
 .cite:hover { background: #dbe6ff; }
+/* External literature citation. Deliberately NOT styled like .cite above: a note
+   citation moves the canvas to a passage of THIS patient's notes, while a PMID
+   leaves the application for PubMed. Same shape, different destination — so the
+   colour differs, and it is a real link that opens in a new tab. */
+.cite-pmid a {
+  color: #1d4ed8; text-decoration: none; border-bottom: 1px dotted #93c5fd;
+}
+.cite-pmid a:hover { background: #dbeafe; border-bottom-style: solid; }
 
 /* ---------- canvas (Screen 2/3) ---------- */
 .canvas { position: relative; flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 12px; }

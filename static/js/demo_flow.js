@@ -83,15 +83,31 @@ export function bandColor(band) {
   return { low: 'var(--risk-low)', borderline: 'var(--risk-borderline)', high: 'var(--risk-high)' }[band] || 'var(--muted)';
 }
 
-/** Parse citation markers in agent prose: ^[1], ^[1, 2], or ^[1-3].
-    Returns [{ full, numbers }] where full is the exact matched marker text
-    and numbers the expanded citation ids. */
+/** Parse citation markers in agent prose.
+
+    Two namespaces, and they are not interchangeable:
+
+      ^[1] / ^[1, 2] / ^[1-3]  a passage of THIS patient's notes. Resolves
+                                against the turn's `sources` and moves the canvas.
+      ^[PMID: 31234567]         a published article. Leaves the application for
+                                PubMed — it is not our evidence to display.
+
+    The agent prompt mandates the PMID form for literature (LITERATURE), so a
+    renderer that only understands digits leaves those markers on screen as raw
+    text — which is precisely what it did.
+
+    Returns [{ full, numbers, pmid }]: full is the exact matched marker text,
+    numbers the expanded note-citation ids, pmid the article id (or null). */
 function citationMarkers(text) {
   const out = [];
   // S7-11: support mixed lists (^[1, 3-5]) and guard reversed ranges.
-  const re = /\^\[(\d+(?:\s*-\s*\d+)?(?:\s*,\s*\d+(?:\s*-\s*\d+)?)*)\]/g;
+  const re = /\^\[(\d+(?:\s*-\s*\d+)?(?:\s*,\s*\d+(?:\s*-\s*\d+)?)*)\]|\^\[\s*PMID:\s*(\d+)\s*\]/gi;
   let m;
   while ((m = re.exec(String(text || '')))) {
+    if (m[2]) {
+      out.push({ full: m[0], numbers: [], pmid: Number(m[2]) });
+      continue;
+    }
     const numbers = [];
     let valid = true;
     for (const part of m[1].split(',')) {
@@ -106,7 +122,7 @@ function citationMarkers(text) {
     }
     // A reversed/empty marker is kept as prose, never silently consumed.
     if (!valid || numbers.length === 0) continue;
-    out.push({ full: m[0], numbers });
+    out.push({ full: m[0], numbers, pmid: null });
   }
   return out;
 }
@@ -572,24 +588,45 @@ export function createDemoFlow({ root, askUrl, renderCanvas, onCite }) {
     return out.join('');
   }
 
-  /** Turn citation markers in the rendered prose (^[1], ^[1, 2], ^[1-3])
-      into clickable superscripts — one per cited passage. Repeated citations
-      to the SAME passage collapse to the first occurrence (the agent sometimes
-      tags every sentence with the same ^[n]; that reads as noise). */
+  /** Turn citation markers in the rendered prose into clickable superscripts —
+      one per cited source. Note citations (^[1], ^[1, 2], ^[1-3]) move the
+      canvas; literature citations (^[PMID: n]) link out to PubMed. Repeated
+      citations to the SAME source collapse to the first occurrence (the agent
+      sometimes tags every sentence with the same ^[n]; that reads as noise). */
   function wireCitations(root, turnIndex, episode) {
-    const re = /(\^\[\d+(?:\s*-\s*\d+)?(?:\s*,\s*\d+(?:\s*-\s*\d+)?)*\])/g;
+    const re = /(\^\[\d+(?:\s*-\s*\d+)?(?:\s*,\s*\d+(?:\s*-\s*\d+)?)*\]|\^\[\s*PMID:\s*\d+\s*\])/gi;
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
     const nodes = [];
     while (walker.nextNode()) {
       const n = walker.currentNode;
       if (n.nodeValue && citationMarkers(n.nodeValue).length > 0) nodes.push(n);
     }
-    const seen = new Set();  // each passage is footnoted once, at first use
+    const seen = new Set();       // each note passage is footnoted once
+    const seenPmids = new Set();  // so is each article
     for (const node of nodes) {
       const frag = document.createDocumentFragment();
       for (const part of node.nodeValue.split(re)) {
         const mk = citationMarkers(part)[0];
         if (mk && mk.full === part) {
+          if (mk.pmid) {
+            // A real anchor rather than a click handler: the destination is
+            // outside this application, so the browser's own "open in a new
+            // tab" is the right control, and the canvas the clinician was
+            // reading is left exactly as it was.
+            if (seenPmids.has(mk.pmid)) continue;
+            seenPmids.add(mk.pmid);
+            const sup = document.createElement('sup');
+            sup.className = 'cite cite-pmid';
+            const a = document.createElement('a');
+            a.href = `https://pubmed.ncbi.nlm.nih.gov/${mk.pmid}/`;
+            a.target = '_blank';
+            a.rel = 'noopener noreferrer';
+            a.textContent = String(mk.pmid);
+            a.title = `PMID ${mk.pmid} — opens PubMed in a new tab`;
+            sup.appendChild(a);
+            frag.appendChild(sup);
+            continue;
+          }
           for (const n of mk.numbers) {
             if (seen.has(n)) continue;
             seen.add(n);

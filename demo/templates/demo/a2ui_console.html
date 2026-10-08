@@ -173,6 +173,21 @@ emitted (the trace element).
             <div class="pane-head">
               <span>Context canvas</span>
               <span class="pane-head-actions">
+                {% comment %}
+                One surface per clinical view, switched here rather than replaced,
+                so the risk assessment can be returned to after a literature
+                question. Segments, not per-turn tabs: a long thread would overflow
+                a tab strip, and this pane is meant to be a stable monitor for the
+                current context. A view with nothing to draw is disabled, not
+                hidden, so the control does not move under the cursor.
+                {% endcomment %}
+                <div class="canvas-switch" id="canvas-switch" role="group"
+                     aria-label="Canvas view" hidden>
+                  <button type="button" class="canvas-switch-btn" data-view="risk"
+                          aria-pressed="false" disabled>Readmission risk</button>
+                  <button type="button" class="canvas-switch-btn" data-view="literature"
+                          aria-pressed="false" disabled>Literature</button>
+                </div>
                 <span id="canvas-mode" class="pane-head-meta"></span>
               </span>
             </div>

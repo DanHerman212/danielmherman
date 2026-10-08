@@ -22,6 +22,7 @@ import { createDemoFlow } from './demo_flow.js';
 const root = document.getElementById('a2ui-root');
 const host = document.getElementById('a2ui-host');
 const msgPre = document.getElementById('a2ui-messages');
+const switchEl = document.getElementById('canvas-switch');
 
 // The renderer, resolved once. Two envelopes embed the catalog id, and both are
 // built on a render path that has already awaited `scene()`.
@@ -102,13 +103,77 @@ function traceEnvelope(episode, catalog) {
   };
 }
 
+/* ---------------- canvas view switcher ---------------- */
+
+/* The canvas holds one composed surface per clinical view and switches between
+   them, instead of the newest answer silently replacing the last. Without this,
+   asking a literature question moved the risk assessment off screen and the only
+   way back was a footnote click in the older turn.
+
+   `picked` is null until the clinician chooses, and null means "follow the newest
+   answer". An explicit choice sticks until the next answer arrives, which is what
+   makes the two views comparable. */
+let picked = null;
+let followed = null;   // the newest envelope the switcher last auto-followed
+let lastPaint = null;  // { episode, api }, so a switch can redraw what was shown
+
+/** The clinical views an envelope draws, from the components it composes.
+    The surface decides what is on screen, so the surface is what we read. */
+function viewsIn(envelope) {
+  const names = new Set();
+  for (const message of (envelope && envelope.messages) || []) {
+    const components = (message.updateComponents && message.updateComponents.components) || [];
+    for (const component of components) names.add(component.component);
+  }
+  return { risk: names.has('RiskBar'), literature: names.has('LiteratureList') };
+}
+
+/** The newest envelope per view across the episode's turns, plus the view the
+    newest answer produced. */
+function episodeViews(episode) {
+  const latest = { risk: null, literature: null };
+  let newest = null;
+  let newestEnvelope = null;
+  for (const turn of (episode && episode.turns) || []) {
+    if (!turn.a2ui) continue;
+    newestEnvelope = turn.a2ui;
+    const inEnvelope = viewsIn(turn.a2ui);
+    if (inEnvelope.risk) { latest.risk = turn.a2ui; newest = 'risk'; }
+    if (inEnvelope.literature) { latest.literature = turn.a2ui; newest = 'literature'; }
+  }
+  return { latest, newest, newestEnvelope };
+}
+
+/** Point the control at what this episode can actually draw. A view with no
+    canvas is disabled rather than hidden, so the control never moves. */
+function syncSwitch(available, current) {
+  if (!switchEl) return;
+  switchEl.hidden = !available.risk && !available.literature;
+  for (const btn of switchEl.querySelectorAll('.canvas-switch-btn')) {
+    const view = btn.dataset.view;
+    btn.disabled = !available[view];
+    btn.setAttribute('aria-pressed', String(view === current));
+  }
+}
+
+if (switchEl) {
+  switchEl.addEventListener('click', (event) => {
+    const btn = event.target.closest('.canvas-switch-btn');
+    if (!btn || btn.disabled || !lastPaint) return;
+    picked = btn.dataset.view;
+    renderA2uiCanvas(lastPaint.episode, lastPaint.api);
+  });
+}
+
 /** Draw the canvas for an episode as an A2UI surface (episode may be null).
 
     Pass `envelope` to render a specific turn's composed messages instead of
-    the episode's latest — the footnote-click path re-shows the cited turn
-    (and wins over the trace toggle, matching the custom demo). */
+    the episode's latest — the footnote-click path re-shows the cited turn, and
+    that outranks both the switcher and the trace toggle, matching the custom
+    demo. Which view is drawn otherwise is the switcher's business. */
 function renderA2uiCanvas(episode, api, envelope) {
   const { canvasMode, clearCanvas, showEmpty } = api;
+  lastPaint = { episode, api };
   clearCanvas();
 
   // Screen 3: the trace toggle swaps the composed canvas for the raw tool-call
@@ -121,13 +186,37 @@ function renderA2uiCanvas(episode, api, envelope) {
     // S7-16: clear the composed-messages pane too — it otherwise keeps the
     // previous patient's envelope JSON (cross-patient bleed in the trace view).
     msgPre.textContent = '';
+    if (switchEl) switchEl.hidden = true;
     showEmpty(EMPTY_STATE);
   };
 
-  // Nothing was passed and there is nothing local to draw. This is the state
-  // the page opens in, and it needs no renderer at all — keeping this branch
-  // synchronous is what keeps first paint off the renderer bundle.
-  if (!envelope && !isTrace && !(episode && episode.a2ui)) {
+  const views = episodeViews(episode);
+
+  // A new answer takes the canvas back: the clinician asked a question, so the
+  // answer to it is what they should be looking at. A choice made between
+  // answers survives until the next one.
+  if (!envelope && views.newestEnvelope !== followed) {
+    followed = views.newestEnvelope;
+    picked = null;
+  }
+
+  const view = envelope
+    ? null
+    : (picked && views.latest[picked] ? picked : views.newest);
+  syncSwitch(views.latest, view);
+
+  // A footnote click names its own turn; otherwise the chosen view, falling back
+  // to the episode's latest envelope so a surface with neither risk nor
+  // literature components still draws.
+  const chosen = envelope
+    || (view && views.latest[view])
+    || (episode && episode.a2ui)
+    || null;
+
+  // Nothing to draw. This is the state the page opens in, and it needs no
+  // renderer at all — keeping this branch synchronous is what keeps first paint
+  // off the renderer bundle.
+  if (!chosen && !isTrace) {
     showNothing();
     return;
   }
@@ -137,8 +226,7 @@ function renderA2uiCanvas(episode, api, envelope) {
   // cleared above, so a slow first load shows an empty canvas rather than the
   // previous patient's.
   scene().then((renderer) => {
-    const target = envelope
-      || (isTrace ? traceEnvelope(episode, renderer.catalog) : (episode && episode.a2ui));
+    const target = chosen || traceEnvelope(episode, renderer.catalog);
 
     if (!target || !target.messages) {
       showNothing();
@@ -147,7 +235,7 @@ function renderA2uiCanvas(episode, api, envelope) {
 
     canvasMode.textContent = isTrace
       ? 'trace'
-      : `agent-composed · ${episode.lastMode || 'fixture'}`;
+      : `agent-composed · ${(episode && episode.lastMode) || 'fixture'}`;
     msgPre.textContent = JSON.stringify(target, null, 2);
     renderEnvelope(target, renderer);
   });
