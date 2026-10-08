@@ -22,6 +22,15 @@ class AgentSuccess(TypedDict, total=False):
     tool_calls: list[AgentToolCall]
     a2ui: dict[str, Any] | None
     sources: list[dict[str, Any]]
+    # Published records the answer rests on, if it rests on any. Separate from
+    # `sources`, which is the discharge-note citation channel: that list is numbered,
+    # renumbered and resolved against retrieved note passages, and a journal article
+    # has no passage to resolve against.
+    #
+    # The whole tool result travels rather than only its articles, because `None`
+    # ("no search ran") and an empty article list ("searched, found nothing") must not
+    # render identically — and neither must `degraded` ("could not search at all").
+    literature: dict[str, Any] | None
     model: str
     code_revision: str
     # The pointer to the run behind this answer. Optional here rather than
@@ -82,5 +91,18 @@ def validate_agent_response(result: Any) -> AgentSuccess:
                 raise AgentResponseError("Agent returned malformed tool calls.")
             if "derivable" in call and not isinstance(call["derivable"], bool):
                 raise AgentResponseError("Agent returned malformed tool calls.")
+
+    # Checked here rather than trusted to the template: a malformed record renders as
+    # a broken card, and a broken card beside a clinical answer is worse than a card
+    # that says the search did not complete.
+    literature = result.get("literature")
+    if literature is not None:
+        if not isinstance(literature, dict):
+            raise AgentResponseError("Agent returned malformed literature.")
+        articles = literature.get("articles")
+        if articles is not None and not isinstance(articles, list):
+            raise AgentResponseError("Agent returned malformed literature.")
+        if not isinstance(literature.get("degraded", False), bool):
+            raise AgentResponseError("Agent returned malformed literature.")
 
     return result

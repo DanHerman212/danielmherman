@@ -45,19 +45,66 @@ def _agent_presentation():
     return compose_presentation, label_for
 
 
-# The console's starter chips. FIXTURE-MODE DATA ONLY: fixture mode answers these
-# from captured payloads and has to write a `question` into the response, so the
-# wording is kept here for that. The LIVE path sends only the chip *name* and the
-# agent composes the wording — the prompt belongs with the chain (layer 3).
+# The console's starter chips: the ONE list on this side. Everything else in this
+# repository derives from it — the live allowlist, fixture mode's wording, and the
+# buttons the console renders (passed to the page by `views.a2ui_console`).
+#
+# It was two lists here until 2026-10-08: this one and another in
+# `static/js/demo_flow.js`. Two declarations of one concept in one repository is a
+# drift hazard with no upside: a chip added to the console and forgotten here is
+# refused with a 400 the moment somebody clicks it, and the page gives no hint why.
+#
+# `question` is the wording the model is asked, and it is kept here ONLY for fixture
+# mode, which has to write a `question` into its response to match the live contract.
+# The live path sends the chip NAME alone — the agent owns the prompt wording, on
+# purpose, so that a change to half the prompt cannot ship without touching the chain
+# and its revision (see `services/agent/questions.py`). `label` is UI copy and is
+# deliberately not the wording.
+#
+# The agent's keys remain a separate declaration in a separate repository, and cannot
+# be anything else: neither production image contains the other's code. `test_chips.py`
+# holds the two together where drift is actually introduced — on a machine that has
+# both repositories.
 CHIPS = {
-    'risk': 'Assess the 30-day readmission risk for this patient.',
-    'meds': 'What medications was this patient discharged on?',
-    'summarize': 'Summarize the recent discharge notes for this patient.',
+    'risk': {
+        'label': 'Run 30-day readmission risk',
+        'question': 'Assess the 30-day readmission risk for this patient.',
+    },
+    'meds': {
+        'label': 'What medications were they discharged on?',
+        'question': 'What medications was this patient discharged on?',
+    },
+    'summarize': {
+        'label': 'Summarize recent discharge notes',
+        'question': 'Summarize the recent discharge notes for this patient.',
+    },
+    'literature': {
+        'label': 'Search PubMed for recent literature',
+        'question': 'Search PubMed for recent literature on this condition.',
+    },
 }
 
-# Just the names, which is all the live path needs to reject an unknown chip
-# before a credit is spent. Kept derived from CHIPS so the two cannot drift.
+# Just the names, which is all the live path needs to reject an unknown chip before a
+# credit is spent.
+#
+# `literature` is in this set for the live path even though fixture mode cannot answer
+# it (see below): the set is the allowlist `views._parse_starters` checks, so a chip the
+# console offers and this omits is refused at the site and never reaches the agent.
 CHIP_NAMES = tuple(CHIPS)
+
+# Chips whose answer needs a live service that captured payloads cannot stand in for.
+# Fixture mode says so rather than composing something that reads as though the feature
+# worked offline — the one thing fixtures must never do.
+FIXTURE_UNAVAILABLE_CHIPS = frozenset({'literature'})
+
+
+def chip_buttons() -> list[dict]:
+    """The chips the console renders: `[{'key', 'label'}]` in declaration order.
+
+    The page is handed this rather than declaring its own list, so the buttons and the
+    allowlist above cannot disagree.
+    """
+    return [{'key': name, 'label': chip['label']} for name, chip in CHIPS.items()]
 
 # A retrieval query per chip, used to ground the answer (matters when we have
 # captured rag passages; otherwise the honest empty path runs).
@@ -179,6 +226,11 @@ def fixture_ask(payload: dict) -> dict:
                 'message': 'Free-text questions need the live agent '
                            '(DEMO_FIXTURE_MODE=false). Use a starter chip.'}
 
+    if chip in FIXTURE_UNAVAILABLE_CHIPS:
+        return {'error': 'unsupported_in_fixture_mode',
+                'message': 'Literature search runs against PubMed and has no '
+                           'offline fixture. Run with DEMO_FIXTURE_MODE=false.'}
+
     try:
         hadm_id = int(hadm_id)
     except (TypeError, ValueError):
@@ -199,7 +251,7 @@ def fixture_ask(payload: dict) -> dict:
             'rag_search', {'hadm_id': hadm_id, 'query': query, 'top_k': 5},
             _rag_response(hadm_id, query)))
 
-    question = CHIPS[chip]
+    question = CHIPS[chip]['question']
     answer = _compose_answer(chip, tool_calls)
     compose_presentation, _ = _agent_presentation()
     presentation = compose_presentation(question, answer, tool_calls)
@@ -210,6 +262,11 @@ def fixture_ask(payload: dict) -> dict:
         'tool_calls': tool_calls,
         'a2ui': presentation['a2ui'],
         'sources': presentation['sources'],
+        # Carried so the fixture response matches the live one exactly. Absent keys
+        # here would be a difference the browser could see even though it is not
+        # supposed to be able to tell the two apart — which is the whole point of
+        # composing the fixture response with the agent's own modules.
+        'literature': presentation.get('literature'),
         'source': 'fixture',
         'model': 'fixture-mode (real captured payloads)',
         'fixture_note': (

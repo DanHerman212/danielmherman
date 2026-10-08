@@ -21,7 +21,7 @@ emitted (the trace element).
 {% block content %}
 <div id="a2ui-root"
      data-ask-url="{% url 'demo:a2ui_ask' %}"
-     data-renderer-url="{% static 'js/bundled/a2ui_renderer.js' %}?v=1">
+     data-renderer-url="{% static 'js/bundled/a2ui_renderer.js' %}?v=2">
 
   {# ---------------- Enterprise header ---------------- #}
   <header class="demo-header">
@@ -152,6 +152,12 @@ emitted (the trace element).
             <!-- Composer: contextual chips + ask bar, pinned to the bottom so
                  the compose area never walks down the page as the thread grows. -->
             <div class="composer">
+              {% comment %}
+              The chips, from the site's one list (demo/fixtures.py) — the same list
+              the allowlist is derived from, so the buttons and the check that accepts
+              them cannot disagree. Read by static/js/demo_flow.js.
+              {% endcomment %}
+              {{ chips|json_script:"composer-chip-data" }}
               <div class="composer-chips" id="composer-chips" hidden></div>
               <div class="thread-input">
                 <input id="question-input" type="text" placeholder="Ask a question…"
@@ -198,5 +204,5 @@ emitted (the trace element).
   </div>
 </div>
 
-<script type="module" src="{% static 'js/bundled/demo_a2ui.js' %}?v=2"></script>
+<script type="module" src="{% static 'js/bundled/demo_a2ui.js' %}?v=4"></script>
 {% endblock %}

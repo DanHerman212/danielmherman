@@ -23,7 +23,7 @@ from .agent_client import (
     trace_id,
 )
 from .conversations import record_answer, replay_turns
-from .fixtures import CHIP_NAMES, fixture_ask
+from .fixtures import CHIP_NAMES, chip_buttons, fixture_ask
 from .models import Conversation, DemoPatient, DemoQuota
 
 logger = logging.getLogger(__name__)
@@ -242,6 +242,11 @@ def a2ui_console(request):
     return render(request, 'demo/a2ui_console.html', {
         'rows': [{'patient': p} for p in DemoPatient.objects.all()],
         'remaining': DemoQuota.remaining(request.user),
+        # The chips the composer offers, from the one list in `fixtures.py` that also
+        # backs the allowlist checked before a credit is spent. The page used to carry
+        # its own copy in JavaScript, which is how a chip could be offered and refused
+        # in the same click.
+        'chips': chip_buttons(),
         # Fixture mode answers captured payloads one question at a time and keeps
         # no conversation at all, so the page says so rather than letting a
         # follow-up look like it was remembered.
@@ -249,16 +254,38 @@ def a2ui_console(request):
     })
 
 
+# The tools whose failure means the answer is not worth charging for.
+#
+# These read the patient's own record. If one of them fails, the answer that arrives
+# is not the answer that was asked for, and spending a credit on it would be charging
+# for nothing.
+#
+# The literature tool is deliberately NOT here. It is the only one that reaches
+# outside the project, and no clinical question depends on it: an outside agency
+# rate-limiting its own server must not deny a clinician the risk score and note
+# summary they came for. It degrades instead — the agent is instructed to report the
+# search as unavailable rather than as an absence, and the canvas says so beside the
+# answer.
+CORE_TOOLS = frozenset({"predict_readmission", "rag_search", "rag_search_sections"})
+
+
 def _tools_errored(result) -> bool:
-    """True if any tool the agent called returned an error payload.
+    """True if any CORE tool the agent called returned an error payload.
 
     The MCP tools fail GRACEFULLY when a downstream (endpoint) dependency is
     down — they return {"error": ...} instead of raising, so the agent replies
-    with HTTP 200. That is still a failure for quota purposes (a credit was
-    spent and no real answer came back), so the views refund + 502 on this.
+    with HTTP 200. For a core tool that is still a failure for quota purposes (a
+    credit was spent and no real answer came back), so the views refund + 502.
+
+    A tool outside that set is not an outage. The literature tool degrades its own
+    external failures and never returns one, so this is a second line rather than
+    the mechanism — but a rule kept in step with every new tool by hand is one that
+    drifts, and the failure it would cause is an unnecessary outage page shown to
+    somebody asking about a patient.
     """
     return any(
         (tc.get("response") or {}).get("error")
+        and tc.get("name") in CORE_TOOLS
         for tc in (result.get("tool_calls") or [])
     )
 

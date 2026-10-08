@@ -230,6 +230,25 @@ class A2uiFixtureContractTests(TestCase):
         self.assertEqual(body['source'], 'fixture')
         self.assertIn('remaining', body)
 
+    def test_fixture_mode_refuses_the_literature_chip_rather_than_faking_it(self):
+        """No captured PubMed payload exists, and inventing one is not an option.
+
+        The chip is on the console's list and in the live allowlist, so it arrives at
+        fixture mode as a *known* chip — which is exactly why the refusal has to be
+        explicit. Without it the flow falls through to "ask a specific question, or
+        use a starter chip" in reply to a chip the user just clicked, and a fixture
+        answer that looked like a real literature search would be worse still.
+        """
+        response = self.client.post(
+            reverse('demo:a2ui_ask'),
+            data=json.dumps({'hadm_id': 90000017, 'chip': 'literature'}),
+            content_type='application/json',
+        )
+        body = response.json()
+
+        self.assertEqual(body['error'], 'unsupported_in_fixture_mode')
+        self.assertIn('PubMed', body['message'])
+
 
 class ConversationStoreTests(TestCase):
     """The conversation store enforces the policy, not just the schema."""
@@ -569,6 +588,12 @@ class A2uiConsolePageTests(TestCase):
         # rather than showing a stale page in production.
         self.assertContains(response, 'demo_splitpane.css?v=13')
         self.assertContains(response, 'js/bundled/demo_a2ui.js')
+        # The chips the composer offers, rendered from the site's one list. Pinned
+        # because the failure is silent: the console reads them from here rather than
+        # declaring its own, so a missing context entry loads a page that offers no
+        # buttons at all and says nothing about why.
+        self.assertContains(response, 'id="composer-chip-data"')
+        self.assertContains(response, 'Search PubMed for recent literature')
         # The console script loads the A2UI renderer on demand from this URL. A
         # missing attribute is a canvas that never draws and no error message,
         # so it is pinned here rather than left to a browser test.
@@ -690,11 +715,39 @@ class A2uiAskLiveTests(TestCase):
 
     @patch('demo.views.ask_agent', return_value=dict(A2UI_AGENT_REPLY))
     def test_every_chip_travels_unchanged(self, mocked):
-        for chip in ('risk', 'meds', 'summarize'):
+        for chip in ('risk', 'meds', 'summarize', 'literature'):
             with self.subTest(chip=chip):
                 self._post({'hadm_id': 90000009, 'chip': chip})
                 self.assertEqual(mocked.call_args.args[0],
                                  {'chip': chip, 'hadm_id': 90000009})
+
+    def test_only_core_tool_failures_are_treated_as_an_outage(self):
+        """A peripheral tool's failure must not cost the clinician their answer.
+
+        `search_literature` is the only tool that reaches outside the project. It
+        degrades its own external failures and never returns an error, so this list
+        is the second line rather than the mechanism — but the rule is what stops a
+        future tool that does return one from taking the dashboard down with it.
+        """
+        from demo.views import _tools_errored
+
+        failure = {'error': 'unknown_patient', 'message': 'Not found.'}
+
+        def result(name, response):
+            return {'tool_calls': [{'name': name, 'response': response}]}
+
+        for core in ('predict_readmission', 'rag_search', 'rag_search_sections'):
+            with self.subTest(tool=core):
+                self.assertTrue(_tools_errored(result(core, failure)))
+
+        self.assertFalse(_tools_errored(result('search_literature', failure)))
+        self.assertFalse(_tools_errored(result('predict_readmission', {})))
+        self.assertFalse(_tools_errored({}))
+        # A core failure alongside a peripheral one is still an outage.
+        self.assertTrue(_tools_errored({'tool_calls': [
+            {'name': 'search_literature', 'response': failure},
+            {'name': 'rag_search', 'response': failure},
+        ]}))
 
     @patch('demo.views.ask_agent', return_value=dict(A2UI_AGENT_REPLY))
     def test_a_patient_with_nothing_asked_sends_only_the_admission(self, mocked):

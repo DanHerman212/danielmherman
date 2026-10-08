@@ -1,12 +1,13 @@
 /**
  * Custom A2UI components for the readmission-risk canvas (Q3 spike).
  *
- * Beyond the basic catalog we add three components that reproduce the custom
+ * Beyond the basic catalog we add four components that reproduce the custom
  * demo's widgets exactly (card, widget title, band pill, SHAP bars, cited
- * source with expand/collapse):
- *   - RiskBar     — RISK widget: big number + band pill + bar + threshold
- *   - FactorBars  — DRIVERS widget: horizontal SHAP bars
- *   - SourceCard  — SOURCE widget: cited passage + truncate/expand
+ * source with expand/collapse, published articles):
+ *   - RiskBar        — RISK widget: big number + band pill + bar + threshold
+ *   - FactorBars     — DRIVERS widget: horizontal SHAP bars
+ *   - SourceCard     — SOURCE widget: cited passage + truncate/expand
+ *   - LiteratureList — LITERATURE widget: retrieved PubMed records
  *
  * Authoring follows the official A2UI v0.9 recipe (upstream renderers/lit
  * README): define a ComponentApi (name + zod schema), implement a Lit element
@@ -237,6 +238,99 @@ class SourceCardElement extends A2uiLitElement {
 export const SourceCard = { ...SourceCardApi, tagName: 'a2ui-source-card' };
 customElements.define('a2ui-source-card', SourceCardElement);
 
+/* ---------------- LiteratureList ---------------- */
+
+/**
+ * Retrieved PubMed records, shown unedited beside the agent's summary.
+ *
+ * The abstracts are rendered as the tool returned them, not as the answer restates
+ * them — that is the point of the widget. The clinician reads the summary in the
+ * thread and checks it here.
+ *
+ * `degraded` is not decoration. A search that could not be run and a search that
+ * found nothing look identical from the outside — both have no articles — and they
+ * are different claims about the world. Saying "no matching literature" when
+ * nothing was searched for would be stating a fact nobody established, so the two
+ * render differently: a warning badge for one, a plain sentence for the other.
+ */
+const LiteratureListApi = {
+  name: 'LiteratureList',
+  schema: z.object({
+    articles: z.array(z.object({
+      pmid: z.string(),
+      title: z.string().default(''),
+      journal: z.string().default(''),
+      pub_date: z.string().default(''),
+      abstract: z.string().default(''),
+      url: z.string().default(''),
+    })).default([]),
+    // The sentence for a search with nothing to show. Composed by the agent, so the
+    // wording lives with the rest of the answer's language rather than here.
+    note: z.string().optional().default(''),
+    degraded: z.boolean().optional().default(false),
+  }).strict(),
+};
+
+class LiteratureListElement extends A2uiLitElement {
+  static styles = css`
+    ${unsafeCSS(WIDGET)}
+    .lit-item { border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px; margin-bottom: 10px; }
+    .lit-item:last-child { margin-bottom: 0; }
+    .lit-title { font-size: 0.86rem; font-weight: 600; line-height: 1.35; color: #111827; margin: 0 0 5px; }
+    .lit-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 7px; font-size: 0.72rem; color: #6b7280; }
+    .lit-badge {
+      font-size: 0.68rem; font-weight: 700; color: #1d4ed8; background: #eff6ff;
+      border: 1px solid #bfdbfe; border-radius: 999px; padding: 1px 7px;
+      text-decoration: none; white-space: nowrap;
+    }
+    .lit-badge:hover { background: #dbeafe; }
+    .lit-journal { font-style: italic; }
+    .lit-abstract { font-size: 0.76rem; line-height: 1.5; color: #374151; margin: 0; }
+    /* Subtle and non-blocking: the search is an enrichment, and this must not read
+       as the answer having failed. */
+    .lit-warning {
+      font-size: 0.74rem; font-weight: 600; color: #92400e; background: #fffbeb;
+      border: 1px solid #fcd34d; border-radius: 6px; padding: 6px 9px; margin: 0;
+    }
+  `;
+
+  createController() {
+    return new A2uiController(this, LiteratureListApi);
+  }
+
+  render() {
+    const props = this.controller?.props;
+    if (!props) return nothing;
+    const articles = props.articles || [];
+    const degraded = props.degraded === true;
+    return html`
+      <div class="widget widget-literature">
+        <div class="widget-title">Published Literature</div>
+        ${degraded
+          ? html`<p class="lit-warning">${props.note || 'Literature search unavailable.'}</p>`
+          : nothing}
+        ${articles.length === 0
+          ? (degraded
+              ? nothing
+              : html`<p class="widget-fallback">${props.note || 'No matching literature found.'}</p>`)
+          : articles.map((article) => html`
+            <div class="lit-item">
+              <p class="lit-title">${article.title || 'Untitled record'}</p>
+              <p class="lit-meta">
+                <a class="lit-badge" href=${article.url} target="_blank" rel="noopener noreferrer">PMID: ${article.pmid}</a>
+                ${article.journal ? html`<span class="lit-journal">${article.journal}</span>` : nothing}
+                ${article.pub_date ? html`<span>· ${article.pub_date}</span>` : nothing}
+              </p>
+              ${article.abstract ? html`<p class="lit-abstract">${article.abstract}</p>` : nothing}
+            </div>`)}
+      </div>
+    `;
+  }
+}
+
+export const LiteratureList = { ...LiteratureListApi, tagName: 'a2ui-literature-list' };
+customElements.define('a2ui-literature-list', LiteratureListElement);
+
 /* ---------------- TraceCard (Screen 3) ---------------- */
 
 const TraceCardApi = {
@@ -315,6 +409,7 @@ export function buildRiskCatalog(basicCatalog) {
       ['RiskBar', RiskBar],
       ['FactorBars', FactorBars],
       ['SourceCard', SourceCard],
+      ['LiteratureList', LiteratureList],
       ['TraceCard', TraceCard],
     ]),
     functions: basicCatalog.functions,

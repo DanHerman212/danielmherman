@@ -25,11 +25,23 @@
  * R8: every surface has a text fallback — the demo never renders nothing.
  */
 
-const CHIPS = [
-  { key: 'risk', label: 'Run 30-day readmission risk' },
-  { key: 'summarize', label: 'Summarize recent discharge notes' },
-  { key: 'meds', label: 'What medications were they discharged on?' },
-];
+/* The chips come from the server, not from a list here.
+ *
+ * Django renders the site's one list (demo/fixtures.py) into the page as JSON, and
+ * this file reads it. The list used to be declared here as well, which meant a chip
+ * could be offered by the console and missing from the allowlist the site checks
+ * before spending a credit — the button works, and the click returns a 400 with no
+ * visible reason. UI labels live with the list now; they are copy, and this is still
+ * where they are rendered. */
+function chipList() {
+  const node = document.getElementById('composer-chip-data');
+  if (!node) return [];
+  try {
+    return JSON.parse(node.textContent) || [];
+  } catch {
+    return [];
+  }
+}
 
 const PAGE_SIZE = 10;
 
@@ -437,7 +449,7 @@ export function createDemoFlow({ root, askUrl, renderCanvas, onCite }) {
     }
     const chips = document.createElement('div');
     chips.className = 'chips';
-    for (const chip of CHIPS) {
+    for (const chip of chipList()) {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'chip';
@@ -862,7 +874,7 @@ export function createDemoFlow({ root, askUrl, renderCanvas, onCite }) {
 
   function askChip(chip) {
     if (!state.current) return;
-    const chipDef = CHIPS.find((c) => c.key === chip);
+    const chipDef = chipList().find((c) => c.key === chip);
     post({ hadm_id: state.current.hadmId, chip }, chipDef ? chipDef.label : chip);
   }
 
