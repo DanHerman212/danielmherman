@@ -1,0 +1,34 @@
+{% load static %}<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Enterprise Clinical Copilot{% endblock %}</title>
+
+  {% comment %}
+  A dedicated base for the application, deliberately NOT the marketing base.
+  The shell owns the viewport, so it must not be framed by the content navbar
+  and the footer of social links; suppressing another template's chrome with
+  `!important` was the interim, and this is the settled fix. Only what the
+  shell itself needs is loaded here — no Bootstrap, no Prism, no site script.
+  {% endcomment %}
+
+  {# FontAwesome — the same SRI-pinned build the site base loads #}
+  <link rel="stylesheet" crossorigin="anonymous"
+        integrity="sha384-iw3OoTErCYJJB9mCa8LNS2hbsQ7M3C0EpIsO/H5+EGAkPGc6rk+V8i04oW/K5xq0"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  {# Inter — the shell's UI face #}
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"
+        rel="stylesheet">
+
+  <link rel="stylesheet" href="{% static 'css/demo_shell.css' %}?v=15">
+  {% block extra_css %}{% endblock %}
+</head>
+<body>
+{% block content %}{% endblock %}
+{% block extra_js %}{% endblock %}
+</body>
+</html>

@@ -21,7 +21,7 @@ from pathlib import Path
 
 from django.test import SimpleTestCase
 
-from demo.fixtures import CHIP_NAMES, CHIPS, chip_buttons
+from demo.fixtures import CHIP_NAMES, CHIPS, SLASH_COMMANDS, chip_buttons
 
 _ECC_ROOT = Path(__file__).resolve().parents[2] / 'enterprise_clinical_copilot'
 
@@ -65,6 +65,33 @@ class ChipListTests(SimpleTestCase):
         for button in chip_buttons():
             with self.subTest(chip=button['key']):
                 self.assertTrue(button['label'].strip())
+
+
+class SlashCommandTests(SimpleTestCase):
+    """The composer's command menu, and the intents it names.
+
+    A command is a second vocabulary for the same intents: what a clinician types
+    (`/ehr`) and what the agent is sent (`summarize`) need not match. But every
+    intent named here must be one the agent defines, or the menu offers a command
+    that is refused the moment someone uses it.
+    """
+
+    def test_every_command_names_a_real_intent(self):
+        for entry in SLASH_COMMANDS:
+            with self.subTest(command=entry['command']):
+                self.assertIn(entry['chip'], CHIP_NAMES)
+
+    def test_the_commands_are_distinct(self):
+        names = [entry['command'] for entry in SLASH_COMMANDS]
+        self.assertEqual(len(names), len(set(names)))
+
+    def test_every_command_is_typeable_and_described(self):
+        """The name has to survive the composer's own pattern, which accepts a
+        slash and then letters and nothing else."""
+        for entry in SLASH_COMMANDS:
+            with self.subTest(command=entry['command']):
+                self.assertRegex(entry['command'], r'^[a-zA-Z]+$')
+                self.assertTrue(entry['description'].strip())
 
 
 class ChipDriftTests(SimpleTestCase):

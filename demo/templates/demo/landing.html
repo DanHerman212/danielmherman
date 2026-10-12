@@ -1,0 +1,75 @@
+{% extends "demo/app_base.html" %}
+{% load static %}
+{% comment %}
+The public front door. Reachable without a login, so the project page can link
+straight to it instead of dropping a visitor onto a sign-in form.
+
+It offers three ways in, only one of which is wired:
+
+  * the ask bar is the anonymous way in. It is deliberately inert for now —
+    the anonymous path that would answer here is not built, so the submit is
+    cancelled rather than allowed to reload the page and read as a failed send.
+  * "Sign up" is a placeholder. Social OAuth is planned but not built.
+  * "Log in" reaches the accounts that already exist.
+
+The menu carries the Demo User Guide, which itself requires a login: a visitor
+who follows it is asked to sign in, which is the honest outcome while the demo
+proper is issued-accounts-only.
+{% endcomment %}
+
+{% block title %}Enterprise Clinical Copilot{% endblock %}
+
+{% block content %}
+<div class="cp" id="copilot-shell">
+
+  {# ---------------- top right: the way in ---------------- #}
+  <header class="cp-head">
+    <div class="cp-actions">
+      <a class="cp-btn cp-btn-quiet" href="{% url 'login' %}">Log in</a>
+      <button type="button" class="cp-btn cp-btn-solid" id="cp-signup"
+              title="Sign up is not built yet">Sign up</button>
+      <div class="cp-menu-anchor">
+        <button type="button" class="cp-icon-btn" id="cp-menu-btn"
+                aria-expanded="false" aria-controls="cp-menu"
+                aria-label="Open menu" title="Menu">
+          <i class="fa-solid fa-bars" aria-hidden="true"></i>
+        </button>
+        <div class="cp-menu" id="cp-menu" hidden>
+          <a class="cp-menu-item" href="{% url 'demo:guide' %}">
+            <i class="fa-regular fa-circle-question" aria-hidden="true"></i>
+            <span>Demo User Guide</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  {# ---------------- centre: the mark and the ask bar ---------------- #}
+  <main class="cp-hero">
+    <div class="cp-brand">
+      <svg class="cp-logo" viewBox="0 0 48 48" role="img" aria-hidden="true">
+        <rect x="1" y="1" width="46" height="46" rx="11" fill="#1f2937"/>
+        <text x="24" y="31" text-anchor="middle"
+              font-family="Inter, system-ui, sans-serif"
+              font-size="17" font-weight="700" letter-spacing="1"
+              fill="#ffffff">ECC</text>
+      </svg>
+      <h1 class="cp-brand-name">Enterprise Clinical Copilot</h1>
+    </div>
+
+    <form class="cp-ask" id="cp-ask" role="search" autocomplete="off">
+      <label class="cp-sr-only" for="cp-ask-input">Ask the copilot</label>
+      <input type="text" id="cp-ask-input" class="cp-ask-input"
+             placeholder="Search for patient using @ command or /slash commands for agent requests">
+      <button type="submit" class="cp-send" aria-label="Send">
+        <i class="fa-solid fa-arrow-up" aria-hidden="true"></i>
+      </button>
+    </form>
+  </main>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/copilot_shell.js' %}?v=2"></script>
+{% endblock %}

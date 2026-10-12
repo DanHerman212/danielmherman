@@ -180,14 +180,15 @@ class SourceCardElement extends A2uiLitElement {
 
   static styles = css`
     ${unsafeCSS(WIDGET)}
-    /* Pin the cited discharge notes to the bottom of the canvas so they stay
-       in view however long the session gets. :host is inside the shadow DOM,
-       so a light-DOM selector cannot reach it — the sticky lives here. */
-    :host {
-      display: block; position: sticky; bottom: 0; z-index: 2;
-      background: #ffffff;
-      box-shadow: 0 -1px 0 #e5e7eb;
-    }
+    /* The source card used to pin itself to the bottom of the canvas so the cited
+       notes stayed in view however long the session ran. That was written for a
+       canvas that scrolled on its own; in the redesigned console the canvas sizes
+       itself to the answer, and a pinned card floated up over the SHAP bars —
+       hiding the very evidence it exists to support. It sits in the column now,
+       in the order the agent composed it. The sticky cannot be undone from the
+       page's stylesheet because :host is inside the shadow DOM, so the rule has
+       to change here. */
+    :host { display: block; }
     .source-passage { border: 1px solid #2563eb; background: #f4f7ff; box-shadow: 0 0 0 1px #2563eb; border-radius: 8px; padding: 10px; }
     .source-head { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
     .source-cite { font-weight: 700; color: #2563eb; }

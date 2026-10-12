@@ -1,4 +1,5 @@
-"""The demo patient cohort and per-user usage quota.
+"""The demo patient cohort, per-user identity and usage quota, and the
+conversation store.
 
 The cohort is FULLY SYNTHETIC — hadm_id, age, sex, and everything the model
 reads are generated values (synthetic_cohort.json), not real patient data.
@@ -332,3 +333,85 @@ class Turn(models.Model):
 
     def __str__(self):
         return f'{self.ordinal}. conversation {self.conversation_id} ({self.role})'
+
+
+class Profile(models.Model):
+    """The application's view of a person, kept separate from how they signed in.
+
+    Authentication is a local password today and a social identity later. Both
+    land on the same `auth.User`; what differs is which fields can be filled.
+    This model holds the two the shell actually needs — a display name and a
+    picture — so the OAuth path can populate them from the provider without a
+    migration to the user table and without any template changing what it reads.
+
+    A blank field is the normal state for a password account, not an error:
+    `name` and `initials` fall back, so the shell always has something to show.
+    """
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='profile',
+    )
+    display_name = models.CharField(
+        max_length=150,
+        blank=True,
+        help_text='Set from the provider on a social sign-in; otherwise blank.',
+    )
+    avatar_url = models.URLField(
+        blank=True,
+        help_text='Provider picture on a social sign-in. Empty renders initials.',
+    )
+
+    class Meta:
+        verbose_name = 'profile'
+        verbose_name_plural = 'profiles'
+
+    def __str__(self):
+        return f'profile for {self.user.username}'
+
+    @classmethod
+    def for_user(cls, user):
+        """The profile for `user`, created on first use.
+
+        Lazy rather than signal-driven, matching `DemoQuota.consume`: a row
+        exists because something asked for it. A signal would write a second row
+        for every account the admin, the test suite or `createsuperuser` creates,
+        for a page most of them will never open.
+        """
+        profile, _ = cls.objects.get_or_create(user=user)
+        return profile
+
+    @property
+    def name(self):
+        """What the shell calls this person.
+
+        The provider's name wins when there is one; then the name Django already
+        holds; then the username. That last fallback is why this returns
+        something for every account rather than an empty string.
+        """
+        return self.display_name or self.user.get_full_name() or self.user.username
+
+    @property
+    def email(self):
+        """The identifier the shell shows under the name.
+
+        Accounts created by hand may carry no address, so the username stands in
+        for one: the shell needs something to show, and the username is what the
+        account is actually called.
+        """
+        return self.user.email or self.user.username
+
+    @property
+    def initials(self):
+        """One or two letters for the avatar circle when there is no picture.
+
+        Derived rather than stored: it is a rendering of `name`, so storing it
+        would only create a second thing to keep in step.
+        """
+        parts = [part for part in self.name.replace('.', ' ').split() if part]
+        if not parts:
+            return '?'
+        if len(parts) == 1:
+            return parts[0][0].upper()
+        return (parts[0][0] + parts[-1][0]).upper()

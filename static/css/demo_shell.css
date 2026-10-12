@@ -1,0 +1,488 @@
+/* ------------------------------------------------------------------
+   Enterprise Clinical Copilot — application shell.
+
+   Loaded by the application base (demo/templates/demo/app_base.html), so every
+   page that extends it — the public front door, the guarded application, and the
+   sign-in form — shares one voice. The base is standalone, so there is no
+   marketing chrome to suppress: the shell simply owns the viewport.
+
+   The first two rules replace what Bootstrap supplied on the marketing pages and
+   what this base therefore lost. Without border-box a declared 264px menu renders
+   289px wide, because padding and border add to the declared width; without the
+   margin reset the shell is inset from the viewport edge.
+   ------------------------------------------------------------------ */
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; }
+
+.cp {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  color: #0f172a;
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+/* ---------- top bar: account actions and the menu ---------- */
+.cp-head { display: flex; justify-content: flex-end; padding: 14px 20px 0; }
+.cp-actions { display: flex; align-items: center; gap: 10px; }
+
+.cp-btn {
+  font: inherit; font-size: 0.85rem; font-weight: 600; line-height: 1.2;
+  padding: 8px 16px; border-radius: 999px; cursor: pointer;
+  border: 1px solid transparent; text-decoration: none;
+}
+.cp-btn-quiet { color: #334155; background: transparent; }
+.cp-btn-quiet:hover { background: #f1f5f9; color: #0f172a; }
+.cp-btn-solid { background: #2563eb; color: #fff; border-color: #2563eb; }
+.cp-btn-solid:hover { background: #1d4ed8; }
+
+.cp-icon-btn {
+  width: 38px; height: 38px; border-radius: 10px; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 1rem; color: #334155; background: transparent;
+  border: 1px solid transparent;
+}
+.cp-icon-btn:hover { background: #f1f5f9; color: #0f172a; }
+.cp-icon-btn[aria-expanded="true"] { background: #f1f5f9; color: #0f172a; }
+
+.cp-menu-anchor { position: relative; }
+.cp-menu {
+  position: absolute; top: calc(100% + 8px); right: 0; z-index: 20;
+  min-width: 240px; padding: 6px;
+  display: flex; flex-direction: column; gap: 2px;
+  /* Declared here rather than per item so the button below can inherit it. */
+  font-size: 0.85rem;
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 12px;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.12);
+}
+.cp-menu[hidden] { display: none; }
+.cp-menu-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 10px; border-radius: 8px;
+  color: #1f2937; text-decoration: none;
+}
+.cp-menu-item i { width: 16px; text-align: center; color: #64748b; }
+a.cp-menu-item:hover,
+button.cp-menu-item:hover { background: #f1f5f9; color: #0f172a; }
+/* The menu is authored for links and readouts. Sign-out has to POST, so it is a
+   button carrying the same item shape with the browser's button styling
+   removed. */
+button.cp-menu-item {
+  width: 100%; font-family: inherit; font-size: inherit;
+  text-align: left; cursor: pointer;
+  background: transparent; border: none;
+}
+/* The request count is a readout, not a control: same row shape as the guide
+   link so the menu reads as one list, but nothing to click. */
+.cp-menu-quota { color: #475569; }
+.cp-menu-quota strong {
+  margin-left: auto; color: #0f172a; font-variant-numeric: tabular-nums;
+}
+
+/* A slim state strip under the top bar. Only rendered in fixture mode, where it
+   is the difference between an offline demo and a demo pretending to be live. */
+.cp-note {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  margin: 10px 20px 0; padding: 8px 14px;
+  font-size: 0.8rem; color: #475569;
+  background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 10px;
+}
+.cp-note i { color: #64748b; }
+
+/* ---------- the front door: the mark and the ask bar, centred ---------- */
+/* The public page has no answer region to make room for, so it centres what it
+   holds. The application's own head is `.cp-top`, below. */
+.cp-hero {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 0 20px 12vh; gap: 26px;
+}
+
+/* ---------- the head of the canvas: the mark, the question, the run ---------- */
+/* One column serves both states. Before a question is asked it holds only the
+   mark, and the auto margins on it and on the composer meet in the middle of the
+   canvas. Once a question is asked the top rises to the head of the canvas and
+   the composer falls to its foot, because the margin that was lifting the top
+   becomes zero and the one on the composer now only pushes it down. */
+.cp-top {
+  flex: none; width: 100%; max-width: 860px;
+  margin: 0 auto 26px; padding: 0 20px;
+  display: flex; flex-direction: column; align-items: center; gap: 18px;
+}
+.cp-brand { display: flex; align-items: center; gap: 12px; }
+.cp-logo { width: 44px; height: 44px; display: block; }
+.cp-brand-name {
+  margin: 0; font-size: 1.35rem; font-weight: 600;
+  letter-spacing: -0.01em; color: #0f172a;
+}
+
+/* The question as it was asked. It stays above the run, so the answer below it
+   cannot be read as the answer to some other question. */
+.cp-question {
+  width: 100%; padding: 12px 16px;
+  background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 12px;
+}
+.cp-question[hidden] { display: none; }
+.cp-question-text { margin: 0; font-size: 0.95rem; line-height: 1.5; color: #1f2937; }
+
+/* The run. While the agent works the row is the whole story: the dots say it is
+   still going, the text says where it is. The caret belongs to the finished run,
+   because until there is an answer there is no span to open. */
+.cp-status { width: 100%; display: flex; flex-direction: column; gap: 2px; }
+.cp-status[hidden] { display: none; }
+.cp-status-row {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; padding: 4px 0;
+  font: inherit; font-size: 0.85rem; text-align: left;
+  color: #475569; background: transparent; border: none;
+}
+.cp-status.is-done .cp-status-row { cursor: pointer; }
+/* Takes its natural width and no more, so the caret sits beside the stage rather
+   than at the far edge of the canvas; it still shrinks when the label is long. */
+.cp-status-text { flex: 0 1 auto; min-width: 0; }
+.cp-status-caret {
+  flex: none; font-size: 0.7rem; color: #94a3b8;
+  transition: transform 120ms ease;
+}
+.cp-status-row[aria-expanded="true"] .cp-status-caret { transform: rotate(180deg); }
+/* Nothing to open until the run is over, so the caret is absent rather than
+   present and inert. */
+.cp-status:not(.is-done) .cp-status-caret { visibility: hidden; }
+.cp-status:not(.is-done) .cp-status-row { cursor: default; }
+
+/* The dots, carried over from the earlier demo's typing indicator so both
+   surfaces say "working" the same way. */
+.typing-dots { display: inline-flex; gap: 4px; align-items: center; flex: none; }
+.typing-dots span {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: #2563eb; animation: typing-blink 1.2s infinite ease-in-out;
+}
+.typing-dots span:nth-child(2) { animation-delay: 0.18s; }
+.typing-dots span:nth-child(3) { animation-delay: 0.36s; }
+@keyframes typing-blink {
+  0%, 60%, 100% { opacity: 0.25; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(-3px); }
+}
+.cp-status.is-done .typing-dots { display: none; }
+/* Each stage's wording replaces the last, and arrives fading in, so the change
+   reads as the run moving on rather than the page flickering. */
+.cp-status-text { animation: status-fade 260ms ease-out; }
+@keyframes status-fade { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .typing-dots span, .cp-status-text { animation: none !important; }
+}
+
+.cp-ask {
+  display: flex; align-items: center; gap: 8px;
+  /* The form is a child of the canvas now, so it carries its own inset: nothing
+     above it supplies one any more. */
+  width: calc(100% - 40px); max-width: 720px;
+  margin: 0 auto;
+  padding: 8px 8px 8px 18px;
+  background: #fff; border: 1px solid #cbd5e1; border-radius: 999px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+.cp-ask:focus-within {
+  border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+.cp-ask-input {
+  flex: 1; min-width: 0; padding: 10px 0;
+  border: none; outline: none; background: transparent;
+  font: inherit; font-size: 1rem; color: #0f172a;
+  /* The placeholder is longer than a narrow viewport can show. The input is
+     already width-bounded by the flex row above, so the text is clipped at the
+     edge; the ellipsis is what makes the clipping read as deliberate. */
+  text-overflow: ellipsis;
+}
+/* A placeholder is drawn by the browser rather than as this element's own text,
+   so the ellipsis has to be declared on the pseudo-element too. */
+.cp-ask-input::placeholder { color: #94a3b8; text-overflow: ellipsis; }
+.cp-send {
+  flex: none; width: 40px; height: 40px; border-radius: 50%;
+  border: none; cursor: pointer; background: #2563eb; color: #fff;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 1rem;
+}
+.cp-send:hover { background: #1d4ed8; }
+
+/* The input carries a placeholder but no visible label, so the label is here
+   for assistive technology only. */
+.cp-sr-only {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* ---------- sign-in: the same shell, a form where the ask bar sits ---------- */
+.cp-auth-main {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 0 20px 12vh; gap: 22px;
+}
+.cp-auth-card {
+  width: 100%; max-width: 380px;
+  display: flex; flex-direction: column; gap: 16px;
+  padding: 24px;
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 16px;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+}
+.cp-field { display: flex; flex-direction: column; gap: 6px; }
+.cp-field span { font-size: 0.8rem; font-weight: 600; color: #334155; }
+.cp-field input {
+  font: inherit; font-size: 0.95rem; color: #0f172a;
+  padding: 10px 12px; outline: none;
+  background: #fff; border: 1px solid #cbd5e1; border-radius: 10px;
+}
+.cp-field input:focus {
+  border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+.cp-auth-error {
+  margin: 0; padding: 9px 12px;
+  font-size: 0.82rem; color: #991b1b;
+  background: #fef2f2; border: 1px solid #fecaca; border-radius: 10px;
+}
+.cp-btn-block {
+  width: 100%; text-align: center;
+  padding: 11px 16px; font-size: 0.9rem;
+}
+
+/* ---------- the composer's `@` patient selector ---------- */
+/* The dropdown positions against the bar, so the bar is the anchor. */
+.cp-ask { position: relative; }
+
+/* The chosen patient, as a pill at the head of the bar. A sibling of the input,
+   not a child of it — an `<input>` holds text and nothing else, so the bar is the
+   flex container that holds both. */
+.patient-pill {
+  flex: none; display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 6px 5px 12px;
+  font-size: 0.85rem; font-weight: 600; color: #1d4ed8;
+  background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 999px;
+  white-space: nowrap;
+}
+.patient-pill[hidden] { display: none; }
+.patient-pill-clear {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; padding: 0; cursor: pointer;
+  font-size: 0.7rem; color: #1d4ed8;
+  background: transparent; border: none; border-radius: 50%;
+}
+.patient-pill-clear:hover { background: #dbeafe; }
+
+/* The chosen command, beside the chosen patient: same bar, same shape, a quieter
+   palette so "who" and "what" do not read as the same kind of thing. */
+.command-pill {
+  flex: none; display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 6px 5px 12px;
+  font-size: 0.85rem; font-weight: 600; color: #334155;
+  background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 999px;
+  white-space: nowrap;
+}
+.command-pill[hidden] { display: none; }
+.command-pill-clear {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; padding: 0; cursor: pointer;
+  font-size: 0.7rem; color: #475569;
+  background: transparent; border: none; border-radius: 50%;
+}
+.command-pill-clear:hover { background: #e2e8f0; }
+
+/* Both dropdowns share one shape: anchored above the bar, full width of it. */
+.cp-patient-list,
+.cp-command-list {
+  position: absolute; bottom: calc(100% + 8px); left: 0; right: 0; z-index: 30;
+  margin: 0; padding: 6px; list-style: none;
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 14px;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.12);
+}
+.cp-patient-list[hidden],
+.cp-command-list[hidden] { display: none; }
+.cp-patient {
+  display: flex; align-items: baseline; gap: 10px;
+  padding: 9px 12px; border-radius: 9px; cursor: pointer;
+}
+.cp-patient[aria-selected="true"] { background: #f1f5f9; }
+.cp-patient-name { font-size: 0.9rem; color: #0f172a; }
+.cp-patient-meta { font-size: 0.78rem; color: #64748b; }
+.cp-patient-empty { padding: 10px 12px; font-size: 0.85rem; color: #64748b; }
+.cp-command {
+  display: flex; align-items: baseline; gap: 10px;
+  padding: 9px 12px; border-radius: 9px; cursor: pointer;
+}
+.cp-command[aria-selected="true"] { background: #f1f5f9; }
+.cp-command-name { flex: none; font-size: 0.85rem; font-weight: 600; color: #1d4ed8; }
+.cp-command-desc {
+  font-size: 0.82rem; color: #64748b;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* ---------- the answer surface ---------- */
+.cp-answer {
+  flex: 1; min-height: 0; width: 100%; max-width: 860px;
+  margin: 0 auto; padding: 8px 20px 32px;
+  overflow-y: auto;
+}
+.cp-answer[hidden] { display: none; }
+
+/* The span: every stage the run passed through, kept in full and closed until
+   the caret above asks for it. */
+.cp-stages {
+  margin: 2px 0 0; padding: 0 0 0 4px; list-style: none;
+  display: flex; flex-direction: column; gap: 3px;
+}
+.cp-stages[hidden] { display: none; }
+.cp-stage {
+  display: flex; align-items: baseline; gap: 8px;
+  padding: 2px 0; font-size: 0.8rem; color: #64748b;
+}
+.cp-stage::before {
+  content: ''; flex: none; width: 5px; height: 5px; border-radius: 50%;
+  background: #cbd5e1; position: relative; top: -2px;
+}
+
+/* The agent's composed surface. Empty until a surface is mounted, so it
+   contributes no space before an answer exists. */
+.cp-canvas:empty { display: none; }
+.cp-canvas { margin-bottom: 16px; }
+
+.cp-answer-text { font-size: 0.95rem; line-height: 1.65; color: #0f172a; }
+.cp-answer-text p { margin: 0 0 0.9em; }
+.cp-answer-error {
+  margin: 0; padding: 10px 14px; font-size: 0.88rem; color: #991b1b;
+  background: #fef2f2; border: 1px solid #fecaca; border-radius: 10px;
+}
+
+/* ---------- application: the menu and the surface beside it ---------- */
+/* The shell becomes a row: the menu takes a fixed column, the working surface
+   takes the rest. `.cp` stays a column for the front door and the sign-in form,
+   which have no menu to sit beside. */
+/* The application owns the viewport: the menu and the canvas scroll within it
+   rather than the page scrolling, which is what keeps the composer where it is
+   put however long the answer runs. */
+.cp-app { flex-direction: row; height: 100dvh; overflow: hidden; }
+
+.cp-side {
+  flex: none; width: 264px;
+  display: flex; flex-direction: column;
+  padding: 14px 12px;
+  background: #f8fafc; border-right: 1px solid #e2e8f0;
+  transition: width 150ms ease;
+}
+.cp-side-head {
+  display: flex; justify-content: space-between; align-items: center;
+  padding-bottom: 10px;
+}
+.cp-side-nav { display: flex; flex-direction: column; gap: 2px; }
+
+.cp-nav-item {
+  display: flex; align-items: center; gap: 11px;
+  width: 100%; padding: 9px 10px;
+  font: inherit; font-size: 0.86rem; text-align: left;
+  color: #334155; background: transparent;
+  border: none; border-radius: 9px;
+}
+.cp-nav-item i:first-child { width: 16px; text-align: center; color: #64748b; }
+.cp-nav-caret { margin-left: auto; font-size: 0.65rem; color: #94a3b8; }
+/* The four labels are placeholders and are rendered `disabled`. Keep the cursor
+   from offering a click the element will not honour. */
+.cp-nav-item[disabled] { cursor: default; }
+
+/* The identity sits at the foot of the menu, which is where the eye expects to
+   find the account it is signed in as. It opens the account menu above it. */
+.cp-side-foot { position: relative; margin-top: auto; padding-top: 10px; border-top: 1px solid #e2e8f0; }
+
+.cp-user {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; padding: 8px;
+  font: inherit; text-align: left; cursor: pointer;
+  background: transparent; border: none; border-radius: 10px;
+}
+.cp-user:hover { background: #eef2f7; }
+.cp-avatar {
+  flex: none; width: 30px; height: 30px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 0.72rem; font-weight: 600; letter-spacing: 0.02em;
+  color: #fff; background: #475569;
+}
+.cp-user-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.cp-user-name {
+  font-size: 0.84rem; font-weight: 600; color: #0f172a;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cp-user-email {
+  font-size: 0.74rem; color: #64748b;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cp-user-caret { font-size: 0.65rem; color: #94a3b8; }
+
+/* Anchored to the right of the footer rather than above it, aligned to the bottom
+   so it reads as an extension of the row. The extra 20px clears the sidebar's own
+   padding and border, so the gap is measured from the sidebar's edge rather than
+   from the text inside it. The minimum width keeps the menu legible when the
+   sidebar is collapsed and the footer is only an avatar wide. */
+.cp-account-menu {
+  position: absolute; bottom: 0; left: calc(100% + 20px); z-index: 20;
+  min-width: 248px; padding: 6px;
+  display: flex; flex-direction: column; gap: 2px;
+  font-size: 0.85rem;
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 12px;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.12);
+}
+.cp-account-menu[hidden] { display: none; }
+/* The account being signed in as: a readout, so the check says which one it is
+   rather than the row being clickable. */
+.cp-account-current { color: #64748b; }
+.cp-account-current span {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cp-account-menu .cp-account-logout {
+  margin-top: 4px; padding-top: 4px; border-top: 1px solid #e2e8f0;
+}
+
+/* The collapse control shows the direction it will move the menu in. Both arrows
+   live in the button and one is hidden, so the swap needs no script. */
+.cp-side-toggle-icon { width: 19px; height: 19px; display: block; }
+.cp-icon-when-collapsed { display: none; }
+.cp-app.is-collapsed .cp-icon-when-open { display: none; }
+.cp-app.is-collapsed .cp-icon-when-collapsed { display: block; }
+
+/* A disabled control must not look like a live one. */
+.cp-icon-btn[disabled] { cursor: default; opacity: 0.45; }
+
+/* Collapsed: the labels go and the icons stay, so the rail still says what the
+   menu holds without spending the width on saying it. */
+.cp-app.is-collapsed .cp-side { width: 64px; }
+.cp-app.is-collapsed .cp-side-head { justify-content: center; }
+.cp-app.is-collapsed .cp-side-search { display: none; }
+.cp-app.is-collapsed .cp-nav-item span,
+.cp-app.is-collapsed .cp-nav-caret,
+.cp-app.is-collapsed .cp-user-text,
+.cp-app.is-collapsed .cp-user-caret { display: none; }
+.cp-app.is-collapsed .cp-nav-item,
+.cp-app.is-collapsed .cp-user { justify-content: center; }
+
+.cp-app-main {
+  flex: 1; min-width: 0; height: 100%; overflow: hidden;
+  display: flex; flex-direction: column;
+  /* The optical lift the empty state had when the mark and the composer were one
+     centred block. */
+  padding-bottom: 10vh;
+}
+/* Empty: two auto margins meet in the middle and centre the mark with the
+   composer beneath it. Asked: the top margin goes, so the mark rises to the head
+   of the canvas, and the composer's margin now only carries it to the foot.
+   Scoped to this column on purpose: the public front door asks the same question
+   of its own layout rule above, and a bare `.cp-ask` margin would move its
+   composer as well. */
+.cp-app-main .cp-top { margin-top: auto; }
+.cp-app-main .cp-ask { margin-bottom: auto; }
+.cp-app.is-asking .cp-app-main { padding-bottom: 0; }
+.cp-app.is-asking .cp-top {
+  margin-top: 0; margin-bottom: 18px;
+  align-items: stretch; gap: 12px;
+}
+.cp-app.is-asking .cp-ask { margin-top: auto; margin-bottom: 22px; }
+/* The mark gives its size to the answer. */
+.cp-app.is-asking .cp-logo { width: 30px; height: 30px; }
+.cp-app.is-asking .cp-brand-name { font-size: 1.05rem; }
+.cp-app.is-asking .cp-brand { justify-content: flex-start; }

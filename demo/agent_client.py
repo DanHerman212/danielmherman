@@ -38,6 +38,48 @@ class AgentError(Exception):
         self.spent = spent
 
 
+class AgentRefused(AgentError):
+    """The agent refused the request as a contract error, before doing any work.
+
+    A subclass rather than a sibling, because every caller that handles
+    `AgentError` should handle this one: it is still a call that produced no
+    answer, and the refund rule is the same one — nothing was dispatched, so
+    nothing was billed. What it adds is `message`, which is the agent's own
+    wording and is written for the clinician rather than for an operator.
+    """
+
+    def __init__(self, code, message):
+        super().__init__(message, spent=False)
+        self.code = code
+        self.message = message
+
+
+def _refusal(status_code, body_text):
+    """The agent's own refusal, when that is what this response is.
+
+    Only the agent's 4xx contract refusals are relayed, and the check is on the
+    shape of the body rather than on a list of codes, so an unexpected 4xx still
+    falls through to the generic message. The reason for relaying at all: these
+    strings are composed to be read by the caller — "Please include a clinical
+    topic to search" describes what to send instead — and replacing one with
+    "the agent failed" leaves a clinician with a command that silently does
+    nothing. No other status is relayed: the agent's error bodies can quote
+    internal URLs and service account names (S1-03, ECC-06).
+    """
+    if status_code != 400:
+        return None
+    try:
+        body = json.loads(body_text)
+    except ValueError:
+        return None
+    if not isinstance(body, dict):
+        return None
+    code, message = body.get('error'), body.get('message')
+    if not isinstance(code, str) or not isinstance(message, str) or not message:
+        return None
+    return AgentRefused(code, message)
+
+
 # Bounds concurrent agent calls per instance. Each call blocks a sync-view
 # worker thread for up to DEMO_AGENT_TIMEOUT (120s); without a bound, a
 # handful of slow calls exhaust the thread pool and stall the whole public
@@ -160,6 +202,9 @@ def ask(body, trace=''):
             raise AgentError(f'{type(exc).__name__}: {exc}') from exc
 
         if response.status_code != 200:
+            refusal = _refusal(response.status_code, response.text)
+            if refusal is not None:
+                raise refusal
             # Log the body, return a generic message. The agent's errors can
             # quote internal URLs and service account names.
             logger.error(
@@ -263,6 +308,9 @@ def ask_stream(body, trace=''):
 
         with response:
             if response.status_code != 200:
+                refusal = _refusal(response.status_code, response.text)
+                if refusal is not None:
+                    raise refusal
                 logger.error(
                     'agent stream returned %s trace=%s: %s',
                     response.status_code, trace or '-', response.text[:2000],

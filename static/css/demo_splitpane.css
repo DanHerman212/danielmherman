@@ -170,12 +170,17 @@ body:has(#demo-root), body:has(#a2ui-root) { overflow-x: auto; }
   border-right: 1px solid var(--line); background: var(--surface);
   min-width: 0;
 }
+/* All three header bars — the rail's search strip and both pane heads — are the
+   same height so their bottom borders read as one continuous line across the
+   console. Component height, padding and font all live here, not on the
+   individual bars, so a change cannot drift one of them. */
 .demo-rail-search {
   display: flex; align-items: center; gap: 8px;
-  padding: 10px 12px; border-bottom: 1px solid var(--line); color: var(--muted);
+  height: 40px; box-sizing: border-box; padding: 0 12px;
+  border-bottom: 1px solid var(--line); color: var(--muted);
 }
 .demo-rail-search input {
-  flex: 1; border: none; outline: none; font: inherit; font-size: 0.85rem; background: transparent;
+  flex: 1; border: none; outline: none; font: inherit; font-size: 0.8rem; background: transparent;
 }
 /* A column, so the rows can share the height between them. With the clinical
    descriptor gone the rows were short and a full page of ten left a block of
@@ -216,9 +221,23 @@ body:has(#demo-root), body:has(#a2ui-root) { overflow-x: auto; }
 .pane-thread { position: relative; border-right: 1px solid var(--line); }
 .pane-head {
   display: flex; justify-content: space-between; align-items: center; gap: 8px;
-  padding: 10px 14px; font-size: 0.8rem; font-weight: 600;
+  height: 40px; box-sizing: border-box; padding: 0 14px;
+  font-size: 0.8rem; font-weight: 600;
   border-bottom: 1px solid var(--line); background: var(--surface-2);
 }
+/* The canvas bar centres its title while the view switcher stays right. A
+   three-column grid centres the title on the pane; a space-between flex row
+   would centre it on whatever space the switcher left over, which moves it as
+   the switcher appears and disappears. */
+.pane-head-center { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; }
+.pane-head-center > .pane-title { grid-column: 2; text-align: center; }
+.pane-head-center > .pane-head-actions { grid-column: 3; justify-content: flex-end; }
+/* The thread bar is centred on the same axis as the canvas bar, so the two pane
+   titles line up. The back control and the age/sex descriptor flank the label,
+   and they are placed by column rather than left to source order so the label
+   stays centred when only one of them is present. */
+.pane-head-center > .back-btn { grid-column: 1; justify-self: start; }
+.pane-head-center > .pane-head-meta { grid-column: 3; justify-self: end; }
 .pane-head-meta { font-weight: 400; color: var(--muted); font-size: 0.72rem; }
 /* Canvas view switcher. Segments, not per-turn tabs: the number of views is
    fixed and small, so the control must not grow as the thread does. */
@@ -334,7 +353,6 @@ body:has(#demo-root), body:has(#a2ui-root) { overflow-x: auto; }
   margin: auto; text-align: center; color: var(--muted); max-width: 320px; font-size: 0.9rem;
 }
 .canvas-empty i { font-size: 1.8rem; opacity: 0.6; }
-.canvas-empty-sub { font-size: 0.8rem; opacity: 0.8; }
 
 .widget { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; }
 .widget-title { font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin-bottom: 10px; }
@@ -436,6 +454,10 @@ body:has(#demo-root), body:has(#a2ui-root) { overflow-x: auto; }
   flex-direction: column;
   gap: 8px;
 }
+/* Absent until a patient is chosen. Display is set above, so `hidden` needs the
+   rule to actually collapse it — and it hides the whole bar, border included,
+   rather than leaving an empty strip where the composer was. */
+.composer[hidden] { display: none; }
 .composer-chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .composer-chips[hidden] { display: none; }
 

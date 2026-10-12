@@ -1,7 +1,8 @@
-"""The demo's endpoints: the A2UI console page and its ask proxy.
+"""The demo's endpoints: the public front door, the A2UI console, its ask proxy,
+and the `@` patient lookup.
 
-Both require a login. Accounts are issued, not self-registered — there is no
-signup route anywhere in this app, by design.
+The front door is public; everything else requires a login. Accounts are issued,
+not self-registered — there is no signup route anywhere in this app, by design.
 """
 
 import json
@@ -18,17 +19,23 @@ from django.views.decorators.http import require_POST
 
 from .agent_client import (
     AgentError,
+    AgentRefused,
     ask as ask_agent,
     ask_stream as ask_agent_stream,
     trace_id,
 )
 from .conversations import record_answer, replay_turns
-from .fixtures import CHIP_NAMES, chip_buttons, fixture_ask
-from .models import Conversation, DemoPatient, DemoQuota
+from .fixtures import CHIP_NAMES, SLASH_COMMANDS, fixture_ask
+from .models import Conversation, DemoPatient, DemoQuota, Profile
 
 logger = logging.getLogger(__name__)
 
 MAX_QUESTION_CHARS = 2000
+
+# The `@` selector. One character matches most of the cohort, so the lookup waits
+# for a second; the cap keeps the payload small enough to read at a glance.
+MIN_PATIENT_QUERY_CHARS = 2
+PATIENT_LOOKUP_LIMIT = 5
 
 # The fields a request may carry, mirroring the agent's closed contract
 # (services/agent/contracts.py). An unknown field used to be ignored here, so a
@@ -184,6 +191,11 @@ def _intent_for(payload):
     What stays on this side is the validation that must happen before a credit is
     spent, and the one check only this side can make: the admission exists in the
     demo cohort, which is the authorization boundary (S1-09).
+
+    A chip and text can arrive together. Which commands take the caller's words
+    and which refuse them as a second intention is the agent's decision, not
+    this side's: the command vocabulary lives in one place, and this proxy is a
+    pass-through for intent rather than a second interpreter of it.
     """
     hadm_id = payload.get('hadm_id')
     if hadm_id is not None:
@@ -205,6 +217,19 @@ def _intent_for(payload):
         if chip is not None:
             if chip not in CHIP_NAMES:
                 return None, 'unknown chip.'
+            # Text beside a chip is forwarded rather than dropped. Which
+            # commands take the caller's words — and which refuse text as a
+            # second intention — is the agent's vocabulary to interpret, and it
+            # is the only layer that knows it: `routing.py` is the single owner
+            # of the command set. This side used to resolve it by keeping the
+            # chip and discarding the text, which is how a clinician who typed a
+            # topic got the previous answer back instead.
+            question = payload.get('question')
+            if isinstance(question, str) and question.strip():
+                q = question.strip()
+                if len(q) > MAX_QUESTION_CHARS:
+                    return None, f'Question exceeds {MAX_QUESTION_CHARS} characters.'
+                return {'chip': chip, 'hadm_id': hadm_id, 'question': q}, None
             return {'chip': chip, 'hadm_id': hadm_id}, None
         # Free text sent alongside the selected patient: the agent embeds the
         # admission in the question so it can ground the answer.
@@ -232,26 +257,69 @@ def _intent_for(payload):
 # live branch runs the real agent once the endpoint is deployed.
 # --------------------------------------------------------------------------- #
 
+def landing(request):
+    """The public front door: the shell with no conversation behind it yet.
+
+    Reachable without a login so the project page can link straight to it rather
+    than dropping a visitor onto a sign-in form. The ask bar is deliberately
+    inert — the anonymous path that would answer here is not built, and an input
+    that appears to send is worse than one that plainly does not.
+    """
+    return render(request, 'demo/landing.html')
+
+
 @login_required
 def a2ui_console(request):
-    """The A2UI canvas demo: enterprise shell + patient rail + thread, with the
-    context canvas rendered from agent-composed A2UI messages.
+    """The application behind the front door: the shell for a signed-in account.
 
-    The patient rail carries no precomputed risk band — every patient is
-    unscored until a live assessment is run in the thread."""
+    No patient list is passed. The redesign moves patient selection into the ask
+    bar as an `@` command, so handing the page every patient would be the legacy
+    rail rebuilt rather than a step away from it."""
     return render(request, 'demo/a2ui_console.html', {
-        'rows': [{'patient': p} for p in DemoPatient.objects.all()],
+        # Who the shell is showing. `Profile` is where a social sign-in will
+        # write a name and a picture; today it falls back to the account's own.
+        'profile': Profile.for_user(request.user),
         'remaining': DemoQuota.remaining(request.user),
-        # The chips the composer offers, from the one list in `fixtures.py` that also
-        # backs the allowlist checked before a credit is spent. The page used to carry
-        # its own copy in JavaScript, which is how a chip could be offered and refused
-        # in the same click.
-        'chips': chip_buttons(),
+        # What the composer's `/` menu offers, from the one list in `fixtures.py`
+        # that also names the intent each command sends.
+        'commands': SLASH_COMMANDS,
         # Fixture mode answers captured payloads one question at a time and keeps
         # no conversation at all, so the page says so rather than letting a
         # follow-up look like it was remembered.
         'fixture_mode': settings.DEMO_FIXTURE_MODE,
     })
+
+
+@login_required
+def patient_autocomplete(request):
+    """The `@` selector's lookup: patients whose name contains what was typed.
+
+    Behind a login like the rest of the application. The cohort is the demo's
+    whole patient list, so an open endpoint here would publish it; when the
+    anonymous path exists it can decide for itself what a visitor sees.
+
+    A lookup rather than the cohort rendered into the page: that would ship every
+    patient on every load whether or not anyone types an `@`, and would have to be
+    re-shipped whenever the cohort changes.
+    """
+    query = request.GET.get('q', '').strip()
+    if len(query) < MIN_PATIENT_QUERY_CHARS:
+        return JsonResponse({'results': []})
+
+    patients = DemoPatient.objects.filter(
+        display_name__icontains=query
+    ).order_by('display_name')[:PATIENT_LOOKUP_LIMIT]
+
+    return JsonResponse({'results': [
+        {
+            'hadm_id': p.hadm_id,
+            'display_name': p.display_name,
+            # Built from the fields rather than read from `summary`, so the
+            # dropdown's format is this line's decision and not the data's.
+            'meta': f'{p.age}{p.sex}',
+        }
+        for p in patients
+    ]})
 
 
 # The tools whose failure means the answer is not worth charging for.
@@ -480,6 +548,19 @@ def a2ui_ask(request):
 
     try:
         result = ask_agent(intent, trace=trace)
+    except AgentRefused as exc:
+        # The agent declined the request as it stands, before running anything.
+        # Its message is the guidance the clinician needs ("Please include a
+        # clinical topic to search"), so it is relayed rather than replaced, and
+        # the credit is given back freely because nothing was dispatched.
+        logger.info(
+            'a2ui_ask: agent refused trace=%s code=%s', trace or '-', exc.code
+        )
+        DemoQuota.refund(request.user, period, spent=exc.spent)
+        return JsonResponse({
+            'error': exc.message,
+            'remaining': DemoQuota.remaining(request.user),
+        }, status=400)
     except AgentError as exc:
         # Give the credit back — freely if provably nothing was billed,
         # under the daily refund cap otherwise (S1-09). Exception detail
@@ -537,6 +618,18 @@ def _streaming_ask(request, intent, trace, period, conversation=None):
         # otherwise escape the view as a 500.
         stream = ask_agent_stream(intent, trace=trace)
         first = next(stream, None)
+    except AgentRefused as exc:
+        # Same reasoning as the blocking path: the refusal is guidance rather
+        # than a failure, and nothing was dispatched, so the credit is free.
+        logger.info(
+            'a2ui_ask: agent refused the stream before its first frame trace=%s code=%s',
+            trace or '-', exc.code,
+        )
+        DemoQuota.refund(request.user, period, spent=exc.spent)
+        return JsonResponse({
+            'error': exc.message,
+            'remaining': DemoQuota.remaining(request.user),
+        }, status=400)
     except AgentError as exc:
         logger.error(
             'a2ui_ask: agent stream failed before its first frame trace=%s: %s',

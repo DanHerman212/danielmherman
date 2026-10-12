@@ -97,6 +97,23 @@ CHIP_NAMES = tuple(CHIPS)
 # worked offline — the one thing fixtures must never do.
 FIXTURE_UNAVAILABLE_CHIPS = frozenset({'literature'})
 
+# The slash commands the composer offers.
+#
+# `command` is what a clinician types; `chip` is the intent the agent receives.
+# Keeping both means the visible vocabulary and the wire vocabulary can differ
+# without either becoming a second list to hold in step. Every `chip` here must
+# be a key of `CHIPS` — `test_chips.py` fails if one is not.
+SLASH_COMMANDS = (
+    {'command': 'risk', 'chip': 'risk',
+     'description': 'Run the 30-day readmission risk model'},
+    {'command': 'meds', 'chip': 'meds',
+     'description': 'Extract the discharge medications'},
+    {'command': 'ehr', 'chip': 'summarize',
+     'description': 'Summarize the discharge notes'},
+    {'command': 'pubmed', 'chip': 'literature',
+     'description': 'Search the medical literature'},
+)
+
 
 def chip_buttons() -> list[dict]:
     """The chips the console renders: `[{'key', 'label'}]` in declaration order.

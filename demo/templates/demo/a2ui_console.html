@@ -1,235 +1,283 @@
-{% extends "content/base.html" %}
+{% extends "demo/app_base.html" %}
 {% load static %}
 {% comment %}
-A2UI spike — the same enterprise shell, patient rail, thread and starter chips
-as the custom demo, but the context canvas is composed as A2UI messages and
-rendered by the vendored A2UI renderer (agent-composed UI), compared against
-the custom-DOM demo. Fixture mode; same real payloads.
+Enterprise Clinical Copilot — the application, behind the front door.
 
-Driven by static/js/demo_a2ui.js via the shared flow (static/js/demo_flow.js).
-The server returns an A2UI envelope; the page feeds it to the A2UI renderer.
-The "Show composed messages" toggle reveals exactly what the agent would have
-emitted (the trace element).
+The shell is the frame the conversation will render inside: a collapsible menu
+on the left, and the working surface beside it. There is no patient list. The
+redesign moves patient selection into the ask bar as an `@` command, so a rail
+of every patient would be the legacy layout rebuilt rather than a step away
+from it.
+
+The menu carries four labels — New Conversation, Discover, Tools, History —
+from the reference interface. They are placeholders, rendered `disabled` so that
+a control doing nothing cannot be mistaken for a feature that is broken. Wiring
+them is a later phase.
+
+Account actions are split. The user guide and the request count sit in the menu at
+the top right of the page — the same markup the front door uses, and the same
+script drives it, so the two menus cannot drift apart. Sign-out sits under the
+identity at the foot of the sidebar, beside the account it signs out of.
+
+NOT YET WIRED, and inert on purpose:
+
+  * the ask bar accepts typing and submits nothing. copilot_shell.js cancels the
+    submit; an empty form falling through to a GET reload of this URL would look
+    like the question had been sent.
+  * the history-search control in the sidebar head.
+  * the four menu labels in the sidebar.
 {% endcomment %}
 
-{% block title %}Enterprise Clinical Copilot · A2UI{% endblock %}
-
-{% block extra_css %}
-<link rel="stylesheet" href="{% static 'css/demo_splitpane.css' %}?v=13">
-{% endblock %}
+{% block title %}Enterprise Clinical Copilot{% endblock %}
 
 {% block content %}
-<div id="a2ui-root"
-     data-ask-url="{% url 'demo:a2ui_ask' %}"
-     data-renderer-url="{% static 'js/bundled/a2ui_renderer.js' %}?v=2">
+<div class="cp cp-app" id="copilot-shell" data-ask-url="{% url 'demo:a2ui_ask' %}">
 
-  {# ---------------- Enterprise header ---------------- #}
-  <header class="demo-header">
-    <div class="demo-header-left">
-      <span class="demo-brand" aria-label="Enterprise Clinical Copilot">
-        <svg class="ecc-logo" viewBox="0 0 48 48" role="img" aria-hidden="true">
+  {# ---------------- left: the menu ---------------- #}
+  <aside class="cp-side" id="cp-side">
+    <div class="cp-side-head">
+      <button type="button" class="cp-icon-btn" id="cp-side-toggle"
+              aria-expanded="true" aria-controls="cp-side"
+              aria-label="Collapse the menu" title="Collapse the menu">
+        {% comment %}
+        Drawn rather than taken from the icon font: the reference is a panel with
+        a divider and a chevron, and no free FontAwesome glyph matches it exactly.
+        The two arrows are both in the button and one is hidden by CSS, so the
+        swap on collapse needs no scripting.
+        {% endcomment %}
+        <svg class="cp-side-toggle-icon cp-icon-when-open" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor" stroke-width="1.8"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="3" y="4" width="18" height="16" rx="4"/>
+          <path d="M9 4v16"/>
+          <path d="M16.5 9.5 13.5 12l3 2.5"/>
+        </svg>
+        <svg class="cp-side-toggle-icon cp-icon-when-collapsed" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor" stroke-width="1.8"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="3" y="4" width="18" height="16" rx="4"/>
+          <path d="M9 4v16"/>
+          <path d="M13.5 9.5 16.5 12l-3 2.5"/>
+        </svg>
+      </button>
+      {% comment %}
+      History search, a placeholder for a later phase. Rendered `disabled` for the
+      same reason the section labels are: a control that does nothing should not
+      look like one that is broken. Hidden when the menu is collapsed, where there
+      is no room for it beside the collapse arrow.
+      {% endcomment %}
+      <button type="button" class="cp-icon-btn cp-side-search" id="cp-search-btn"
+              disabled aria-label="Search history"
+              title="Search history — not built yet">
+        <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+      </button>
+    </div>
+
+    <nav class="cp-side-nav" aria-label="Copilot sections">
+      {% comment %}
+      Placeholders. `disabled` is the honest rendering: these are labels reserved
+      for a later phase, not controls that failed.
+      {% endcomment %}
+      <button type="button" class="cp-nav-item" disabled>
+        <i class="fa-regular fa-pen-to-square" aria-hidden="true"></i>
+        <span>New Conversation</span>
+      </button>
+      <button type="button" class="cp-nav-item" disabled>
+        <i class="fa-regular fa-compass" aria-hidden="true"></i>
+        <span>Discover</span>
+      </button>
+      <button type="button" class="cp-nav-item" disabled>
+        <i class="fa-solid fa-screwdriver-wrench" aria-hidden="true"></i>
+        <span>Tools</span>
+        <i class="fa-solid fa-chevron-right cp-nav-caret" aria-hidden="true"></i>
+      </button>
+      <button type="button" class="cp-nav-item" disabled>
+        <i class="fa-regular fa-clock" aria-hidden="true"></i>
+        <span>History</span>
+        <i class="fa-solid fa-chevron-right cp-nav-caret" aria-hidden="true"></i>
+      </button>
+    </nav>
+
+    <div class="cp-side-foot">
+      {% comment %}
+      The identity is a control again: it opens the account menu above it. The
+      menu carries the account being signed in as, a Settings placeholder, and
+      sign-out — the reference interface's shape without the rows that have no
+      meaning here yet (add account, inbox).
+      {% endcomment %}
+      <button type="button" class="cp-user" id="cp-account-btn"
+              aria-expanded="false" aria-controls="cp-account-menu">
+        <span class="cp-avatar" aria-hidden="true">{{ profile.initials }}</span>
+        <span class="cp-user-text">
+          <span class="cp-user-name">{{ profile.name }}</span>
+          <span class="cp-user-email">{{ profile.email }}</span>
+        </span>
+        <i class="fa-solid fa-chevron-right cp-user-caret" aria-hidden="true"></i>
+      </button>
+
+      <div class="cp-account-menu" id="cp-account-menu" hidden>
+        <span class="cp-menu-item cp-account-current">
+          <i class="fa-solid fa-check" aria-hidden="true"></i>
+          <span>{{ profile.email }}</span>
+        </span>
+        <button type="button" class="cp-menu-item" disabled>
+          <i class="fa-solid fa-gear" aria-hidden="true"></i>
+          <span>Settings</span>
+        </button>
+        <form class="cp-account-logout" method="post" action="{% url 'logout' %}">
+          {% csrf_token %}
+          <button type="submit" class="cp-menu-item">
+            <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i>
+            <span>Log out</span>
+          </button>
+        </form>
+      </div>
+    </div>
+  </aside>
+
+  {# ---------------- right: the working surface ---------------- #}
+  <main class="cp-app-main">
+    {# ---------------- top right of the page: the menu ---------------- #}
+    <header class="cp-head">
+      <div class="cp-actions">
+        <div class="cp-menu-anchor">
+          <button type="button" class="cp-icon-btn" id="cp-menu-btn"
+                  aria-expanded="false" aria-controls="cp-menu"
+                  aria-label="Open menu" title="Menu">
+            <i class="fa-solid fa-bars" aria-hidden="true"></i>
+          </button>
+          <div class="cp-menu" id="cp-menu" hidden>
+            <a class="cp-menu-item" href="{% url 'demo:guide' %}">
+              <i class="fa-regular fa-circle-question" aria-hidden="true"></i>
+              <span>Demo User Guide</span>
+            </a>
+            <span class="cp-menu-item cp-menu-quota">
+              <i class="fa-solid fa-bolt" aria-hidden="true"></i>
+              <span>Requests left</span>
+              <strong id="remaining">{{ remaining }}</strong>
+            </span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    {% if fixture_mode %}
+    {% comment %}
+      Offline scaffolding, and it says so. This mode answers captured payloads and
+      keeps no conversation, so a follow-up here is a new question rather than a
+      remembered one. The banner is not decoration: presenting canned answers as
+      if they came from the live agent is the one thing this demo must never do.
+    {% endcomment %}
+    <p class="cp-note" role="note">
+      <i class="fa-solid fa-plug-circle-xmark" aria-hidden="true"></i>
+      <span>Offline demonstration: answers come from captured payloads, one question
+      at a time. Follow-up questions need the live agent.</span>
+    </p>
+    {% endif %}
+
+    <div class="cp-top">
+      <div class="cp-brand">
+        <svg class="cp-logo" viewBox="0 0 48 48" role="img" aria-hidden="true">
           <rect x="1" y="1" width="46" height="46" rx="11" fill="#1f2937"/>
           <text x="24" y="31" text-anchor="middle"
                 font-family="Inter, system-ui, sans-serif"
                 font-size="17" font-weight="700" letter-spacing="1"
                 fill="#ffffff">ECC</text>
         </svg>
-        <span class="demo-brand-name">Enterprise Clinical<br/>Copilot</span>
-      </span>
-    </div>
-    {% comment %}
-    The header carries account actions only. The Demo User Guide sits at the
-    foot of the sidebar with the other demo-meta (the request quota): it is a
-    demo feature, not an account action, and as a pill up here it fought the
-    profile and Log out for the same corner.
-    {% endcomment %}
-    <div class="demo-header-right">
-      <div class="demo-user" title="Signed in as Dr. Lena Ortiz">
-        <span class="demo-user-avatar" aria-hidden="true">LO</span>
-        <span class="demo-user-name">Dr. Lena Ortiz</span>
+        <h1 class="cp-brand-name">Enterprise Clinical Copilot</h1>
       </div>
-      <form method="post" action="{% url 'logout' %}" class="demo-logout">
-        {% csrf_token %}
-        <button type="submit" aria-label="Log out" title="Log out">
-          <i class="fa-solid fa-right-from-bracket"></i>
-          <span>Log out</span>
-        </button>
-      </form>
-    </div>
-  </header>
 
-  <div class="demo-shell">
-
-    {# ---------------- Sidebar nav ---------------- #}
-    <aside class="demo-nav" aria-label="Primary navigation">
-      <nav class="demo-nav-list">
-        <button type="button" class="demo-nav-item" data-view="dashboard">
-          <i class="fa-solid fa-gauge-high"></i>
-          <span>Dashboard</span>
-        </button>
-        <button type="button" class="demo-nav-item active" data-view="risk">
-          <i class="fa-solid fa-heart-pulse"></i>
-          <span>Readmission Risk</span>
-        </button>
-      </nav>
-      <div class="demo-nav-footer">
-        <a class="demo-nav-guide" href="{% url 'demo:guide' %}">
-          <i class="fa-regular fa-circle-question"></i>
-          <span>Demo User Guide</span>
-        </a>
-        <span class="demo-quota"><i class="fa-solid fa-bolt"></i> Requests left:
-          <strong id="remaining">{{ remaining }}</strong></span>
-      </div>
-    </aside>
-
-    {# ---------------- Risk view: the demo ---------------- #}
-    <div class="demo-view demo-view-risk" id="risk-view">
-
-      {% if fixture_mode %}
       {% comment %}
-        Offline scaffolding, and it says so. This mode answers captured payloads
-        and keeps no conversation: a follow-up here is a new question, not a
-        remembered one.
+      The question, once asked. The composer is emptied by the next question, so
+      the one being answered is held here instead — above the status, and clear
+      of the answer that follows it.
       {% endcomment %}
-      <p class="demo-offline-note" role="note">
-        <i class="fa-solid fa-plug-circle-xmark" aria-hidden="true"></i>
-        Offline demonstration: answers come from captured payloads, one question
-        at a time. Follow-up questions need the live agent.
-      </p>
-      {% endif %}
+      <div class="cp-question" id="cp-question" hidden>
+        <p class="cp-question-text" id="cp-question-text"></p>
+      </div>
 
-      <div class="demo-layout">
-
-        {# --- Screen 1: patient rail --- #}
-        <aside class="demo-rail" aria-label="Patient list">
-          <div class="demo-rail-search">
-            <i class="fa-solid fa-magnifying-glass"></i>
-            <input id="patient-search" type="search" placeholder="Search patients…"
-                   aria-label="Search patients">
-          </div>
-          <div class="demo-rail-list" id="patient-list">
-            {% for row in rows %}
-            <button type="button"
-                    class="patient-row"
-                    data-hadm-id="{{ row.patient.hadm_id }}">
-              <span class="patient-name">{{ row.patient.display_name }}</span>
-              {% comment %}
-              Age and sex only. The rest of the descriptor — admission type,
-              length of stay, discharge disposition — is parsed from the
-              features row and is NOT checked against the discharge note, so
-              the demo was asserting things it could not stand behind. Age and
-              sex ARE cross-checked against the note by coherence_scan.py.
-              {% endcomment %}
-              <span class="patient-age">{{ row.patient.age }}{{ row.patient.sex }}</span>
-            </button>
-            {% empty %}
-            <div class="demo-empty-list">No patients seeded. Run
-              <code>manage.py seed_demo_patients</code>.</div>
-            {% endfor %}
-          </div>
-          <div class="demo-rail-pagination" id="pagination">
-            <button id="page-prev" class="page-btn" type="button"
-                    aria-label="Previous page"><i class="fa-solid fa-chevron-left"></i></button>
-            <span id="page-info" class="page-info"></span>
-            <button id="page-next" class="page-btn" type="button"
-                    aria-label="Next page"><i class="fa-solid fa-chevron-right"></i></button>
-          </div>
-        </aside>
-
-        {# --- Screen 2: split pane (thread + A2UI canvas) --- #}
-        <main class="demo-main">
-          <section class="pane pane-thread" aria-label="Conversation">
-            <div class="pane-head">
-              <button id="back-btn" class="back-btn" type="button" hidden
-                      aria-label="Back to patient list" title="Back to patient list">
-                <i class="fa-solid fa-arrow-left"></i>
-              </button>
-              <span id="thread-patient-name">Select a patient</span>
-              <span id="thread-patient-meta" class="pane-head-meta"></span>
-            </div>
-
-            {% comment %}
-              The conversation lives in this page. Shown only once a conversation
-              is open (the flow unhides it with the id the site returns), so a
-              reload is understood rather than silent: the store keeps the turns
-              for another question, but this thread is the page's own.
-            {% endcomment %}
-            <p id="thread-session-note" class="thread-session-note" hidden>
-              This thread lives in this page. Reloading starts a new
-              conversation.
-            </p>
-
-            <div class="thread" id="thread" aria-live="polite"></div>
-
-            <!-- Composer: contextual chips + ask bar, pinned to the bottom so
-                 the compose area never walks down the page as the thread grows. -->
-            <div class="composer">
-              {% comment %}
-              The chips, from the site's one list (demo/fixtures.py) — the same list
-              the allowlist is derived from, so the buttons and the check that accepts
-              them cannot disagree. Read by static/js/demo_flow.js.
-              {% endcomment %}
-              {{ chips|json_script:"composer-chip-data" }}
-              <div class="composer-chips" id="composer-chips" hidden></div>
-              <div class="thread-input">
-                <input id="question-input" type="text" placeholder="Ask a question…"
-                       aria-label="Ask a question" disabled>
-                <button id="ask-btn" type="button" class="demo-btn demo-btn-primary" disabled>
-                  <i class="fa-solid fa-paper-plane"></i> Ask
-                </button>
-              </div>
-            </div>
-          </section>
-
-          <section class="pane pane-canvas" aria-label="Context canvas">
-            <div class="pane-head">
-              <span>Context canvas</span>
-              <span class="pane-head-actions">
-                {% comment %}
-                One surface per clinical view, switched here rather than replaced,
-                so the risk assessment can be returned to after a literature
-                question. Segments, not per-turn tabs: a long thread would overflow
-                a tab strip, and this pane is meant to be a stable monitor for the
-                current context. A view with nothing to draw is disabled, not
-                hidden, so the control does not move under the cursor.
-                {% endcomment %}
-                <div class="canvas-switch" id="canvas-switch" role="group"
-                     aria-label="Canvas view" hidden>
-                  <button type="button" class="canvas-switch-btn" data-view="risk"
-                          aria-pressed="false" disabled>Readmission risk</button>
-                  <button type="button" class="canvas-switch-btn" data-view="literature"
-                          aria-pressed="false" disabled>Literature</button>
-                </div>
-                <span id="canvas-mode" class="pane-head-meta"></span>
-              </span>
-            </div>
-            <div class="canvas" id="a2ui-host">
-              <div class="canvas-empty" id="canvas-empty">
-                <i class="fa-solid fa-heart-pulse"></i>
-                <p>Select a patient to see their assessment.</p>
-                <p class="canvas-empty-sub">
-                  The A2UI renderer draws the canvas from agent-composed messages.
-                </p>
-              </div>
-            </div>
-            <pre id="a2ui-messages" class="a2ui-messages" hidden></pre>
-          </section>
-        </main>
-
+      {% comment %}
+      The run, as it happens: one row naming the stage it is on, preceded by the
+      dots that say something is happening at all, and followed by the caret that
+      opens the full span once there is an answer to account for. Every stage is
+      kept in the list below the row, which is closed until the caret asks for it.
+      {% endcomment %}
+      <div class="cp-status" id="cp-status" hidden>
+        <button type="button" class="cp-status-row" id="cp-status-toggle"
+                aria-expanded="false" aria-controls="cp-stages">
+          <span class="typing-dots" id="cp-status-dots" aria-hidden="true">
+            <span></span><span></span><span></span>
+          </span>
+          <span class="cp-status-text" id="cp-status-text">Reading the question</span>
+          <i class="fa-solid fa-chevron-down cp-status-caret" aria-hidden="true"></i>
+        </button>
+        <ol class="cp-stages" id="cp-stages" hidden></ol>
       </div>
     </div>
 
-    {# ---------------- Dashboard view: blank placeholder ---------------- #}
-    <div class="demo-view demo-view-dashboard" id="dashboard-view" hidden>
-      <div class="dashboard-placeholder">
-        <i class="fa-solid fa-gauge-high"></i>
-        <p class="dashboard-placeholder-title">Dashboard</p>
-        <p class="dashboard-placeholder-sub">Coming soon.</p>
-      </div>
-    </div>
+    {% comment %}
+    The answer surface. The canvas is where the agent's A2UI messages are mounted,
+    and the text below it is the same answer as prose. The renderer is named by
+    `data-renderer-url` and fetched on demand — never at page load, because its
+    graph is large and nothing on first paint needs it.
+    {% endcomment %}
+    <section class="cp-answer" id="cp-answer" hidden aria-live="polite">
+      <div class="cp-canvas" id="cp-canvas"
+           data-renderer-url="{% static 'js/bundled/a2ui_renderer.js' %}?v=4"></div>
+      <div class="cp-answer-text" id="cp-answer-text"></div>
+    </section>
 
-  </div>
+      {% comment %}
+      The composer: the `@` patient selector and the `/` command menu.
+
+      The bar is the flex container. A chosen patient and a chosen command are
+      pills that are siblings of the input rather than children of it: an
+      `<input>` holds text and nothing else. Each pill shows what was chosen; a
+      hidden field carries its value (`hadm_id`, `chip`), so nothing has to be
+      parsed back out of the text box and what a submit would send is in the DOM.
+      {% endcomment %}
+      <form class="cp-ask" id="cp-ask" role="search" autocomplete="off"
+            data-submit="live"
+            data-lookup-url="{% url 'demo:patient_autocomplete' %}">
+        {% csrf_token %}
+        <span class="patient-pill" id="cp-patient-pill" hidden>
+          <span id="cp-patient-label"></span>
+          <button type="button" class="patient-pill-clear" id="cp-patient-clear"
+                  aria-label="Remove the selected patient">
+            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+          </button>
+        </span>
+        <span class="command-pill" id="cp-command-pill" hidden>
+          <span id="cp-command-label"></span>
+          <button type="button" class="command-pill-clear" id="cp-command-clear"
+                  aria-label="Remove the selected command">
+            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+          </button>
+        </span>
+        <label class="cp-sr-only" for="cp-ask-input">Ask the copilot</label>
+        <input type="text" id="cp-ask-input" class="cp-ask-input"
+               placeholder="Search for patient using @ command or /slash commands for agent requests"
+               role="combobox" aria-expanded="false" aria-controls="cp-patient-list"
+               aria-autocomplete="list" aria-haspopup="listbox">
+        <input type="hidden" name="hadm_id" id="cp-patient-id" value="">
+        <input type="hidden" name="chip" id="cp-command-intent" value="">
+        <button type="submit" class="cp-send" aria-label="Send">
+          <i class="fa-solid fa-arrow-up" aria-hidden="true"></i>
+        </button>
+        <ul class="cp-patient-list" id="cp-patient-list" role="listbox"
+            aria-label="Patients" hidden></ul>
+        <ul class="cp-command-list" id="cp-command-list" role="listbox"
+            aria-label="Commands" hidden></ul>
+      </form>
+      {{ commands|json_script:"cp-command-data" }}
+  </main>
+
 </div>
+{% endblock %}
 
-<script type="module" src="{% static 'js/bundled/demo_a2ui.js' %}?v=4"></script>
+{% block extra_js %}
+<script src="{% static 'js/copilot_shell.js' %}?v=2"></script>
+<script src="{% static 'js/copilot_app.js' %}?v=2"></script>
+<script src="{% static 'js/copilot_composer.js' %}?v=2"></script>
+<script src="{% static 'js/copilot_canvas.js' %}?v=8"></script>
 {% endblock %}

@@ -150,6 +150,7 @@ export function createDemoFlow({ root, askUrl, renderCanvas, onCite }) {
     thread: document.getElementById('thread'),
     input: document.getElementById('question-input'),
     askBtn: document.getElementById('ask-btn'),
+    composer: document.getElementById('composer'),
     composerChips: document.getElementById('composer-chips'),
     canvas: document.getElementById('canvas') || document.getElementById('a2ui-host'),
     canvasMode: document.getElementById('canvas-mode'),
@@ -242,12 +243,17 @@ export function createDemoFlow({ root, askUrl, renderCanvas, onCite }) {
     const age = row.querySelector('.patient-age').textContent;
     state.current = { hadmId, name, meta: age };
 
-    // Parity with the search box: selecting a patient isolates the rail to
-    // them the same way typing their name would (and keeps them highlighted),
-    // so both selection methods leave the list in the same state.
-    els.search.value = name;
+    // Selecting no longer writes the patient's name into the search box. That
+    // parity made both selection routes leave the rail in the same state, but
+    // it also filtered the list down to one row — tolerable while the box was
+    // visible and could be cleared, a trap now that the strip is collapsed and
+    // nothing on screen explains why the rail holds a single patient.
     state.page = 1;
     renderPatientList();
+
+    // The ask box does not exist before a patient is chosen; choosing one is
+    // what brings it into being.
+    if (els.composer) els.composer.hidden = false;
 
     els.threadName.textContent = name;
     els.threadMeta.textContent = state.current.meta;
@@ -282,7 +288,7 @@ export function createDemoFlow({ root, askUrl, renderCanvas, onCite }) {
   /** Deselect the current patient and reset to the starting state; history kept. */
   function clearSelection() {    state.current = null;
     for (const el of allRows()) el.classList.remove('active');
-    els.threadName.textContent = 'Select a patient';
+    els.threadName.textContent = 'Select a Patient';
     els.threadMeta.textContent = '';
     els.backBtn.hidden = true;
     els.input.disabled = true;
@@ -290,6 +296,7 @@ export function createDemoFlow({ root, askUrl, renderCanvas, onCite }) {
     els.thread.replaceChildren();
     syncSessionNote(null);
     if (els.composerChips) els.composerChips.hidden = true;
+    if (els.composer) els.composer.hidden = true;
     paint(null);
     // Reset the left rail to its starting position too: clear the search and
     // return to page 1 so the user browses all patients from the top again.

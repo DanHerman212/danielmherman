@@ -19,7 +19,8 @@ from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from .agent_client import AgentError
+from .agent_client import AgentError, AgentRefused
+from .fixtures import SLASH_COMMANDS
 from .models import Conversation, DemoPatient, DemoQuota, Turn
 
 # A live agent reply shaped like the real /ask response: the agent composes
@@ -516,10 +517,15 @@ class RequestBoundaryTests(TestCase):
 
 @override_settings(DEMO_FIXTURE_MODE=True)
 class A2uiConsolePageTests(TestCase):
-    """The A2UI console page renders the shell the canvas mounts into."""
+    """The application page, and the shell the conversation will render inside."""
 
     def setUp(self):
-        self.user = User.objects.create_user('demo', password='x')
+        # A real-shaped name: the shell renders the profile's name, its initial
+        # and the account identifier, and a bare username would prove none of
+        # them.
+        self.user = User.objects.create_user(
+            'demo', password='x', email='lena@example.com',
+            first_name='Lena', last_name='Ortiz')
         self.client.force_login(self.user)
 
     def test_a2ui_ask_free_text_gets_the_live_agent_message(self):
@@ -549,55 +555,196 @@ class A2uiConsolePageTests(TestCase):
             },
         }
     )
-    def test_a2ui_console_renders_the_canvas_page(self):
+    def test_a2ui_console_renders_the_shell(self):
+        """The application shell: a collapsible menu, the signed-in identity at
+        its foot, and the ask bar as the working surface.
+
+        Pinned because every failure here is silent. A shell that renders without
+        its ask bar, or without its menu, looks like a page that simply has no
+        features yet; nothing errors and nothing logs.
+        """
         DemoPatient.objects.create(
             hadm_id=90000017, display_name='Eugene Sokolov', age=83,
             sex='M', summary='83M', split_name='test',
         )
         response = self.client.get(reverse('demo:a2ui_console'))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'id="a2ui-root"')
-        self.assertContains(response, 'id="a2ui-host"')
-        self.assertContains(response, 'id="patient-list"')
-        self.assertContains(response, 'id="thread"')
-        # The conversation's lifetime is stated in the interface, not left for the
-        # user to discover from a follow-up answered as a first question. It ships
-        # hidden: the flow shows it once the site has given the thread a
-        # conversation id.
-        self.assertContains(response, 'id="thread-session-note"')
-        self.assertContains(response, 'Reloading starts a new')
-        self.assertContains(response, 'id="thread-session-note" class="thread-session-note" hidden')
-        self.assertContains(response, 'id="a2ui-messages"')
-        # The "Show trace" and "Show composed messages" controls were removed on
-        # 2026-10-07. They exposed the agent's plumbing to a viewer whose
-        # question is "is this advice trustworthy": what the canvas already
-        # shows, and what the trace link in the thread already reaches. Pinned
-        # as absent so reintroducing one is a deliberate act rather than a merge.
-        self.assertNotContains(response, 'id="trace-toggle"')
-        self.assertNotContains(response, 'id="a2ui-toggle-msg"')
-        # The production demo (A2UI) header carries the Demo User Guide link.
-        self.assertContains(response, 'Demo User Guide')
-        self.assertContains(response, reverse('demo:guide'))
-        # And a POST logout control next to the signed-in identity.
+        # The frame: the menu, and the control that collapses it.
+        self.assertContains(response, 'id="copilot-shell"')
+        self.assertContains(response, 'id="cp-side"')
+        self.assertContains(response, 'id="cp-side-toggle"')
+        # The four labels the reference interface reserves, present as
+        # placeholders so the layout is honest about what is coming.
+        for label in ('New Conversation', 'Discover', 'Tools', 'History'):
+            self.assertContains(response, label)
+        # The identity at the foot of the menu: the profile's name, the account
+        # identifier under it, and the initials standing in for a picture.
+        self.assertContains(response, 'id="cp-account-btn"')
+        self.assertContains(response, 'class="cp-avatar"')
+        self.assertContains(response, 'Lena Ortiz')
+        self.assertContains(response, 'lena@example.com')
+        self.assertContains(response, '>LO<')
+        # The account menu: the account being signed in as, a Settings
+        # placeholder, and sign-out.
+        self.assertContains(response, 'id="cp-account-menu"')
+        self.assertContains(response, 'Settings')
+        # Log out is a POST: LogoutView refuses a GET, and a link that 405s is a
+        # control that looks like it works and does not.
         self.assertContains(response, 'action="%s"' % reverse('logout'))
         self.assertContains(response, 'name="csrfmiddlewaretoken"')
-        # Cache-busted stylesheet + module links so the shell CSS and the A2UI
-        # component module are never stale in the browser. Bumping these is how
-        # an asset change reaches a browser that already has the old file; the
-        # assertion is deliberately exact so forgetting to bump fails here
-        # rather than showing a stale page in production.
-        self.assertContains(response, 'demo_splitpane.css?v=13')
-        self.assertContains(response, 'js/bundled/demo_a2ui.js')
-        # The chips the composer offers, rendered from the site's one list. Pinned
-        # because the failure is silent: the console reads them from here rather than
-        # declaring its own, so a missing context entry loads a page that offers no
-        # buttons at all and says nothing about why.
-        self.assertContains(response, 'id="composer-chip-data"')
-        self.assertContains(response, 'Search PubMed for recent literature')
-        # The console script loads the A2UI renderer on demand from this URL. A
-        # missing attribute is a canvas that never draws and no error message,
-        # so it is pinned here rather than left to a browser test.
+        # The sidebar head: the collapse control, and the history-search
+        # placeholder beside it.
+        self.assertContains(response, 'id="cp-search-btn"')
+        # The top-right row of the page: the menu carrying the guide and the
+        # request count.
+        self.assertContains(response, 'id="cp-menu-btn"')
+        self.assertContains(response, 'id="cp-menu"')
+        self.assertContains(response, 'id="remaining"')
+        self.assertContains(response, 'Demo User Guide')
+        self.assertContains(response, reverse('demo:guide'))
+        # The ask bar, the page's only input.
+        self.assertContains(response, 'class="cp-brand-name"')
+        self.assertContains(response, 'id="cp-ask-input"')
+        self.assertContains(response, 'class="cp-send"')
+        # The `@` selector: the pill, the list it fills, and the lookup it calls.
+        self.assertContains(response, 'class="patient-pill"')
+        self.assertContains(response, 'id="cp-patient-list"')
+        self.assertContains(
+            response, 'data-lookup-url="%s"' % reverse('demo:patient_autocomplete'))
+        self.assertContains(response, 'copilot_composer.js')
+        # The `/` menu: the command pill, its list, and the intent field it fills.
+        # The intent is carried in the field the ask contract already reads, so a
+        # command needs no new wire field and nothing is parsed out of the text.
+        self.assertContains(response, 'class="command-pill"')
+        self.assertContains(response, 'id="cp-command-list"')
+        self.assertContains(response, 'id="cp-command-intent"')
+        self.assertContains(response, 'name="chip"')
+        self.assertContains(response, 'id="cp-command-data"')
+        # Every command is offered, from the one list the server owns.
+        for entry in SLASH_COMMANDS:
+            self.assertContains(response, entry['description'])
+        # The answer surface: stages, the canvas the renderer mounts into, and the
+        # prose. `data-submit="live"` is what stops copilot_shell.js swallowing
+        # the submit now that the composer has somewhere to send to.
+        self.assertContains(response, 'id="cp-answer"')
+        self.assertContains(response, 'id="cp-stages"')
+        self.assertContains(response, 'id="cp-canvas"')
         self.assertContains(response, 'data-renderer-url="')
+        self.assertContains(response, 'data-submit="live"')
+        # Asserted without its cache-buster, like the three scripts above it: pinning
+        # the version here would mean every bump edits this file too, and a test that
+        # fails on a correct bump is one people learn to update without reading.
+        self.assertContains(response, 'copilot_canvas.js')
+        # The conversation state's two new pieces: the box that holds the question
+        # once the composer is done with it, and the row that names the stage the
+        # run is on — carrying the dots that say it is still running and the caret
+        # that opens the span when it is not.
+        self.assertContains(response, 'id="cp-question-text"')
+        self.assertContains(response, 'id="cp-status-toggle"')
+        self.assertContains(response, 'id="cp-status-text"')
+        self.assertContains(response, 'class="typing-dots"')
+        self.assertContains(response, 'aria-controls="cp-stages"')
+        # The persistent patient list is pinned as absent. It is the specific
+        # legacy pattern this redesign removes, and re-adding it "just for
+        # convenience" is how it would come back.
+        self.assertNotContains(response, 'id="patient-list"')
+        self.assertNotContains(response, 'class="demo-rail"')
+        self.assertNotContains(response, 'id="a2ui-host"')
+        # Cache-busted asset links, asserted exactly so a forgotten bump fails
+        # here rather than serving a stale page out of a browser's cache.
+        self.assertContains(response, 'demo_shell.css?v=15')
+        self.assertContains(response, 'copilot_shell.js')
+        self.assertContains(response, 'copilot_app.js')
+
+
+class LandingPageTests(TestCase):
+    """The front door is public: the project page links straight to it."""
+
+    @override_settings(
+        STORAGES={
+            **settings.STORAGES,
+            "staticfiles": {
+                "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"
+            },
+        }
+    )
+    def test_the_landing_is_reachable_without_a_login(self):
+        response = Client().get(reverse('demo:landing'))
+        self.assertEqual(response.status_code, 200)
+        # The shell itself: the mark and the ask bar that is the anonymous way in.
+        self.assertContains(response, 'id="copilot-shell"')
+        self.assertContains(response, 'class="cp-brand-name"')
+        self.assertContains(response, 'id="cp-ask-input"')
+        self.assertContains(response, 'class="cp-send"')
+        # The three ways in: the ask bar above, and these two account actions.
+        self.assertContains(response, 'id="cp-signup"')
+        self.assertContains(response, reverse('login'))
+        # The persistent patient list belongs to the application, not the door.
+        self.assertNotContains(response, 'id="patient-list"')
+
+
+class PatientAutocompleteTests(TestCase):
+    """The `@` selector's lookup over the local patient table."""
+
+    def setUp(self):
+        self.user = User.objects.create_user('demo', password='x')
+        self.client.force_login(self.user)
+        for hadm_id, name, age, sex in (
+            (90000001, 'Andre Ashford', 30, 'M'),
+            (90000002, 'Andreas Bright', 44, 'F'),
+            (90000003, 'Beatrice Ashford', 51, 'F'),
+        ):
+            DemoPatient.objects.create(
+                hadm_id=hadm_id, display_name=name, age=age, sex=sex,
+                summary=f'{age}{sex}', split_name='test',
+            )
+
+    def _lookup(self, query):
+        return self.client.get(
+            reverse('demo:patient_autocomplete'), {'q': query}).json()['results']
+
+    def test_the_lookup_requires_a_login(self):
+        response = Client().get(reverse('demo:patient_autocomplete'), {'q': 'ash'})
+        self.assertEqual(response.status_code, 302)
+
+    def test_a_short_query_is_not_worth_a_lookup(self):
+        """One character matches most of the cohort, so it is refused rather than
+        answered with a list nobody can use."""
+        self.assertEqual(self._lookup('a'), [])
+
+    def test_it_matches_anywhere_in_the_name(self):
+        self.assertEqual(
+            [row['display_name'] for row in self._lookup('ash')],
+            ['Andre Ashford', 'Beatrice Ashford'],
+        )
+
+    def test_it_ignores_case(self):
+        self.assertEqual(
+            [row['display_name'] for row in self._lookup('BEATRICE')],
+            ['Beatrice Ashford'],
+        )
+
+    def test_the_payload_is_the_three_fields_the_dropdown_renders(self):
+        """Pinned as an exact dict: the page reads these three keys, and an extra
+        one is a field the dropdown silently never shows."""
+        self.assertEqual(
+            self._lookup('andre')[0],
+            {'hadm_id': 90000001, 'display_name': 'Andre Ashford', 'meta': '30M'},
+        )
+
+    def test_no_match_is_an_empty_list_rather_than_an_error(self):
+        response = self.client.get(
+            reverse('demo:patient_autocomplete'), {'q': 'zzz'})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {'results': []})
+
+    def test_the_list_is_capped(self):
+        for index in range(10):
+            DemoPatient.objects.create(
+                hadm_id=90000100 + index, display_name=f'Ash Test {index}',
+                age=40, sex='M', summary='40M', split_name='test',
+            )
+        self.assertEqual(len(self._lookup('ash')), 5)
 
 
 @override_settings(DEMO_FIXTURE_MODE=False)
@@ -720,6 +867,52 @@ class A2uiAskLiveTests(TestCase):
                 self._post({'hadm_id': 90000009, 'chip': chip})
                 self.assertEqual(mocked.call_args.args[0],
                                  {'chip': chip, 'hadm_id': 90000009})
+
+    @patch('demo.views.ask_agent', return_value=dict(A2UI_AGENT_REPLY))
+    def test_text_beside_a_chip_is_forwarded_rather_than_dropped(self, mocked):
+        """The literature command needs the clinician's own search terms, so a
+        chip and text arriving together is the command's normal input.
+
+        Which commands take text that way is the agent's vocabulary, so this
+        side forwards both and lets the agent answer for it. It used to keep the
+        chip and discard the text, which is how a typed topic turned into a
+        repeat of the previous answer.
+        """
+        self._post({'hadm_id': 90000009, 'chip': 'literature',
+                    'question': 'dual antiplatelet therapy'})
+
+        self.assertEqual(mocked.call_args.args[0], {
+            'chip': 'literature',
+            'hadm_id': 90000009,
+            'question': 'dual antiplatelet therapy',
+        })
+
+    @patch('demo.views.ask_agent')
+    def test_an_agent_refusal_reaches_the_clinician_and_refunds(self, mocked):
+        """A refusal is guidance, not an outage: the clinician is told what to
+        send instead, and the credit comes back because nothing was dispatched.
+
+        Replacing the agent's message with the generic outage wording would
+        leave them with a command that silently does nothing.
+        """
+        mocked.side_effect = AgentRefused(
+            'topic_required',
+            'Please include a clinical topic to search '
+            '(e.g., /pubmed coronary artery disease).',
+        )
+        DemoQuota.objects.create(user=self.user, daily_limit=5)
+
+        response = self._post({'hadm_id': 90000009, 'chip': 'literature'})
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.json()['error'],
+            'Please include a clinical topic to search '
+            '(e.g., /pubmed coronary artery disease).',
+        )
+        self.assertEqual(DemoQuota.remaining(self.user), 5)
+        self.assertEqual(mocked.call_args.args[0],
+                         {'chip': 'literature', 'hadm_id': 90000009})
 
     def test_only_core_tool_failures_are_treated_as_an_outage(self):
         """A peripheral tool's failure must not cost the clinician their answer.
@@ -999,6 +1192,27 @@ class A2uiAskStreamTests(TestCase):
 
         async_to_sync(read_one_then_abandon)()
         self.assertEqual(closed, [True])
+
+    @patch('demo.views.ask_agent_stream')
+    def test_a_refusal_before_the_first_frame_is_a_400_not_a_stream(self, mocked):
+        """The streamed path is the one the console uses, so a refusal has to
+        arrive there as the same 400 the blocking path returns — with the agent's
+        own wording, and without charging for a call that never ran."""
+        mocked.side_effect = AgentRefused(
+            'topic_required',
+            'Please include a clinical topic to search '
+            '(e.g., /pubmed coronary artery disease).',
+        )
+        DemoQuota.objects.create(user=self.user, daily_limit=5)
+
+        response = self._post(
+            {'hadm_id': 90000009, 'chip': 'literature'},
+            accept='text/event-stream',
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('Please include a clinical topic', response.json()['error'])
+        self.assertEqual(DemoQuota.remaining(self.user), 5)
 
     @patch('demo.views.ask_agent_stream')
     def test_fixture_mode_never_streams(self, mocked):

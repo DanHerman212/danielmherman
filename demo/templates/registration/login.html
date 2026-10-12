@@ -1,42 +1,61 @@
-{% extends "content/base.html" %}
+{% extends "demo/app_base.html" %}
 {% comment %}
-django.contrib.auth.urls expects this at registration/login.html. There is no
-signup template and no signup route — demo accounts are created with
-`manage.py createsuperuser` or through the admin.
+django.contrib.auth.urls expects this at registration/login.html.
+
+Restyled to the application shell so a visitor who chooses "Log in" on the front
+door stays inside the product rather than landing on a page framed by the
+marketing chrome. It is the same form the LoginView always rendered — only the
+presentation changed. The view supplies `form` and `next`; the field ids come
+from Django's AuthenticationForm.
+
+There is no signup template and no signup route: accounts are issued, not
+self-registered.
 {% endcomment %}
 
-{% block title %}Sign in{% endblock %}
+{% block title %}Sign in · Enterprise Clinical Copilot{% endblock %}
 
 {% block content %}
-<div class="container py-5" style="max-width: 28rem;">
-  <h1 class="h3 mb-4">Sign in</h1>
+<div class="cp cp-auth">
 
-  {% if form.errors %}
-  <div class="alert alert-danger">Incorrect username or password.</div>
-  {% endif %}
-
-  <form method="post">
-    {% csrf_token %}
-    <div class="mb-3">
-      <label class="form-label" for="{{ form.username.id_for_label }}">Username</label>
-      <input type="text" name="username" id="{{ form.username.id_for_label }}"
-             class="form-control" autocomplete="username" autofocus required>
+  <header class="cp-head">
+    <div class="cp-actions">
+      <a class="cp-btn cp-btn-quiet" href="{% url 'demo:landing' %}">Back</a>
     </div>
-    <div class="mb-3">
-      <label class="form-label" for="{{ form.password.id_for_label }}">Password</label>
-      <input type="password" name="password" id="{{ form.password.id_for_label }}"
-             class="form-control" autocomplete="current-password" required>
-    </div>
-    <input type="hidden" name="next" value="{{ next }}">
-    <button type="submit" class="btn btn-dark">Sign in</button>
-  </form>
+  </header>
 
-  <p class="text-muted small mt-4">
-    Demo accounts are issued on request. There is no self-registration.
-  </p>
-  <p class="text-muted small mb-0">
-    If you would like a guided demo or self-service account, please contact
-    <a href="mailto:dan@danielmherman.com?subject=Enterprise%20Clinical%20Copilot%20demo%20request">dan@danielmherman.com</a>.
-  </p>
+  <main class="cp-auth-main">
+    <div class="cp-brand">
+      <svg class="cp-logo" viewBox="0 0 48 48" role="img" aria-hidden="true">
+        <rect x="1" y="1" width="46" height="46" rx="11" fill="#1f2937"/>
+        <text x="24" y="31" text-anchor="middle"
+              font-family="Inter, system-ui, sans-serif"
+              font-size="17" font-weight="700" letter-spacing="1"
+              fill="#ffffff">ECC</text>
+      </svg>
+      <span class="cp-brand-name">Enterprise Clinical Copilot</span>
+    </div>
+
+    <form class="cp-auth-card" method="post">
+      {% csrf_token %}
+      {% if form.errors %}
+      <p class="cp-auth-error" role="alert">Incorrect username or password.</p>
+      {% endif %}
+
+      <label class="cp-field" for="{{ form.username.id_for_label }}">
+        <span>Username</span>
+        <input type="text" name="username" id="{{ form.username.id_for_label }}"
+               autocomplete="username" autofocus required>
+      </label>
+      <label class="cp-field" for="{{ form.password.id_for_label }}">
+        <span>Password</span>
+        <input type="password" name="password" id="{{ form.password.id_for_label }}"
+               autocomplete="current-password" required>
+      </label>
+
+      <input type="hidden" name="next" value="{{ next }}">
+      <button type="submit" class="cp-btn cp-btn-solid cp-btn-block">Sign in</button>
+    </form>
+  </main>
+
 </div>
 {% endblock %}

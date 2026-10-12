@@ -58,8 +58,12 @@ function scene() {
 root.addEventListener('pointerdown', scene, { once: true, capture: true });
 
 const EMPTY_STATE = {
-  title: 'Select a patient to see their assessment.',
-  sub: 'The A2UI renderer draws the canvas from agent-composed messages.',
+  // Shown once a patient is selected and nothing has been asked yet: the canvas
+  // is idle, so it names the two ways to put something in it. The
+  // pre-selection prompt lives in the template instead, because before a
+  // patient is chosen the composer is disabled and this text would be offering
+  // a control the page cannot yet accept.
+  title: 'Select an instruction to send to the agent, or type in your question.',
 };
 
 /** Mount an envelope's messages into a fresh A2UI surface. */
