@@ -219,7 +219,12 @@ customElements.define('a2ui-risk-influencers', RiskInfluencersElement);
 // because a model can emit a marker the retrieval did not support, and a bare
 // number reads as evidence the reader simply has not opened yet.
 
-const MARKER = /\^\[(\d+)\]/g;
+// `^[2]` is the instructed form; `^[PMID: 35186616]` is the form the model reaches for
+// anyway, because on a literature turn the marker it displays IS the identifier. Both are
+// recognised: a marker this cannot read is drawn as literal text, which is what a reader
+// saw in production instead of a citation (2026-10-13). The agent strips a marker naming
+// a record the turn does not have — in either form — so nothing here points at nothing.
+const MARKER = /\^\[\s*(?:PMID\s*[:#]?\s*)?(\d+)\s*\]/gi;
 
 /**
  * The record a PMID addresses. One builder, so a marker and the card beneath it
@@ -621,7 +626,7 @@ class CitedNarrativeElement extends A2uiLitElement {
       // Every match is collected from the original string before any of it is
       // consumed. Slicing while stepping through the same regex let `lastIndex`
       // drift ahead of the text it was indexing, so a marker went missing.
-      const matches = [...node.data.matchAll(new RegExp(MARKER.source, 'g'))];
+      const matches = [...node.data.matchAll(new RegExp(MARKER.source, MARKER.flags))];
       const fragment = document.createDocumentFragment();
       let cursor = 0;
       for (const match of matches) {
@@ -637,7 +642,12 @@ class CitedNarrativeElement extends A2uiLitElement {
   }
 
   _marker(digits, citations, streaming) {
-    const citation = citations.find((entry) => Number(entry.index) === Number(digits));
+    // A marker names its citation by position, or — when the model writes the identifier
+    // instead — by PMID. Position is tried first: it is the instructed form, and an index
+    // is far too small to be mistaken for an eight-digit identifier.
+    const citation =
+      citations.find((entry) => Number(entry.index) === Number(digits)) ||
+      citations.find((entry) => String(entry.pmid || '') === String(digits));
     // What the marker says. On a literature turn it is the PMID, because the marker is
     // an identifier the reader can act on rather than a count of evidence; on a note
     // turn it is the index its popover answers to.
