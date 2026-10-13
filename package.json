@@ -4,8 +4,11 @@
   "type": "module",
   "description": "Front-end sources for danielmherman.com (the A2UI console page). Django serves the built output from static/js/bundled/.",
   "scripts": {
-    "build": "vite build",
-    "dev": "vite build --watch"
+    "build": "npm run build:console && npm run build:clinical",
+    "build:console": "vite build",
+    "build:clinical": "vite build --config vite.clinical.config.js",
+    "dev": "vite build --watch",
+    "dev:clinical": "vite build --watch --config vite.clinical.config.js"
   },
   "dependencies": {
     "@a2ui/lit": "0.10.2",

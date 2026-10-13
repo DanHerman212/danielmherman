@@ -12,7 +12,11 @@
 # the build is reproducible and cannot drift.
 FROM node:22-slim AS jsbuild
 WORKDIR /src
-COPY package.json package-lock.json vite.config.js ./
+# Every config `npm run build` reads has to be here. A missing one is not a warning:
+# vite exits non-zero on an unknown --config path, so the build would stop before the
+# image existed — which is why the clinical console's config is listed beside the
+# site's own rather than left to be discovered at deploy time.
+COPY package.json package-lock.json vite.config.js vite.clinical.config.js ./
 RUN npm ci
 COPY static/js ./static/js
 RUN npm run build

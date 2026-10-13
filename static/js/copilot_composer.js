@@ -25,9 +25,6 @@
   var clearButton = document.getElementById('cp-patient-clear');
   var hiddenId = document.getElementById('cp-patient-id');
   var commandList = document.getElementById('cp-command-list');
-  var commandPill = document.getElementById('cp-command-pill');
-  var commandLabel = document.getElementById('cp-command-label');
-  var commandClear = document.getElementById('cp-command-clear');
   var intentField = document.getElementById('cp-command-intent');
   var commandData = document.getElementById('cp-command-data');
   if (!form || !input || !list || !pill || !label || !hiddenId) return;
@@ -210,9 +207,10 @@
   // ---------- the `/` command menu ----------
   //
   // The list is fixed, so unlike the patient lookup there is no request, no
-  // debounce and no race. The chosen command is held the way the patient is: a
-  // pill shows it and a hidden field carries the intent name, so nothing has to
-  // be parsed back out of the text box.
+  // debounce and no race. An armed command is held in two places, and neither is a
+  // chip (UX ruling 2026-10-13): the hidden field carries the intent name to the
+  // server, and the typed `/command` stays in the box as the reader's confirmation.
+  // The pill that used to show it was the last chip in the input container.
 
   var commands = [];
   try {
@@ -272,14 +270,19 @@
     var entry = matches[index];
     if (!entry) return;
     intentField.value = entry.chip;
-    commandLabel.textContent = '/' + entry.command;
-    commandPill.hidden = false;
-    input.value = '';
+    // The chosen command is also published for the record the canvas prints above the
+    // answer ("@Cynthia Petrov - /pubmed - …"). The chip that used to carry it is
+    // gone, and the typed text has the command stripped out before that runs, so this
+    // attribute is what keeps the request describable.
+    form.setAttribute('data-command', '/' + entry.command);
+    // The typed text is left exactly as the reader wrote it. It is the confirmation
+    // that a command is armed, and with the pill gone it is the only one — so this
+    // deliberately does not clear the box. It comes off the question at submit.
     closeCommands();
     input.focus();
   }
 
-  if (commandList && commandPill && commandLabel && intentField && commandData) {
+  if (commandList && intentField && commandData) {
     input.addEventListener('input', function () {
       // A command is the whole of the input: a slash and then letters, nothing
       // else. A slash mid-sentence is a path or a ratio, not a command.
@@ -326,24 +329,48 @@
       closeCommands();
     });
 
-    if (commandClear) {
-      commandClear.addEventListener('click', function () {
-        intentField.value = '';
-        commandLabel.textContent = '';
-        commandPill.hidden = true;
-        input.focus();
-      });
-    }
+    // A command goes over the wire as `chip` — the intent the server routes on — and
+    // never as text inside the question. Two ways in, one payload:
+    //
+    //   * picked from the `/` menu: the intent field already holds the chip;
+    //   * typed by hand, e.g. `/pubmed risk of readmission`: the menu never opened,
+    //     because it opens only for a bare `/letters`, so the chip is derived here
+    //     from the leading token before anything reads the field.
+    //
+    // Typed commands used to travel as plain text with no chip, which the request
+    // could only resolve by inference: "/pubmed risk of readmission" reached the
+    // agent as free text and the word *risk* settled it (observed 2026-10-13). One
+    // explicit intent removes the guess.
+    //
+    // The `/command` token then comes off the question, because for a command that
+    // takes the caller's words those words ARE the question: a PubMed topic of
+    // "/pubmed risk of readmission" searches for the literal token. The command is
+    // not lost by removing it — it is in `chip`, and the record printed above the
+    // answer shows it from `data-command`.
+    form.addEventListener('submit', function () {
+      var typed = /^\/([a-zA-Z]+)\s*(.*)$/.exec(input.value.trim());
+      if (!intentField.value && typed) {
+        var entry = commands.filter(function (candidate) {
+          return candidate.command === typed[1].toLowerCase();
+        })[0];
+        if (entry) {
+          intentField.value = entry.chip;
+          form.setAttribute('data-command', '/' + entry.command);
+        }
+      }
+      if (intentField.value) {
+        input.value = input.value.replace(/^\/[a-zA-Z]+\s*/, '');
+      }
+    });
 
-    // A command is sent once. The canvas asks for this after it has read the
-    // intent, so the pill is cleared by the send rather than by a timer: leaving
-    // it pinned makes the next typed question arrive as a command AND a question,
-    // which the server refuses (it can only answer one of the two). The patient
-    // pill is untouched — the admission is what the next question is about.
+    // A command is sent once. The canvas asks for this after it has read the intent,
+    // so the intent is cleared by the send rather than by a timer: leaving it armed
+    // makes the next typed question arrive as a command AND a question, which the
+    // server refuses (it can only answer one of the two). The patient pill is
+    // untouched — the admission is what the next question is about.
     form.addEventListener('cp:command-consumed', function () {
       intentField.value = '';
-      commandLabel.textContent = '';
-      commandPill.hidden = true;
+      form.removeAttribute('data-command');
     });
   }
 })();

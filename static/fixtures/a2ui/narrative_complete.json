@@ -1,0 +1,43 @@
+{
+  "surface_id": "narrative-complete",
+  "catalog_id": "https://example.com/catalogs/readmission-risk-v1.json",
+  "note": "ILLUSTRATIVE, not captured: the prose and the citation metadata below were written for this review. Markers 1 and 2 are backed; marker 3 is deliberately unbacked, to show the state a model can produce. Structure is what is under review.",
+  "messages": [
+    {
+      "version": "v0.9",
+      "createSurface": {
+        "surfaceId": "narrative-complete",
+        "catalogId": "https://example.com/catalogs/readmission-risk-v1.json"
+      }
+    },
+    {
+      "version": "v0.9",
+      "updateComponents": {
+        "surfaceId": "narrative-complete",
+        "components": [
+          {
+            "id": "root",
+            "component": "CitedNarrative",
+            "streaming": false,
+            "text": "Her 30-day readmission risk sits **above** the cohort threshold, and the two drivers that raise it are length of stay and recent emergency department use ^[1]. Medication order count and the lowest red blood cell count pull the estimate down ^[2]. The estimate is a screening signal rather than a disposition: a course of therapy depends on the whole record, not on this number alone ^[3].",
+            "citations": [
+              {
+                "index": 1,
+                "source": "Discharge summary",
+                "title": "Discharge summary",
+                "excerpt": "Documents the length of stay and the emergency department visits in the six months before admission."
+              },
+              {
+                "index": 2,
+                "source": "Literature",
+                "title": "Placeholder record — layout review only",
+                "excerpt": "A placeholder used to review this card's layout. It is not a citation to any real publication.",
+                "url": "https://example.com/literature/illustrative"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

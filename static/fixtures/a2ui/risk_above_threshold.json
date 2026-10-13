@@ -1,0 +1,47 @@
+{
+  "surface_id": "risk-above-threshold",
+  "catalog_id": "https://example.com/catalogs/readmission-risk-v1.json",
+  "note": "The above-threshold state, shown by moving the THRESHOLD below Cynthia's served score (0.05 rather than 0.11) and setting decision 1. Her score and her five drivers are the real served values — probability 0.090459, captured 2026-10-13 — and only the threshold is moved, so this is a rendering state and not a claim that she is above it. Her own served state is the below cell.",
+  "messages": [
+    {
+      "version": "v0.9",
+      "createSurface": {
+        "surfaceId": "risk-above-threshold",
+        "catalogId": "https://example.com/catalogs/readmission-risk-v1.json"
+      }
+    },
+    {
+      "version": "v0.9",
+      "updateComponents": {
+        "surfaceId": "risk-above-threshold",
+        "components": [
+          {
+            "id": "root",
+            "component": "Column",
+            "children": ["risk", "prov"]
+          },
+          {
+            "id": "risk",
+            "component": "RiskInfluencers",
+            "probability": 0.090459,
+            "threshold": 0.05,
+            "decision": 1,
+            "factors": [
+              { "label": "lowest monocyte count", "contribution": -0.5138, "direction": "decreases" },
+              { "label": "prior inpatient days", "contribution": -0.1544, "direction": "decreases" },
+              { "label": "oncology history", "contribution": -0.1178, "direction": "decreases" },
+              { "label": "admission type", "contribution": 0.1121, "direction": "increases" },
+              { "label": "red cell distribution width (RDW)", "contribution": 0.0709, "direction": "increases" }
+            ]
+          },
+          {
+            "id": "prov",
+            "component": "Text",
+            "text": "Model readmission-final-20260917173317 · features from bigquery · A2UI canvas",
+            "variant": "caption"
+          }
+        ]
+      }
+    }
+  ]
+}

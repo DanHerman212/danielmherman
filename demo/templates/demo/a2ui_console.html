@@ -223,7 +223,7 @@ NOT YET WIRED, and inert on purpose:
     {% endcomment %}
     <section class="cp-answer" id="cp-answer" hidden aria-live="polite">
       <div class="cp-canvas" id="cp-canvas"
-           data-renderer-url="{% static 'js/bundled/a2ui_renderer.js' %}?v=4"></div>
+           data-renderer-url="{% static 'js/bundled/a2ui_clinical.js' %}?v=1"></div>
       <div class="cp-answer-text" id="cp-answer-text"></div>
     </section>
 
@@ -244,13 +244,6 @@ NOT YET WIRED, and inert on purpose:
           <span id="cp-patient-label"></span>
           <button type="button" class="patient-pill-clear" id="cp-patient-clear"
                   aria-label="Remove the selected patient">
-            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
-          </button>
-        </span>
-        <span class="command-pill" id="cp-command-pill" hidden>
-          <span id="cp-command-label"></span>
-          <button type="button" class="command-pill-clear" id="cp-command-clear"
-                  aria-label="Remove the selected command">
             <i class="fa-solid fa-xmark" aria-hidden="true"></i>
           </button>
         </span>
@@ -279,5 +272,5 @@ NOT YET WIRED, and inert on purpose:
 <script src="{% static 'js/copilot_shell.js' %}?v=2"></script>
 <script src="{% static 'js/copilot_app.js' %}?v=2"></script>
 <script src="{% static 'js/copilot_composer.js' %}?v=2"></script>
-<script src="{% static 'js/copilot_canvas.js' %}?v=8"></script>
+<script src="{% static 'js/copilot_canvas.js' %}?v=9"></script>
 {% endblock %}

@@ -1,0 +1,29 @@
+{
+  "surface_id": "narrative-streaming",
+  "catalog_id": "https://example.com/catalogs/readmission-risk-v1.json",
+  "note": "ILLUSTRATIVE, not captured: a mid-answer snapshot — the prose stops mid-sentence and no citations have arrived yet. The marker is on screen and inert. This is the state the reader sees while the answer is still streaming.",
+  "messages": [
+    {
+      "version": "v0.9",
+      "createSurface": {
+        "surfaceId": "narrative-streaming",
+        "catalogId": "https://example.com/catalogs/readmission-risk-v1.json"
+      }
+    },
+    {
+      "version": "v0.9",
+      "updateComponents": {
+        "surfaceId": "narrative-streaming",
+        "components": [
+          {
+            "id": "root",
+            "component": "CitedNarrative",
+            "streaming": true,
+            "text": "Her 30-day readmission risk sits **above** the cohort threshold, and the two drivers that raise it are length of stay and recent emergency department use ^[1]. Medication order count and the lowest red blood cell count pull the estimate down",
+            "citations": []
+          }
+        ]
+      }
+    }
+  ]
+}

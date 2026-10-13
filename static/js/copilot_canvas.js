@@ -63,17 +63,20 @@
     answer.hidden = false;
   }
 
-  /* What was asked, in the terms it was asked in: the patient and the command
-     chosen in the composer, plus anything typed alongside them. The composer keeps
-     its pills, so this is a record of the request rather than a copy of the
-     controls that made it. */
+  /* What was asked, in the terms it was asked in: the patient, the command chosen in
+     the composer, and anything typed alongside them. A record of the request, not a
+     copy of the controls that made it.
+
+     The command is read from the data attribute the composer sets, not from a chip:
+     the chip was removed (UX ruling 2026-10-13) and the typed `/command` is stripped
+     out of the field before this runs, so neither control nor text is the source. */
   function askedFor() {
     var parts = [];
     var patient = document.getElementById('cp-patient-label');
-    var command = document.getElementById('cp-command-label');
+    var command = form.getAttribute('data-command');
     var typed = document.getElementById('cp-ask-input');
     if (patient && patient.textContent.trim()) parts.push(patient.textContent.trim());
-    if (command && command.textContent.trim()) parts.push(command.textContent.trim());
+    if (command && command.trim()) parts.push(command.trim());
     if (typed && typed.value.trim()) parts.push(typed.value.trim());
     return parts.join(' - ');
   }
@@ -128,7 +131,13 @@
       });
       renderer = {
         MessageProcessor: module.MessageProcessor,
-        catalog: module.buildRiskCatalog(module.basicCatalog),
+        // The clinical catalog, from the clinical bundle: it carries the Phase 2
+        // components (RiskInfluencers, LiteratureList) that the agent's composer
+        // now emits. The legacy risk catalog is not loaded at all, so a surface
+        // naming a retired component would draw nothing rather than draw the old
+        // widget — a mismatch that fails loudly in review instead of quietly in
+        // production.
+        catalog: module.buildClinicalCatalog(module.basicCatalog),
       };
     }
     return renderer;
@@ -235,6 +244,14 @@
     // do not belong together (ECC-22).
     var intent = intentField ? intentField.value : '';
     var asked = input ? input.value.trim() : '';
+    // A patient selected with nothing typed is still a submission, and the default
+    // action is the risk assessment. It goes as the COMMAND rather than as a
+    // question about risk: a question runs the free-text loop, which no longer
+    // holds the risk tool (UX Phase 1B), so that path could not answer it. The
+    // wire value is the agent's vocabulary — the shorthand for "the risk
+    // assessment" that the command menu already offers. A rebuilt composer should
+    // take it from the command list the server sends rather than repeating it here.
+    if (!intent && !asked) intent = 'risk';
     if (intent) request.chip = intent;
     if (asked) request.question = asked;
 
@@ -294,7 +311,15 @@
         if (remaining && answerPayload.remaining !== undefined) {
           remaining.textContent = answerPayload.remaining;
         }
-        say(answerPayload.answer || '');
+
+        // The surface draws the prose itself when it carries the cited narrative, and
+        // the envelope says so with `renders_prose`. Writing the answer here as well
+        // would print it twice — once with nothing clickable — which is the same
+        // duplicate that got the risk sentence deleted. This element stays, because it
+        // is where an error or a refusal is written.
+        if (!(answerPayload.a2ui && answerPayload.a2ui.renders_prose)) {
+          say(answerPayload.answer || '');
+        }
         // The composed surface is a bonus on top of the prose: if the renderer
         // cannot mount, the answer the clinician needs is already on screen.
         try {

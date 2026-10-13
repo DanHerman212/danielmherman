@@ -28,22 +28,22 @@ from .models import Conversation, DemoPatient, DemoQuota, Turn
 # Django is a pass-through. The mock carries a minimal-but-real envelope so
 # the view proves it forwards rather than recomposes.
 A2UI_AGENT_REPLY = {
-    'question': 'Assess the 30-day readmission risk for admission 90000009.',
+    'question': 'Assess the 30-day readmission risk for admission 90000015.',
     'answer': ('Estimated 30-day unplanned readmission risk is 0.1540 (15.4%), '
                'above the 0.12 operating threshold.^[1]'),
     'tool_calls': [
         {'name': 'predict_readmission',
-         'args': {'hadm_id': 90000009},
+         'args': {'hadm_id': 90000015},
          'response': {
-             'hadm_id': 90000009, 'probability': 0.154016, 'threshold': 0.12,
+             'hadm_id': 90000015, 'probability': 0.154016, 'threshold': 0.12,
              'decision': 1, 'model_version': 'readmission-final-x',
              'feature_source': 'synthetic',
              'top_factors': [
                  {'feature': 'oncology_flag', 'contribution': 0.2,
                   'direction': 'increases'}]}},
         {'name': 'rag_search',
-         'args': {'hadm_id': 90000009, 'query': 'medications', 'top_k': 5},
-         'response': {'hadm_id': 90000009, 'query': 'medications', 'returned': 1,
+         'args': {'hadm_id': 90000015, 'query': 'medications', 'top_k': 5},
+         'response': {'hadm_id': 90000015, 'query': 'medications', 'returned': 1,
                       'passages': [
                           {'id': 'x_1', 'section': 'discharge_medications',
                            'text': 'Discharge Medications:\nwarfarin 4 mg QD',
@@ -59,18 +59,26 @@ A2UI_AGENT_REPLY = {
             {'version': 'v0.9', 'updateComponents': {
                 'surfaceId': 'risk-canvas',
                 'components': [
-                    {'id': 'root', 'component': 'Card', 'child': 'body'},
-                    {'id': 'body', 'component': 'Column',
-                     'children': ['risk', 'factors', 'source']},
-                    {'id': 'risk', 'component': 'RiskBar',
-                     'probability': 0.154016, 'threshold': 0.12, 'band': 'borderline'},
-                    {'id': 'factors', 'component': 'FactorBars', 'factors': []},
-                    {'id': 'source', 'component': 'SourceCard', 'cite': 1,
-                     'section': 'discharge_medications',
-                     'text': 'warfarin 4 mg QD', 'query': 'medications'},
+                    {'id': 'root', 'component': 'Column',
+                     'children': ['narrative', 'risk']},
+                    {'id': 'narrative', 'component': 'CitedNarrative',
+                     'text': ('Estimated 30-day unplanned readmission risk is '
+                              '0.1540 (15.4%), above the 0.12 operating '
+                              'threshold.^[1]'),
+                     'streaming': False,
+                     'citations': [
+                         {'index': 1, 'source': 'Discharge note',
+                          'title': 'Discharge medications',
+                          'excerpt': 'warfarin 4 mg QD'}]},
+                    {'id': 'risk', 'component': 'RiskInfluencers',
+                     'decision': 1, 'probability': 0.154016, 'threshold': 0.12,
+                     'factors': [
+                         {'label': 'Oncology Flag', 'contribution': 0.2,
+                          'direction': 'increases'}]},
                 ]}},
         ],
-        'fallback_text': 'Admission 90000009: 15.4% 30-day readmission probability.',
+        'renders_prose': True,
+        'fallback_text': 'Admission 90000015: 15.4% 30-day readmission probability.',
     },
     'sources': [{'cite': 1, 'section': 'discharge_medications',
                  'text': 'warfarin 4 mg QD', 'query': 'medications'}],
@@ -211,7 +219,7 @@ class A2uiFixtureContractTests(TestCase):
     def test_a2ui_ask_returns_the_full_contract_from_fixture(self):
         response = self.client.post(
             reverse('demo:a2ui_ask'),
-            data=json.dumps({'hadm_id': 90000017, 'chip': 'risk'}),
+            data=json.dumps({'hadm_id': 90000015, 'chip': 'risk'}),
             content_type='application/json',
         )
         self.assertEqual(response.status_code, 200)
@@ -222,8 +230,11 @@ class A2uiFixtureContractTests(TestCase):
             'risk-canvas')
         comps = body['a2ui']['messages'][1]['updateComponents']['components']
         types = {c['component'] for c in comps}
-        self.assertIn('RiskBar', types)
-        self.assertIn('SourceCard', types)
+        self.assertIn('RiskInfluencers', types)
+        # The prose and its citations travel inside the surface now, and the card that
+        # restated the same evidence is retired (UX ruling 2026-10-13).
+        self.assertIn('CitedNarrative', types)
+        self.assertNotIn('SourceCard', types)
         # Resolved sources are attached by the agent, not recomposed here.
         self.assertIn('sources', body)
         self.assertIsInstance(body['sources'], list)
@@ -615,7 +626,11 @@ class A2uiConsolePageTests(TestCase):
         # The `/` menu: the command pill, its list, and the intent field it fills.
         # The intent is carried in the field the ask contract already reads, so a
         # command needs no new wire field and nothing is parsed out of the text.
-        self.assertContains(response, 'class="command-pill"')
+        # The command chip is gone (UX ruling 2026-10-13): the `/` menu arms a
+        # command and the typed `/command` in the box is the confirmation. The intent
+        # field it sets is what the server reads, so it stays.
+        self.assertNotContains(response, 'class="command-pill"')
+        self.assertContains(response, 'id="cp-command-intent"')
         self.assertContains(response, 'id="cp-command-list"')
         self.assertContains(response, 'id="cp-command-intent"')
         self.assertContains(response, 'name="chip"')
@@ -792,9 +807,9 @@ class A2uiAskLiveTests(TestCase):
         self.assertEqual(body['sources'], A2UI_AGENT_REPLY['sources'])
         comps = body['a2ui']['messages'][1]['updateComponents']['components']
         types = {c['component'] for c in comps}
-        self.assertIn('RiskBar', types)
-        self.assertIn('FactorBars', types)
-        self.assertIn('SourceCard', types)
+        self.assertIn('RiskInfluencers', types)
+        self.assertIn('CitedNarrative', types)
+        self.assertNotIn('SourceCard', types)
 
     @patch('demo.views.ask_agent', return_value=dict(A2UI_AGENT_REPLY))
     def test_live_free_text_is_accepted(self, mocked):

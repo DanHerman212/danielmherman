@@ -8,6 +8,11 @@ import { defineConfig } from 'vite';
  *   - demo_a2ui.js    — the patient rail, thread, chips, ask
  *   - a2ui_renderer.js — the A2UI/Lit renderer, loaded on demand by the console
  *
+ * Phase 2's clinical components are NOT here. They are built by
+ * `vite.clinical.config.js` as a single-entry, self-contained bundle, because a
+ * second entry that shares Lit with these two would be hoisted into an
+ * `assets/` chunk that collectstatic then renames out from under the bundle.
+ *
  * The page must not contain the renderer at load, or the rail's paging code
  * waits on the whole renderer graph — which is what made the page sit behind a
  * spinner. Splitting is also avoided because it emits `import("./chunk.js")`

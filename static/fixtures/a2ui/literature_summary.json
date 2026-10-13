@@ -1,0 +1,91 @@
+{
+  "surface_id": "literature-summary",
+  "catalog_id": "https://example.com/catalogs/readmission-risk-v1.json",
+  "note": "A captured /pubmed answer for admission 90000015, unedited: the prose is the model's own and the three records are the ones the tool returned. The marker in the sentence IS the PMID and opens the record at PubMed; the rows beneath carry the citation details only. No abstract is on the wire any more — nothing draws it, and the record is one click away.",
+  "messages": [
+    {
+      "version": "v0.9",
+      "createSurface": {
+        "surfaceId": "literature-summary",
+        "catalogId": "https://example.com/catalogs/readmission-risk-v1.json"
+      }
+    },
+    {
+      "version": "v0.9",
+      "updateComponents": {
+        "surfaceId": "literature-summary",
+        "components": [
+          {
+            "id": "root",
+            "component": "Column",
+            "children": ["narrative", "literature", "prov"]
+          },
+          {
+            "id": "narrative",
+            "component": "CitedNarrative",
+            "text": "Evidence regarding readmission rates following knee replacement varies by surgical approach. Enhanced Recovery After Surgery (ERAS) protocols have been shown to have no significant effect on or do not increase readmission rates compared to traditional care ^[1], ^[2]. Conversely, day-case knee and hip replacement has been associated with significantly lower odds of readmission compared to inpatient surgery, though this evidence is limited by a high risk of selection bias ^[3].",
+            "citations": [
+              {
+                "index": 1,
+                "source": "PubMed",
+                "title": "Enhanced Recovery After Primary Total Hip and Knee Arthroplasty: A Systematic Review.",
+                "pmid": "34166275",
+                "url": "https://pubmed.ncbi.nlm.nih.gov/34166275/"
+              },
+              {
+                "index": 2,
+                "source": "PubMed",
+                "title": "Enhanced recovery after surgery in patients after hip and knee arthroplasty: a systematic review and meta-analysis.",
+                "pmid": "38134323",
+                "url": "https://pubmed.ncbi.nlm.nih.gov/38134323/"
+              },
+              {
+                "index": 3,
+                "source": "PubMed",
+                "title": "Day-case knee and hip replacement.",
+                "pmid": "39615519",
+                "url": "https://pubmed.ncbi.nlm.nih.gov/39615519/"
+              }
+            ],
+            "streaming": false
+          },
+          {
+            "id": "literature",
+            "component": "LiteratureList",
+            "articles": [
+              {
+                "pmid": "34166275",
+                "title": "Enhanced Recovery After Primary Total Hip and Knee Arthroplasty: A Systematic Review.",
+                "journal": "The Journal of bone and joint surgery. American volume",
+                "pub_date": "2021 Oct 20",
+                "url": "https://pubmed.ncbi.nlm.nih.gov/34166275/"
+              },
+              {
+                "pmid": "38134323",
+                "title": "Enhanced recovery after surgery in patients after hip and knee arthroplasty: a systematic review and meta-analysis.",
+                "journal": "Postgraduate medical journal",
+                "pub_date": "2024 Feb 15",
+                "url": "https://pubmed.ncbi.nlm.nih.gov/38134323/"
+              },
+              {
+                "pmid": "39615519",
+                "title": "Day-case knee and hip replacement.",
+                "journal": "The bone & joint journal",
+                "pub_date": "2024 Dec 01",
+                "url": "https://pubmed.ncbi.nlm.nih.gov/39615519/"
+              }
+            ],
+            "note": "",
+            "degraded": false
+          },
+          {
+            "id": "prov",
+            "component": "Text",
+            "text": "PubMed · 3 record(s) for \"risk for readmission from knee replacement\" · A2UI canvas",
+            "variant": "caption"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "surface_id": "risk-at-threshold",
+  "catalog_id": "https://example.com/catalogs/readmission-risk-v1.json",
+  "note": "The boundary case: the threshold set exactly equal to the served probability (0.090459). The rule you approved is `>= threshold` is above, so this must read Above threshold — the case a bare `>` would silently get wrong. Cynthia's score and drivers are her real ones; only the threshold is moved.",
+  "messages": [
+    {
+      "version": "v0.9",
+      "createSurface": {
+        "surfaceId": "risk-at-threshold",
+        "catalogId": "https://example.com/catalogs/readmission-risk-v1.json"
+      }
+    },
+    {
+      "version": "v0.9",
+      "updateComponents": {
+        "surfaceId": "risk-at-threshold",
+        "components": [
+          {
+            "id": "root",
+            "component": "Column",
+            "children": ["risk", "prov"]
+          },
+          {
+            "id": "risk",
+            "component": "RiskInfluencers",
+            "probability": 0.090459,
+            "threshold": 0.090459,
+            "decision": 1,
+            "factors": [
+              { "label": "lowest monocyte count", "contribution": -0.5138, "direction": "decreases" },
+              { "label": "prior inpatient days", "contribution": -0.1544, "direction": "decreases" },
+              { "label": "oncology history", "contribution": -0.1178, "direction": "decreases" },
+              { "label": "admission type", "contribution": 0.1121, "direction": "increases" },
+              { "label": "red cell distribution width (RDW)", "contribution": 0.0709, "direction": "increases" }
+            ]
+          },
+          {
+            "id": "prov",
+            "component": "Text",
+            "text": "Model readmission-final-20260917173317 · features from bigquery · A2UI canvas",
+            "variant": "caption"
+          }
+        ]
+      }
+    }
+  ]
+}

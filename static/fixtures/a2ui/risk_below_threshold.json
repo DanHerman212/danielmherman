@@ -1,0 +1,47 @@
+{
+  "surface_id": "risk-below-threshold",
+  "catalog_id": "https://example.com/catalogs/readmission-risk-v1.json",
+  "note": "The real served state, unchanged: /risk for admission 90000015 (Cynthia Petrov), captured 2026-10-13 — probability 0.090459 against a 0.11 threshold, decision 0, and her five drivers in the order the tool returned them. Nothing in this cell is moved.",
+  "messages": [
+    {
+      "version": "v0.9",
+      "createSurface": {
+        "surfaceId": "risk-below-threshold",
+        "catalogId": "https://example.com/catalogs/readmission-risk-v1.json"
+      }
+    },
+    {
+      "version": "v0.9",
+      "updateComponents": {
+        "surfaceId": "risk-below-threshold",
+        "components": [
+          {
+            "id": "root",
+            "component": "Column",
+            "children": ["risk", "prov"]
+          },
+          {
+            "id": "risk",
+            "component": "RiskInfluencers",
+            "probability": 0.090459,
+            "threshold": 0.11,
+            "decision": 0,
+            "factors": [
+              { "label": "lowest monocyte count", "contribution": -0.5138, "direction": "decreases" },
+              { "label": "prior inpatient days", "contribution": -0.1544, "direction": "decreases" },
+              { "label": "oncology history", "contribution": -0.1178, "direction": "decreases" },
+              { "label": "admission type", "contribution": 0.1121, "direction": "increases" },
+              { "label": "red cell distribution width (RDW)", "contribution": 0.0709, "direction": "increases" }
+            ]
+          },
+          {
+            "id": "prov",
+            "component": "Text",
+            "text": "Model readmission-final-20260917173317 · features from bigquery · A2UI canvas",
+            "variant": "caption"
+          }
+        ]
+      }
+    }
+  ]
+}

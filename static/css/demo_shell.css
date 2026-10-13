@@ -269,23 +269,9 @@ button.cp-menu-item {
 }
 .patient-pill-clear:hover { background: #dbeafe; }
 
-/* The chosen command, beside the chosen patient: same bar, same shape, a quieter
-   palette so "who" and "what" do not read as the same kind of thing. */
-.command-pill {
-  flex: none; display: inline-flex; align-items: center; gap: 6px;
-  padding: 5px 6px 5px 12px;
-  font-size: 0.85rem; font-weight: 600; color: #334155;
-  background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 999px;
-  white-space: nowrap;
-}
-.command-pill[hidden] { display: none; }
-.command-pill-clear {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 18px; height: 18px; padding: 0; cursor: pointer;
-  font-size: 0.7rem; color: #475569;
-  background: transparent; border: none; border-radius: 50%;
-}
-.command-pill-clear:hover { background: #e2e8f0; }
+/* The command pill's rules were here. Removed with the pill itself (UX ruling
+   2026-10-13): an armed command is shown by the typed `/command` left in the input,
+   so nothing on the bar renders as a chip any more. */
 
 /* Both dropdowns share one shape: anchored above the bar, full width of it. */
 .cp-patient-list,
