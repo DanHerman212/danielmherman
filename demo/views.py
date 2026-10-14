@@ -53,8 +53,13 @@ PATIENT_LOOKUP_LIMIT = 5
 # the failure the agent's own closure exists to prevent, sitting at the boundary
 # a browser can actually reach. Refusing is what keeps a single-turn demo honest
 # about being single-turn.
+# `stream_prose` is the browser asking to be shown the answer as it is written, and it
+# is opt-in here for the same reason it is on the agent: the `answer_delta` and
+# `prose_settled` frames are relayed unaltered, so a client that draws a progress row
+# per unrecognised event would print the answer as a log. The decision belongs to the
+# layer that has to draw it, and a page loaded before this existed simply never asks.
 APPROVED_REQUEST_FIELDS = frozenset(
-    {'question', 'hadm_id', 'chip', 'conversation_id', 'asked'}
+    {'question', 'hadm_id', 'chip', 'conversation_id', 'asked', 'stream_prose'}
 )
 
 # Names a caller reaches for when it expects the copilot to remember the
@@ -812,7 +817,13 @@ def a2ui_ask(request):
     trace = trace_id(request)
     _with_replay(intent, conversation)
     if 'text/event-stream' in request.headers.get('Accept', ''):
-        return _streaming_ask(request, intent, trace, period, conversation, asked)
+        return _streaming_ask(
+            request, intent, trace, period, conversation, asked,
+            # Strict identity rather than truthiness: a caller sending the string
+            # `"true"` has got the type wrong, and answering that by turning prose
+            # streaming on is a guess about what it meant.
+            prose_stream=payload.get('stream_prose') is True,
+        )
 
     try:
         result = ask_agent(intent, trace=trace)
@@ -869,7 +880,8 @@ def a2ui_ask(request):
     return JsonResponse(result)
 
 
-def _streaming_ask(request, intent, trace, period, conversation=None, asked=''):
+def _streaming_ask(request, intent, trace, period, conversation=None, asked='',
+                   prose_stream=False):
     """Start a streamed answer, or fail the way the blocking path fails.
 
     The first frame is pulled here, before the response is committed to being a
@@ -878,6 +890,12 @@ def _streaming_ask(request, intent, trace, period, conversation=None, asked=''):
     browser's existing error path and the refund rule exactly as they are. Only
     once a frame exists does the response become a stream, and from that point
     failures arrive as a terminal error frame instead.
+
+    `prose_stream` asks the agent to announce the answer's prose as it is written
+    (`answer_delta`), and to say when what was announced did not survive into the
+    settled answer (`prose_settled`). It is set only when the browser asked for it,
+    because both frames reach the browser unaltered. The blocking path never sets
+    it: a single JSON response has nothing to stream into.
     """
     stream = None
     try:
@@ -885,7 +903,10 @@ def _streaming_ask(request, intent, trace, period, conversation=None, asked=''):
         # generator today, so a failure surfaces on the first `next()`, but
         # nothing enforces that, and a raise from the call itself would
         # otherwise escape the view as a 500.
-        stream = ask_agent_stream(intent, trace=trace)
+        stream = ask_agent_stream(
+            {**intent, 'stream_prose': True} if prose_stream else intent,
+            trace=trace,
+        )
         first = next(stream, None)
     except AgentRefused as exc:
         # Same reasoning as the blocking path: the refusal is guidance rather

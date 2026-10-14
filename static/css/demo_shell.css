@@ -362,6 +362,17 @@ button.cp-menu-item {
   background: #fef2f2; border: 1px solid #fecaca; border-radius: 10px;
 }
 
+/* The Evidence-Check notice: shown only when a guardrail removed something from prose
+   the reader has already watched arrive. Amber rather than red — the answer is not
+   broken, it is corrected — and it belongs to the turn rather than to the run, which
+   is why it is not the status row: the footer is retired when the run ends, and a
+   correction the reader is owed has to outlive the thing that announced it. */
+.cp-evidence {
+  margin: 10px 0 0; padding: 9px 13px; font-size: 0.85rem;
+  color: #78350f; background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px;
+}
+.cp-evidence[hidden] { display: none; }
+
 /* ---------- application: the menu and the surface beside it ---------- */
 /* The shell becomes a row: the menu takes a fixed column, the working surface
    takes the rest. `.cp` stays a column for the front door and the sign-in form,

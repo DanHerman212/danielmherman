@@ -17,9 +17,18 @@
    on first paint needs it. `import()` works from a classic script, so this needs no
    build step.
 
-   The answer arrives complete, in one frame. That is the server's decision, not this
-   file's: the guardrails rewrite the model's text after it finishes, so a token
-   stream would show text that is then corrected. What streams is progress. */
+   The answer's prose arrives as it is written, when the request asks for it. That is a
+   Phase 4 reversal of what this file used to assume, and it is asked for rather than
+   assumed: the request body carries `stream_prose`, so a client that cannot draw the
+   frames is never sent them.
+
+   The consequence the old note named has not gone away — the guardrails rewrite the
+   model's text after it finishes, so what arrives first is a draft. The server says so
+   when the draft did not survive, on a `prose_settled` frame, and that frame is what
+   this file acts on: a `visible` swap replaces the text and says so in the turn's
+   Evidence-Check notice, because a dose or a probability that appears on screen and is
+   then withdrawn is something the reader is owed rather than something to tidy up
+   quietly. A `silent` swap reconciles without comment — nothing was taken away. */
 (function () {
   'use strict';
 
@@ -201,7 +210,14 @@
     var answerSection = el('section', 'cp-answer');
     var canvas = el('div', 'cp-canvas');
     var prose = el('div', 'cp-answer-text');
-    answerSection.append(canvas, prose);
+    /* The Evidence-Check notice, present in every turn and shown only by the one case
+       that earns it. It lives here rather than in the footer because the footer is
+       retired when the run ends, and this note is about the answer that outlives the
+       run — a correction the reader has to still be able to see after the fact. */
+    var evidence = el('div', 'cp-evidence');
+    evidence.setAttribute('role', 'status');
+    evidence.hidden = true;
+    answerSection.append(canvas, prose, evidence);
     body.appendChild(answerSection);
 
     /* The run, while it is running. The dots say it is still going and the label
@@ -263,6 +279,24 @@
       // a detached node would be a line that runs and does nothing.
     }
 
+    /* The answer as it is written. `say` replaces, which is what a settled answer
+       needs; a delta appends, which is what a stream of them needs. Both write the same
+       node, so the reader watches one body of text grow rather than a second one
+       appear beside it — and the settled answer overwrites the lot, so a delta that
+       arrived after the answer cannot survive it. */
+    function appendProse(piece) {
+      prose.appendChild(document.createTextNode(piece));
+    }
+
+    /* What the server said about the prose it announced, once it settled. `visible`
+       means a guardrail removed something from what the reader has just read. */
+    function settleProse(swap) {
+      if (swap !== 'visible') return;
+      evidence.textContent = 'Corrected after verification: part of what was shown while '
+        + 'this answer was being written was removed.';
+      evidence.hidden = false;
+    }
+
     return {
       root: root,
       canvas: canvas,
@@ -271,6 +305,8 @@
       finish: finish,
       restore: restore,
       say: say,
+      appendProse: appendProse,
+      settleProse: settleProse,
       answer: function (message) { say(message || ''); },
     };
   }
@@ -334,7 +370,16 @@
   async function fillTurn(block, payload) {
     var envelope = payload.a2ui || null;
     var drawsProse = !!(envelope && envelope.renders_prose);
-    if (!drawsProse) block.answer(payload.answer || '');
+    if (!drawsProse) {
+      block.answer(payload.answer || '');
+    } else {
+      // The surface is drawing the prose, so the streamed draft has to go. The guard
+      // above only stops a SECOND write to this element; it cannot remove text the
+      // deltas already put there, and a turn that streamed would otherwise show the
+      // answer twice — once cited and clickable, once as raw prose with bare `^[1]`
+      // markers beside it. Emptying it is enough: `:empty` hides the element.
+      block.answer('');
+    }
     if (envelope && envelope.messages) {
       // A composed surface is a bonus on top of the prose: if the renderer cannot
       // mount, the answer the clinician needs is already on screen.
@@ -354,6 +399,7 @@
     var decoder = new TextDecoder();
     var buffer = '';
     var answerPayload = null;
+    var swap = null;
 
     function frame(raw) {
       var name = '';
@@ -373,6 +419,20 @@
 
       if (name === 'answer') {
         answerPayload = payload;
+        return;
+      }
+      if (name === 'answer_delta') {
+        // The answer arriving early. Written straight into the turn's prose so it grows
+        // in place; the settled answer replaces it wholesale when it lands, which is
+        // what stops the two from interleaving.
+        if (payload.text) block.appendProse(String(payload.text));
+        return;
+      }
+      if (name === 'prose_settled') {
+        // Sent only when what was announced did not survive into the answer. The
+        // verdict is the server's to make and not this file's: the client can see that
+        // the text moved, but only the process that ran the guardrails knows why.
+        swap = payload.swap || null;
         return;
       }
       if (name === 'error') {
@@ -405,7 +465,7 @@
       }
     }
     if (buffer.trim()) frame(buffer);
-    return answerPayload;
+    return { payload: answerPayload, swap: swap };
   }
 
   // --- the context bar ----------------------------------------------------------
@@ -912,7 +972,7 @@
           'Accept': 'text/event-stream',
           'X-CSRFToken': csrfToken(),
         },
-        body: JSON.stringify(request),
+        body: JSON.stringify(Object.assign({}, request, { stream_prose: true })),
       });
 
       if (!response.ok) {
@@ -931,7 +991,8 @@
         return;
       }
 
-      var answerPayload = await consume(response.body, block);
+      var settled = await consume(response.body, block);
+      var answerPayload = settled.payload;
 
       if (answerPayload) {
         if (remaining && answerPayload.remaining !== undefined) {
@@ -946,6 +1007,10 @@
         }
         block.finish();
         await fillTurn(block, answerPayload);
+        // After the settled answer is drawn, not before. The notice describes a
+        // correction to the text that is now on screen, and a notice shown before the
+        // text it is about would point at a draft that is about to be replaced.
+        block.settleProse(settled.swap);
         updateContext(answerPayload.expires_at);
         // The list is re-read because asking about a new patient is what creates their
         // thread, so the sidebar is one patient out of date otherwise.
