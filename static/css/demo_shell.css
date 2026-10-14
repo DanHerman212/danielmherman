@@ -100,11 +100,9 @@ button.cp-menu-item {
 }
 
 /* ---------- the head of the canvas: the mark, the question, the run ---------- */
-/* One column serves both states. Before a question is asked it holds only the
-   mark, and the auto margins on it and on the composer meet in the middle of the
-   canvas. Once a question is asked the top rises to the head of the canvas and
-   the composer falls to its foot, because the margin that was lifting the top
-   becomes zero and the one on the composer now only pushes it down. */
+/* One column serves both states. It holds the mark and nothing else: the question
+   and the run it produced belong to the turn that carries them, and are built by
+   the client inside the feed. */
 .cp-top {
   flex: none; width: 100%; max-width: 860px;
   margin: 0 auto 26px; padding: 0 20px;
@@ -117,39 +115,17 @@ button.cp-menu-item {
   letter-spacing: -0.01em; color: #0f172a;
 }
 
-/* The question as it was asked. It stays above the run, so the answer below it
-   cannot be read as the answer to some other question. */
-.cp-question {
-  width: 100%; padding: 12px 16px;
-  background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 12px;
-}
-.cp-question[hidden] { display: none; }
-.cp-question-text { margin: 0; font-size: 0.95rem; line-height: 1.5; color: #1f2937; }
+/* The run, while it runs. The dots say it is still going and the label says where
+   it is; each stage replaces the label as it arrives.
 
-/* The run. While the agent works the row is the whole story: the dots say it is
-   still going, the text says where it is. The caret belongs to the finished run,
-   because until there is an answer there is no span to open. */
-.cp-status { width: 100%; display: flex; flex-direction: column; gap: 2px; }
+   There is nothing else here. The caret and the list it opened belonged to a
+   finished run, and a finished turn now removes this row outright — so both were
+   left with no way to be reached. */
+.cp-status { width: 100%; display: flex; align-items: center; gap: 10px; }
 .cp-status[hidden] { display: none; }
-.cp-status-row {
-  display: flex; align-items: center; gap: 10px;
-  width: 100%; padding: 4px 0;
-  font: inherit; font-size: 0.85rem; text-align: left;
-  color: #475569; background: transparent; border: none;
-}
-.cp-status.is-done .cp-status-row { cursor: pointer; }
-/* Takes its natural width and no more, so the caret sits beside the stage rather
-   than at the far edge of the canvas; it still shrinks when the label is long. */
-.cp-status-text { flex: 0 1 auto; min-width: 0; }
-.cp-status-caret {
-  flex: none; font-size: 0.7rem; color: #94a3b8;
-  transition: transform 120ms ease;
-}
-.cp-status-row[aria-expanded="true"] .cp-status-caret { transform: rotate(180deg); }
-/* Nothing to open until the run is over, so the caret is absent rather than
-   present and inert. */
-.cp-status:not(.is-done) .cp-status-caret { visibility: hidden; }
-.cp-status:not(.is-done) .cp-status-row { cursor: default; }
+/* Takes its natural width and no more, so the label sits beside the dots rather
+   than running to the far edge of the canvas; it still shrinks when it is long. */
+.cp-status-text { flex: 0 1 auto; min-width: 0; font-size: 0.85rem; color: #475569; }
 
 /* The dots, carried over from the earlier demo's typing indicator so both
    surfaces say "working" the same way. */
@@ -164,7 +140,6 @@ button.cp-menu-item {
   0%, 60%, 100% { opacity: 0.25; transform: translateY(0); }
   30% { opacity: 1; transform: translateY(-3px); }
 }
-.cp-status.is-done .typing-dots { display: none; }
 /* Each stage's wording replaces the last, and arrives fading in, so the change
    reads as the run moving on rather than the page flickering. */
 .cp-status-text { animation: status-fade 260ms ease-out; }
@@ -310,26 +285,75 @@ button.cp-menu-item {
 }
 .cp-answer[hidden] { display: none; }
 
-/* The span: every stage the run passed through, kept in full and closed until
-   the caret above asks for it. */
-.cp-stages {
-  margin: 2px 0 0; padding: 0 0 0 4px; list-style: none;
-  display: flex; flex-direction: column; gap: 3px;
-}
-.cp-stages[hidden] { display: none; }
-.cp-stage {
-  display: flex; align-items: baseline; gap: 8px;
-  padding: 2px 0; font-size: 0.8rem; color: #64748b;
-}
-.cp-stage::before {
-  content: ''; flex: none; width: 5px; height: 5px; border-radius: 50%;
-  background: #cbd5e1; position: relative; top: -2px;
-}
-
 /* The agent's composed surface. Empty until a surface is mounted, so it
    contributes no space before an answer exists. */
 .cp-canvas:empty { display: none; }
 .cp-canvas { margin-bottom: 16px; }
+/* ---- the conversation viewport ------------------------------------------------
+   Three zones in a fixed-height column: the context bar, the feed, and the
+   composer. Only the feed scrolls. The failure this replaces was a page that grew
+   downward as turns were added, pushing the composer off the bottom and leaving
+   the reader to scroll for the thing they type into. */
+.cp-app-main { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+.cp-feed {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto; width: 100%;
+  /* No vertical padding: a pinned heading sticks to the top of the scrollport, and
+     padding here would leave a strip above it for the text to show through. The
+     space above the first heading belongs to the heading. */
+  padding: 0 32px;
+}
+.cp-ask { flex: 0 0 auto; }
+
+/* The context bar: what the thread is about, and how long it will be kept. */
+.cp-context {
+  flex: 0 0 auto; display: flex; align-items: center; gap: 12px;
+  padding: 10px 32px; border-bottom: 1px solid #eceef1; flex-wrap: wrap;
+}
+.cp-context-pill {
+  display: inline-flex; align-items: center; gap: 8px; background: #f3f4f6;
+  border: 1px solid #e5e7eb; border-radius: 999px; padding: 4px 12px;
+  font-size: 0.85rem; font-weight: 600; color: #1f2937;
+}
+.cp-context-hadm { font-weight: 400; color: #6b7280; }
+.cp-context-state { font-size: 0.8rem; color: #6b7280; }
+
+/* ---- the conversation: one column of turns -----------------------------------
+   No card, no border, no number. A turn is a stretch of the column separated from
+   the next by whitespace and a hairline, so twenty of them read as one document
+   rather than as twenty boxes, and nothing has to be opened to be read. */
+.cp-turn {
+  width: 100%; max-width: 960px; margin: 0 auto;
+  padding-bottom: 26px;
+  border-bottom: 1px solid #f1f5f9;
+}
+.cp-turn:last-child { border-bottom: 0; }
+
+/* The question, pinned to the head of the scroll area while its own answer passes
+   under it. The next turn's question pushes it up and out, which is what makes the
+   heading in view always the one belonging to the text beneath it — the job the
+   navigator was doing, without a second control to keep in step with the first.
+
+   The side margins are negative so the background reaches the edges of the scroll
+   area rather than stopping at the text column: a heading that let the answer show
+   past its left and right edges would read as text bleeding through. */
+.cp-turn-head {
+  position: sticky; top: 0; z-index: 10;
+  margin: 0 -32px; padding: 16px 32px 10px;
+  background: rgba(255, 255, 255, 0.92);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+.cp-turn-title {
+  margin: 0; font-size: 1rem; font-weight: 600; line-height: 1.45;
+  color: #0f172a; letter-spacing: -0.005em;
+}
+.cp-turn-body { padding-top: 4px; }
+.cp-turn-foot { padding-top: 12px; }
+/* An empty part of a turn takes no space: a block is born with a canvas host and a
+   prose element and neither has anything in it yet, so without this the gaps
+   between them read as a turn that rendered blankly. */
+.cp-answer-text:empty { display: none; }
+.cp-canvas:empty { display: none; }
 
 .cp-answer-text { font-size: 0.95rem; line-height: 1.65; color: #0f172a; }
 .cp-answer-text p { margin: 0 0 0.9em; }
@@ -368,10 +392,103 @@ button.cp-menu-item {
   border: none; border-radius: 9px;
 }
 .cp-nav-item i:first-child { width: 16px; text-align: center; color: #64748b; }
-.cp-nav-caret { margin-left: auto; font-size: 0.65rem; color: #94a3b8; }
 /* The four labels are placeholders and are rendered `disabled`. Keep the cursor
    from offering a click the element will not honour. */
 .cp-nav-item[disabled] { cursor: default; }
+
+/* ---- the thread list ---------------------------------------------------------
+   One row per thread, and a thread is one patient. The row carries the name and
+   nothing else: no first question, no turn count, no date. A reader looking for a
+   patient is looking for a name, and everything beside it is read past. */
+.cp-thread-search { padding: 0 2px 10px; }
+.cp-thread-input {
+  width: 100%; font: inherit; font-size: 0.86rem;
+  padding: 7px 12px; border: 1px solid #e2e8f0; border-radius: 999px;
+  background: #fff; color: #0f172a;
+}
+.cp-thread-input:focus {
+  outline: none; border-color: #93c5fd; box-shadow: 0 0 0 3px #dbeafe;
+}
+.cp-thread-input::placeholder { color: #94a3b8; }
+
+.cp-threads {
+  display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto;
+  margin-top: 18px;
+}
+.cp-threads-label {
+  margin: 0 0 6px; padding: 0 12px;
+  font-size: 0.72rem; font-weight: 600; letter-spacing: 0.06em;
+  text-transform: uppercase; color: #94a3b8;
+}
+.cp-thread-list {
+  list-style: none; margin: 0; padding: 0;
+  display: flex; flex-direction: column; gap: 2px;
+  overflow-y: auto;
+}
+.cp-thread { position: relative; display: flex; align-items: center; gap: 2px; }
+.cp-thread-open {
+  display: flex; align-items: center; gap: 8px; flex: 1 1 auto; min-width: 0;
+  padding: 8px 12px; border: 0; border-radius: 999px;
+  font: inherit; font-size: 0.86rem; color: #334155;
+  text-align: left; background: transparent; cursor: pointer;
+}
+.cp-thread-name {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cp-thread-pin { flex: 0 0 auto; font-size: 0.62rem; color: #94a3b8; }
+.cp-thread-open:hover { background: #eef2f7; }
+/* The thread on screen: bold, and carried on a pill. */
+.cp-thread-open[aria-current="true"] {
+  background: #e2e8f0; color: #0f172a; font-weight: 700;
+}
+.cp-threads-empty {
+  margin: 0; padding: 6px 12px;
+  font-size: 0.82rem; line-height: 1.45; color: #94a3b8;
+}
+
+/* The row's actions. Hidden until the row is hovered or the control is reached by
+   keyboard: three dots on every row at rest is a column of dots, not a list of
+   patients. */
+.cp-thread-menu-wrap { display: flex; flex: 0 0 auto; }
+.cp-thread-menu-btn {
+  display: grid; place-items: center;
+  width: 26px; height: 26px; border: 0; border-radius: 999px;
+  background: transparent; color: #64748b; cursor: pointer;
+  opacity: 0; transition: opacity 120ms ease-out;
+}
+.cp-thread:hover .cp-thread-menu-btn,
+.cp-thread-menu-btn:focus-visible,
+.cp-thread-menu-btn[aria-expanded="true"] { opacity: 1; }
+.cp-thread-menu-btn:hover { background: #e2e8f0; color: #0f172a; }
+/* Opacity is not enough on its own: a control that cannot be seen must not be able
+   to be clicked by accident either. */
+@media (hover: none) {
+  .cp-thread-menu-btn { opacity: 1; }
+}
+/* Fixed to the viewport, not to the row. The list it belongs to is a scroll
+   container, and a scroll container clips its absolutely positioned descendants —
+   which is why this used to open downward and come out cut in half. Nothing here
+   may be clipped or covered, so it is attached to the document instead and given
+   the top of the stack. */
+.cp-row-menu {
+  position: fixed; z-index: 60;
+  min-width: 172px; padding: 6px;
+  display: flex; flex-direction: column; gap: 2px;
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 12px;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.14);
+}
+.cp-row-menu[hidden] { display: none; }
+.cp-row-menu-item {
+  padding: 7px 10px; border: 0; border-radius: 8px;
+  font: inherit; font-size: 0.85rem; color: #1f2937;
+  text-align: left; background: transparent; cursor: pointer;
+}
+.cp-row-menu-item:hover { background: #f1f5f9; }
+.cp-row-menu-danger { color: #b91c1c; }
+.cp-row-menu-danger:hover { background: #fef2f2; }
+.cp-row-menu-prompt {
+  margin: 2px 2px 6px; font-size: 0.82rem; line-height: 1.4; color: #475569;
+}
 
 /* The identity sits at the foot of the menu, which is where the eye expects to
    find the account it is signed in as. It opens the account menu above it. */
@@ -439,9 +556,10 @@ button.cp-menu-item {
    menu holds without spending the width on saying it. */
 .cp-app.is-collapsed .cp-side { width: 64px; }
 .cp-app.is-collapsed .cp-side-head { justify-content: center; }
-.cp-app.is-collapsed .cp-side-search { display: none; }
+.cp-app.is-collapsed .cp-side-search,
+.cp-app.is-collapsed .cp-thread-search,
+.cp-app.is-collapsed .cp-threads { display: none; }
 .cp-app.is-collapsed .cp-nav-item span,
-.cp-app.is-collapsed .cp-nav-caret,
 .cp-app.is-collapsed .cp-user-text,
 .cp-app.is-collapsed .cp-user-caret { display: none; }
 .cp-app.is-collapsed .cp-nav-item,
@@ -450,25 +568,63 @@ button.cp-menu-item {
 .cp-app-main {
   flex: 1; min-width: 0; height: 100%; overflow: hidden;
   display: flex; flex-direction: column;
-  /* The optical lift the empty state had when the mark and the composer were one
-     centred block. */
-  padding-bottom: 10vh;
+  padding-bottom: 0;
 }
-/* Empty: two auto margins meet in the middle and centre the mark with the
-   composer beneath it. Asked: the top margin goes, so the mark rises to the head
-   of the canvas, and the composer's margin now only carries it to the foot.
-   Scoped to this column on purpose: the public front door asks the same question
-   of its own layout rule above, and a bare `.cp-ask` margin would move its
-   composer as well. */
-.cp-app-main .cp-top { margin-top: auto; }
-.cp-app-main .cp-ask { margin-bottom: auto; }
-.cp-app.is-asking .cp-app-main { padding-bottom: 0; }
-.cp-app.is-asking .cp-top {
+/* The console's column is fixed, in every state: the mark at the head, the
+   composer at the foot, and the conversation taking whatever is between.
+
+   The two auto margins that used to meet in the middle were written for a canvas
+   with nothing else on it, and they were the only thing centring the mark. With a
+   sidebar and a populated thread list beside it, a title floating mid-page reads as
+   a stray heading in the middle of a document rather than as a welcome — and the
+   composer, which is the one control this surface exists for, sat above the fold
+   with empty space beneath it. Nothing here needs centring to look deliberate.
+
+   Scoped to this column on purpose: the public front door asks the same question of
+   its own layout rule above, and a bare `.cp-ask` margin would move its composer as
+   well. */
+.cp-app-main .cp-top {
   margin-top: 0; margin-bottom: 18px;
-  align-items: stretch; gap: 12px;
+  align-items: stretch;
 }
-.cp-app.is-asking .cp-ask { margin-top: auto; margin-bottom: 22px; }
-/* The mark gives its size to the answer. */
-.cp-app.is-asking .cp-logo { width: 30px; height: 30px; }
-.cp-app.is-asking .cp-brand-name { font-size: 1.05rem; }
-.cp-app.is-asking .cp-brand { justify-content: flex-start; }
+.cp-app-main .cp-ask { margin-top: auto; margin-bottom: 22px; }
+/* `is-asking` is still set on the shell by the client when the canvas holds a
+   conversation, and nothing in this stylesheet reads it any more: every rule it
+   used to switch was a difference between an empty canvas and a full one, and this
+   column no longer has two states to switch between. It is left in place as the
+   hook for the one that is coming — a run in flight — rather than removed and
+   re-added. */
+/* The mark is app chrome here rather than a hero. It sits at the head of the
+   conversation in every state, so it keeps one size: growing it until the first
+   question and shrinking it after was a change in the page's geometry that
+   answered to nothing the reader had done. The landing page still scales its own. */
+.cp-app-main .cp-logo { width: 30px; height: 30px; }
+.cp-app-main .cp-brand-name { font-size: 1.05rem; }
+
+/* ---- narrow viewports ---------------------------------------------------------
+   The sidebar and the conversation side by side need about 700px before the
+   composer starts losing room to the sidebar. Below that the sidebar is not
+   shrunk to an icon rail, because 64px of rail plus a working composer does not fit
+   either — it is put away, and the composer keeps the width. This surface is a
+   desktop clinical tool; what a narrower one should do with navigation is a
+   question for a layout that has a drawer, not for a rule that squeezes the thing
+   the reader types into. */
+/* The middle band: the sidebar gives up its width before the conversation does. */
+@media (max-width: 900px) {
+  .cp-side { width: 200px; }
+}
+
+@media (max-width: 700px) {
+  .cp-side { display: none; }
+  .cp-feed { padding: 0 16px; }
+  .cp-turn-head { margin: 0 -16px; padding: 14px 16px 10px; }
+  .cp-context { padding: 10px 16px; }
+  .cp-app-main .cp-ask { margin-bottom: 14px; }
+}
+
+/* The composer's floor. It is the one control on the page that has to stay usable
+   at any width, so it wraps before it squeezes: the patient pill moves to its own
+   line rather than the field collapsing to nothing beside it, which is what it did
+   at 300px — nine pixels of input is not a narrow layout, it is a broken one. */
+.cp-ask { flex-wrap: wrap; }
+.cp-ask-input { min-width: 140px; }

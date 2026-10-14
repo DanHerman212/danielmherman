@@ -20,7 +20,7 @@ from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
-from .conversations import MAX_REPLAYED_TURNS, replay_turns
+from .conversations import MAX_REPLAYED_TURNS, replay_turns, turn_payloads
 from .models import Conversation, DemoPatient, Turn
 
 AGENT_REPLY = {
@@ -214,6 +214,108 @@ class TurnStoreTests(_AskTestCase):
         self.assertEqual(Turn.objects.count(), 0)
 
 
+A2UI_ENVELOPE = {
+    'surface_id': 'main',
+    'renders_prose': True,
+    'messages': [
+        {'version': 'v0.9',
+         'createSurface': {'surfaceId': 'main', 'catalogId': 'catalog-v1'}},
+        {'version': 'v0.9',
+         'updateComponents': {
+             'surfaceId': 'main',
+             'components': [
+                 {'id': 'root', 'component': 'Column', 'children': ['narrative']},
+                 {'id': 'narrative', 'component': 'CitedNarrative',
+                  'text': 'Estimated risk is 31%.^[1]',
+                  'citations': [{'index': 1, 'source': 'PubMed', 'title': 'A study'}],
+                  'streaming': False},
+             ],
+         }},
+    ],
+}
+
+
+class StoredPresentationTests(_AskTestCase):
+    """The composed canvas is kept with the turn (Phase 3, 2026-10-14).
+
+    Recall needs it: the canvas is composed by the agent from live evidence, so a thread
+    restored without it would be a transcript of the answer with none of its artifacts.
+    """
+
+    def _reply(self):
+        return {**AGENT_REPLY, 'a2ui': dict(A2UI_ENVELOPE)}
+
+    @patch('demo.views.ask_agent')
+    def test_the_composed_presentation_is_stored_with_the_turn(self, mocked):
+        mocked.return_value = self._reply()
+
+        self._post({'hadm_id': 90000009, 'chip': 'risk'})
+
+        stored = Turn.objects.filter(role=Turn.Role.AGENT).latest('ordinal')
+        self.assertEqual(stored.presentation, A2UI_ENVELOPE)
+
+    @patch('demo.views.ask_agent')
+    def test_a_turn_with_no_canvas_stores_an_empty_presentation(self, mocked):
+        mocked.return_value = dict(AGENT_REPLY)  # `a2ui` is None
+
+        self._post({'hadm_id': 90000009, 'chip': 'risk'})
+
+        stored = Turn.objects.filter(role=Turn.Role.AGENT).latest('ordinal')
+        self.assertEqual(stored.presentation, {})
+
+    @patch('demo.views.ask_agent')
+    def test_a_payload_that_is_not_an_envelope_is_not_stored_as_one(self, mocked):
+        """The browser mounts this value as a surface, so a list arriving here would
+        reach the renderer malformed and draw nothing — which reads as an answer that
+        failed rather than as a payload that was mis-stored."""
+        mocked.return_value = {**AGENT_REPLY, 'a2ui': ['not', 'an', 'envelope']}
+
+        self._post({'hadm_id': 90000009, 'chip': 'risk'})
+
+        stored = Turn.objects.filter(role=Turn.Role.AGENT).latest('ordinal')
+        self.assertEqual(stored.presentation, {})
+
+    @patch('demo.views.ask_agent')
+    def test_the_canonical_turn_carries_what_the_console_renders(self, mocked):
+        """One shape, used by a live turn and a restored one, so the client has one
+        renderer rather than a live path and a hydrate path that drift apart."""
+        mocked.return_value = self._reply()
+        self._post({'hadm_id': 90000009, 'chip': 'risk'})
+
+        payloads = turn_payloads(self._conversation())
+
+        self.assertEqual(len(payloads), 1)
+        turn = payloads[0]
+        # `asked` is the heading the console draws. This request carried no
+        # `asked` of its own, so it falls back to the composed question — which is
+        # the right answer for a caller that is not the console, and the reason the
+        # fallback exists.
+        self.assertEqual(turn['asked'], AGENT_REPLY['question'])
+        self.assertEqual(turn['answer'], AGENT_REPLY['answer'])
+        self.assertEqual(turn['a2ui'], A2UI_ENVELOPE)
+        self.assertEqual(turn['flags'], [])
+        # The rule the store has always held, asserted on the payload the console
+        # receives: the passage behind a citation is not carried, on the turn or
+        # beside it. Only its identity is, and the agent re-resolves the text.
+        self.assertNotIn('pneumonia', json.dumps(payloads))
+
+    @patch('demo.views.ask_agent')
+    def test_a_restored_turn_is_what_was_stored_not_what_would_be_composed_now(self, mocked):
+        """A recall renders the payload from the turn, so the thread shows what it
+        showed. Re-composing on read would silently rewrite history every time the
+        composer changed."""
+        mocked.return_value = self._reply()
+        self._post({'hadm_id': 90000009, 'chip': 'risk'})
+        conversation = self._conversation()
+
+        stored = Turn.objects.filter(role=Turn.Role.AGENT).latest('ordinal')
+        stored.presentation = {**A2UI_ENVELOPE, 'surface_id': 'recomposed'}
+        stored.save(update_fields=['presentation'])
+
+        self.assertEqual(turn_payloads(conversation)[0]['a2ui']['surface_id'],
+                         'recomposed')
+
+
 class ReplayTests(_AskTestCase):
     """What the site hands back to a stateless agent (A1/A3)."""
 
@@ -270,8 +372,21 @@ class ReplayTests(_AskTestCase):
         turns = replay_turns(conversation)
         self.assertEqual(len(turns), MAX_REPLAYED_TURNS)
         self.assertEqual(turns[-1]['question'], 'Question 7?')
-        self.assertEqual(turns[0]['question'], 'Question 2?',
-                         'the oldest turns are the ones left behind')
+        # The window is the ANCHOR plus the most recent five (2026-10-14), not the
+        # most recent six: the first turn is what established which patient and
+        # which question the thread is about, and a follow-up answered without it
+        # is answered from the last few exchanges alone.
+        anchor = (conversation.turns
+                  .filter(role='user').order_by('ordinal').first().question)
+        self.assertEqual(turns[0]['question'], anchor,
+                         'the first turn is the clinical anchor and is kept')
+        self.assertEqual(
+            [turn['question'] for turn in turns[1:]],
+            ['Question 3?', 'Question 4?', 'Question 5?', 'Question 6?',
+             'Question 7?'],
+        )
+        self.assertNotIn('Question 2?', [turn['question'] for turn in turns],
+                         'the oldest turns of the recent half are left behind')
 
     @patch('demo.views.ask_agent', return_value=dict(AGENT_REPLY))
     def test_a_question_with_a_conversation_id_is_still_refused_its_own_turns(

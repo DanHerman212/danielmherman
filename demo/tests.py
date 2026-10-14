@@ -584,10 +584,17 @@ class A2uiConsolePageTests(TestCase):
         self.assertContains(response, 'id="copilot-shell"')
         self.assertContains(response, 'id="cp-side"')
         self.assertContains(response, 'id="cp-side-toggle"')
-        # The four labels the reference interface reserves, present as
-        # placeholders so the layout is honest about what is coming.
-        for label in ('New Conversation', 'Discover', 'Tools', 'History'):
+        # The three labels the reference interface reserves, present as
+        # placeholders so the layout is honest about what is coming. History was
+        # the fourth and is gone: the thread list is on screen from the moment the
+        # page loads rather than behind a control that called it something else.
+        for label in ('New Conversation', 'Discover', 'Tools'):
             self.assertContains(response, label)
+        # The thread list and its filter, which the magnifying glass reveals.
+        self.assertContains(response, 'id="cp-threads"')
+        self.assertContains(response, 'id="cp-thread-list"')
+        self.assertContains(response, 'id="cp-search-btn"')
+        self.assertContains(response, 'id="cp-thread-search"')
         # The identity at the foot of the menu: the profile's name, the account
         # identifier under it, and the initials standing in for a picture.
         self.assertContains(response, 'id="cp-account-btn"')
@@ -641,24 +648,27 @@ class A2uiConsolePageTests(TestCase):
         # The answer surface: stages, the canvas the renderer mounts into, and the
         # prose. `data-submit="live"` is what stops copilot_shell.js swallowing
         # the submit now that the composer has somewhere to send to.
-        self.assertContains(response, 'id="cp-answer"')
-        self.assertContains(response, 'id="cp-stages"')
-        self.assertContains(response, 'id="cp-canvas"')
+        # The conversation feed: one block per turn, built by copilot_canvas.js. What
+        # the page carries is the feed the blocks are built into, and the renderer it
+        # fetches on demand. The header, status row, canvas host and prose inside a
+        # block are the client's DOM, and pinning them here would be pinning an
+        # implementation the client is entitled to change.
+        self.assertContains(response, 'id="cp-feed"')
         self.assertContains(response, 'data-renderer-url="')
         self.assertContains(response, 'data-submit="live"')
         # Asserted without its cache-buster, like the three scripts above it: pinning
         # the version here would mean every bump edits this file too, and a test that
         # fails on a correct bump is one people learn to update without reading.
         self.assertContains(response, 'copilot_canvas.js')
-        # The conversation state's two new pieces: the box that holds the question
-        # once the composer is done with it, and the row that names the stage the
-        # run is on — carrying the dots that say it is still running and the caret
-        # that opens the span when it is not.
-        self.assertContains(response, 'id="cp-question-text"')
-        self.assertContains(response, 'id="cp-status-toggle"')
-        self.assertContains(response, 'id="cp-status-text"')
-        self.assertContains(response, 'class="typing-dots"')
-        self.assertContains(response, 'aria-controls="cp-stages"')
+        # The per-turn singletons are gone, and their absence is the fix: with the
+        # canvas host addressed by id, a second turn mounted into the first turn's
+        # host. Asserted as absent so that putting one back is a deliberate act with a
+        # test to update rather than a quiet regression.
+        self.assertNotContains(response, 'id="cp-canvas"')
+        self.assertNotContains(response, 'id="cp-answer"')
+        self.assertNotContains(response, 'id="cp-question-text"')
+        self.assertNotContains(response, 'id="cp-status-toggle"')
+        self.assertNotContains(response, 'id="cp-stages"')
         # The persistent patient list is pinned as absent. It is the specific
         # legacy pattern this redesign removes, and re-adding it "just for
         # convenience" is how it would come back.
@@ -667,7 +677,7 @@ class A2uiConsolePageTests(TestCase):
         self.assertNotContains(response, 'id="a2ui-host"')
         # Cache-busted asset links, asserted exactly so a forgotten bump fails
         # here rather than serving a stale page out of a browser's cache.
-        self.assertContains(response, 'demo_shell.css?v=15')
+        self.assertContains(response, 'demo_shell.css?v=18')
         self.assertContains(response, 'copilot_shell.js')
         self.assertContains(response, 'copilot_app.js')
 
@@ -796,7 +806,10 @@ class A2uiAskLiveTests(TestCase):
         response = self._post({'hadm_id': 90000009, 'chip': 'risk'})
         self.assertEqual(response.status_code, 200)
         body = response.json()
-        self.assertEqual(body['remaining'], 9)
+        # Derived from the policy, not restated: this asserted 9 when the allowance
+        # was ten, so raising it to twenty-five turned a passing test red for no
+        # reason other than the number living in two places.
+        self.assertEqual(body['remaining'], settings.DEMO_DAILY_LIMIT - 1)
         # Intent crosses this boundary, not prompt text: the wording lives with
         # the chain, so a prompt change cannot ship from this repository.
         self.assertEqual(mocked.call_args.args[0],
@@ -880,8 +893,13 @@ class A2uiAskLiveTests(TestCase):
         for chip in ('risk', 'meds', 'summarize', 'literature'):
             with self.subTest(chip=chip):
                 self._post({'hadm_id': 90000009, 'chip': chip})
-                self.assertEqual(mocked.call_args.args[0],
-                                 {'chip': chip, 'hadm_id': 90000009})
+                intent = dict(mocked.call_args.args[0])
+                # One thread per patient, so every chip after the first continues
+                # the thread the first one opened and carries it as `turns`. What
+                # this test is about is that the chip itself arrives unaltered;
+                # the replay is the subject of its own tests.
+                intent.pop('turns', None)
+                self.assertEqual(intent, {'chip': chip, 'hadm_id': 90000009})
 
     @patch('demo.views.ask_agent', return_value=dict(A2UI_AGENT_REPLY))
     def test_text_beside_a_chip_is_forwarded_rather_than_dropped(self, mocked):
@@ -1143,7 +1161,7 @@ class A2uiAskStreamTests(TestCase):
         self.assertEqual(answer['sources'], A2UI_AGENT_REPLY['sources'])
         # Django adds exactly one thing: the quota figure, on the final frame,
         # because it cannot be known before the answer exists.
-        self.assertEqual(answer['remaining'], 9)
+        self.assertEqual(answer['remaining'], settings.DEMO_DAILY_LIMIT - 1)
 
     @patch('demo.views.ask_agent_stream')
     def test_the_stream_is_opt_in_by_accept_header(self, mocked):
@@ -1155,7 +1173,7 @@ class A2uiAskStreamTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response['Content-Type'], 'application/json')
-        self.assertEqual(response.json()['remaining'], 9)
+        self.assertEqual(response.json()['remaining'], settings.DEMO_DAILY_LIMIT - 1)
         mocked.assert_not_called()
 
     @patch('demo.views.ask_agent_stream')

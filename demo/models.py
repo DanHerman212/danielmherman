@@ -217,6 +217,14 @@ class Conversation(models.Model):
     )
     created_at = models.DateTimeField(default=timezone.now)
     last_turn_at = models.DateTimeField(null=True, blank=True)
+    # What the sidebar calls this thread. Empty means "use the patient's name",
+    # which is the right label for a thread that is about exactly one patient and
+    # the wrong one for a thread a clinician has renamed. Stored rather than
+    # derived so a rename is a fact about the thread and not about the patient.
+    title = models.CharField(max_length=120, blank=True, default='')
+    # Held at the top of the sidebar. Ordering is a preference about the list, so
+    # it belongs to the conversation rather than to the browser that set it.
+    pinned = models.BooleanField(default=False)
     # A fixed window from creation rather than a sliding one: the retention
     # promise is then about how long a conversation may exist, not about how long
     # it may sit idle.
@@ -286,7 +294,19 @@ class Turn(models.Model):
     )
     ordinal = models.PositiveSmallIntegerField()
     role = models.CharField(max_length=8, choices=Role.choices)
+    # The question as it was PUT TO THE MODEL, which is not the same text as the
+    # question the clinician asked: a chip or a command is composed into a full
+    # prompt with the admission in it, and that composed prompt is what the agent
+    # is sent and what the reply is an answer to. It is also what gets replayed,
+    # so it is the one that has to survive.
     question = models.TextField(blank=True, default='')
+    # The question as the CLINICIAN asked it — `/risk`, or the free text typed.
+    # The console heads each turn with this, and it is stored rather than derived
+    # because the composed prompt cannot be turned back into the command that
+    # produced it without a second copy of the command vocabulary. Two fields
+    # because the two readers want different things: the agent wants the prompt it
+    # was asked, and the reader wants the words they used.
+    asked = models.TextField(blank=True, default='')
     answer = models.TextField(blank=True, default='')
     # The model and the code revision that produced the answer, so a stored turn
     # can be explained after the code has moved on.
@@ -307,6 +327,21 @@ class Turn(models.Model):
     # Identities only: [{'cite': 1, 'section': 'hospital_course', 'query': '…'}].
     # The passage behind each is re-derived from the note on demand.
     citations = models.JSONField(default=list, blank=True)
+    # The composed A2UI payload for this turn — what the canvas drew, stored rather
+    # than recomposed (Phase 3, 2026-10-14).
+    #
+    # Recall needs it. The canvas is composed by the agent from live evidence, so a
+    # thread restored without this would be a transcript of the answer with none of
+    # its artifacts: no risk widget, no medication grid, no citation markers. Storing
+    # the composed payload restores the visual state without storing what it rests on
+    # — the passages behind the citations are still re-derived from the corpus and
+    # never land here, and the prediction score the widget drew is a display of a
+    # result this turn already recorded.
+    #
+    # Empty is a real state and not a defect: a turn whose answer the surface did not
+    # draw has no presentation, and a turn stored before this column existed has none
+    # either. Both render as prose, which is what the answer column holds.
+    presentation = models.JSONField(default=dict, blank=True)
     # [{'name': 'predict_readmission', 'args': {…}, 'payload': {…}}]. The payload
     # is kept only where it cannot be re-derived; retrieval results are left out
     # and resolved again on replay.

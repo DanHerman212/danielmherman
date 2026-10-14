@@ -32,6 +32,11 @@ MAX_REPLAYED_TOOL_CALLS = 5
 MAX_TURN_ANSWER_CHARS = 8000
 MAX_TOOL_NAME_CHARS = 64
 
+# How long the clinician's own words may be when they are used as a turn's
+# heading. The console's composer is what bounds this in practice; this is the
+# bound for a caller that is not the console.
+MAX_ASKED_CHARS = 300
+
 # Marked rather than silent. An earlier answer that has to be shortened for the
 # replay is shortened visibly, so the model is not told that a truncated answer
 # is the whole of what the clinician was told.
@@ -48,7 +53,7 @@ def _next_ordinal(conversation):
     return (highest or 0) + 1
 
 
-def record_answer(conversation, result):
+def record_answer(conversation, result, asked=''):
     """Store the turn the agent just answered. Returns the turn, or None.
 
     `conversation` is None for a question asked with no admission: there is no
@@ -59,11 +64,18 @@ def record_answer(conversation, result):
     leaves the conversation open and unpaid — and the failure itself is in the
     agent's execution log under the same trace id, which is where a failure
     record belongs. What this store holds is what would be replayed.
+
+    `asked` is the clinician's own words — the command they ran, or the text they
+    typed — and it is deliberately a second field rather than a replacement for
+    the composed question. The composed prompt is what the agent was asked and
+    what a follow-up has to be replayed against; the clinician's words are what
+    the console heads the turn with. Turning one into the other would need a copy
+    of the command vocabulary on whichever side was doing the turning.
     """
     if conversation is None:
         return None
 
-    asked = result.get('question') or ''
+    composed = result.get('question') or ''
     ordinal = _next_ordinal(conversation)
     # One transaction for the pair: a stored answer with no question in front of
     # it cannot be replayed, so half a turn is not worth having.
@@ -72,7 +84,8 @@ def record_answer(conversation, result):
             conversation=conversation,
             ordinal=ordinal,
             role=Turn.Role.USER,
-            question=asked,
+            question=composed,
+            asked=_clamp_asked(asked) or composed,
         )
         turn = Turn.objects.create(
             conversation=conversation,
@@ -83,6 +96,7 @@ def record_answer(conversation, result):
             code_revision=result.get('code_revision') or '',
             langfuse_trace_id=_stored_trace_id(result.get('langfuse_trace_id')),
             citations=_stored_citations(result.get('sources')),
+            presentation=_stored_presentation(result.get('a2ui')),
             tool_calls=_stored_calls(result.get('tool_calls')),
             guardrail_flags=_stored_flags(result.get('guardrail_flags')),
         )
@@ -100,6 +114,63 @@ def _stored_flags(flags):
     violation that belongs in the log, not in this table.
     """
     return [flag for flag in flags or [] if isinstance(flag, str)]
+
+
+def _stored_presentation(envelope):
+    """The composed A2UI payload as it will be stored, or {} when there is none.
+
+    Validated as a dict rather than trusted: this value is mounted by the browser as
+    a surface, so a list or a string here would reach the renderer as a malformed
+    envelope and draw nothing — which reads on screen as an answer that failed rather
+    than as a payload that was mis-stored. A turn with no canvas stores {}, and the
+    empty default is what the column already means.
+    """
+    return envelope if isinstance(envelope, dict) else {}
+
+
+def turn_payloads(conversation):
+    """The conversation as the list of turns the console renders, oldest first.
+
+    The canonical turn, defined once and used twice: a live answer and a turn restored
+    from the store are the same shape, so the client has one renderer rather than a
+    live path and a hydrate path that drift apart. Each entry is
+
+        question    the header: the user's own prompt or command, as they typed it
+        answer      the prose, for a turn the surface does not draw
+        a2ui        the composed presentation for the turn, or {} when it had none
+        flags       the guardrails that fired, which is why this answer differs
+        citations   identities, for the click-through list beside the thread
+
+    Nothing here re-composes. `a2ui` is the payload the agent composed at the time
+    and this store kept, so a restored thread shows what the turn showed rather than
+    a recomposition from evidence that has since moved.
+    """
+    if conversation is None:
+        return []
+
+    payloads = []
+    asked = ''
+    label = ''
+    for row in conversation.turns.order_by('ordinal'):
+        if row.role == Turn.Role.USER:
+            asked = row.question
+            # Rows written before the console kept the clinician's own words have
+            # only the composed prompt, which is a worse heading than the command
+            # but not an empty one.
+            label = row.asked or row.question
+            continue
+        if not asked and not row.answer:
+            continue
+        payloads.append({
+            'asked': label,
+            'answer': row.answer,
+            'a2ui': row.presentation or {},
+            'flags': list(row.guardrail_flags or []),
+            'citations': list(row.citations or []),
+            'ordinal': row.ordinal,
+        })
+        asked = ''
+    return payloads
 
 
 def _stored_trace_id(value):
@@ -166,9 +237,13 @@ def _stored_calls(calls):
 def replay_turns(conversation):
     """The conversation as the `turns` the agent replays, oldest first.
 
-    Bounded to the most recent `MAX_REPLAYED_TURNS`: the window is what keeps the
-    current question inside the context it is being asked about, and the oldest
-    turns are the ones a follow-up is least likely to need.
+    Bounded to `MAX_REPLAYED_TURNS`, and the bound is the agent's — this sends what
+    the agent accepts. Which turns fill it changed on 2026-10-14: a conversation
+    longer than the bound sends the FIRST turn and the most recent ones, not the
+    most recent alone. The first turn is the clinical anchor the rest of the thread
+    is written against — the question that established what is being asked about
+    this patient — and a window of recent turns alone would let the agent reason
+    about the patient from the last few exchanges only.
     """
     if conversation is None:
         return []
@@ -191,7 +266,13 @@ def replay_turns(conversation):
         })
         asked = ''
 
-    return turns[-MAX_REPLAYED_TURNS:]
+    if len(turns) <= MAX_REPLAYED_TURNS:
+        return turns
+    # The anchor plus the most recent turns. One turn of the window is spent on the
+    # anchor, so the recent half is one shorter than the bound — the alternative,
+    # sending six recent turns and the anchor, would exceed what the agent accepts
+    # and be refused outright.
+    return turns[:1] + turns[-(MAX_REPLAYED_TURNS - 1):]
 
 
 def _clamp(answer):
@@ -204,6 +285,22 @@ def _clamp(answer):
     if len(answer) <= MAX_TURN_ANSWER_CHARS:
         return answer
     return answer[:MAX_TURN_ANSWER_CHARS - len(TRUNCATION_MARK)] + TRUNCATION_MARK
+
+
+def _clamp_asked(asked):
+    """The clinician's own words, bounded to something a heading can hold.
+
+    The client sends what it drew, and what it drew was bounded by the composer.
+    This is the second line for a caller that is not the console: a heading is one
+    line by construction, and an unbounded string here would be a heading that is a
+    wall of text rather than a heading that is long.
+    """
+    if not isinstance(asked, str):
+        return ''
+    asked = asked.strip()
+    if len(asked) <= MAX_ASKED_CHARS:
+        return asked
+    return asked[:MAX_ASKED_CHARS - len(TRUNCATION_MARK)] + TRUNCATION_MARK
 
 
 def _replay_calls(stored):

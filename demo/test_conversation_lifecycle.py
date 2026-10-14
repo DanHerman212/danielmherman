@@ -12,6 +12,7 @@ and refuses.
 """
 
 import json
+from datetime import timedelta
 from unittest.mock import patch
 
 from django.conf import settings
@@ -167,17 +168,61 @@ class ConversationLifecycleTests(TestCase):
         self.assertEqual(self._quota().used, 1, 'it is still a paid question')
 
     @patch('demo.views.ask_agent', return_value=dict(AGENT_REPLY))
-    def test_a_second_conversation_about_the_same_patient_spends_again(
+    def test_a_second_question_about_the_same_patient_continues_their_thread(
         self, _mocked
     ):
+        """One thread per patient (UX ruling 2026-10-14).
+
+        The rule this asserts was the opposite until then: a second question about
+        the same patient used to open a second conversation, which is how a sidebar
+        came to hold five threads for one patient. A question about a patient whose
+        thread is live continues it, and a continuation is already paid for — the
+        ceiling, not the daily allowance, is what bounds a thread.
+        """
         self._post({'hadm_id': 90000009, 'chip': 'risk'})
         first = Conversation.objects.get(user=self.user)
 
-        response = self._post({'hadm_id': 90000009, 'chip': 'risk'})
+        response = self._post({'hadm_id': 90000009, 'chip': 'meds'})
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(self._quota().used, 2)
+        self.assertEqual(self._quota().used, 1, 'a continuation is the same credit')
+        self.assertEqual(Conversation.objects.filter(user=self.user).count(), 1)
+        self.assertEqual(response.json()['conversation_id'], first.pk)
+
+    @patch('demo.views.ask_agent', return_value=dict(AGENT_REPLY))
+    def test_a_thread_is_reused_even_when_the_caller_names_another(self, _mocked):
+        """A browser that has lost its place must not open a second thread.
+
+        A new tab, a cleared store, or a reload after the id was swept all arrive
+        with the admission and no id. Resolving by patient is what makes the id an
+        optimisation rather than the thing that decides.
+        """
+        self._post({'hadm_id': 90000009, 'chip': 'risk'})
+        first = Conversation.objects.get(user=self.user)
+
+        response = self._post({'hadm_id': 90000009, 'chip': 'meds'})
+
+        self.assertEqual(response.json()['conversation_id'], first.pk)
+        self.assertEqual(Conversation.objects.filter(user=self.user).count(), 1)
+
+    @patch('demo.views.ask_agent', return_value=dict(AGENT_REPLY))
+    def test_a_different_patient_gets_a_thread_of_their_own(self, _mocked):
+        self._post({'hadm_id': 90000009, 'chip': 'risk'})
+        self._post({'hadm_id': 90000010, 'chip': 'risk'})
+
         self.assertEqual(Conversation.objects.filter(user=self.user).count(), 2)
-        self.assertNotEqual(
-            Conversation.objects.filter(user=self.user).exclude(
-                pk=first.pk).get().pk, first.pk)
+        self.assertEqual(self._quota().used, 2, 'two patients, two credits')
+
+    @patch('demo.views.ask_agent', return_value=dict(AGENT_REPLY))
+    def test_an_expired_thread_is_not_the_one_continued(self, _mocked):
+        """The window ends a thread. A patient whose thread has expired gets a new
+        one rather than a refusal, which is what the expiry is for."""
+        self._post({'hadm_id': 90000009, 'chip': 'risk'})
+        stale = Conversation.objects.get(user=self.user)
+        Conversation.objects.filter(pk=stale.pk).update(
+            expires_at=timezone.now() - timedelta(hours=1))
+
+        response = self._post({'hadm_id': 90000009, 'chip': 'risk'})
+
+        self.assertNotEqual(response.json()['conversation_id'], stale.pk)
+        self.assertEqual(Conversation.objects.filter(user=self.user).count(), 2)

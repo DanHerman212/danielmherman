@@ -99,18 +99,24 @@ DEMO_AGENT_URL = os.environ.get('DEMO_AGENT_URL', '')
 # Generous on purpose: a cold agent instance and a cold MCP instance can land on
 # the same request, and both scale to zero.
 DEMO_AGENT_TIMEOUT = int(os.environ.get('DEMO_AGENT_TIMEOUT', '120'))
-DEMO_DAILY_LIMIT = int(os.environ.get('DEMO_DAILY_LIMIT', '10'))
+DEMO_DAILY_LIMIT = int(os.environ.get('DEMO_DAILY_LIMIT', '25'))
 # How long a conversation may exist, and how many user turns it may hold. Both
-# are policy decisions settled on 2026-09-18 (layer 8): the window is fixed from
-# creation so the retention promise is about the age of a conversation rather
-# than its idleness, and the ceiling is a hard limit because only the first turn
-# of a conversation spends a credit, which leaves the ceiling as the only bound
-# on what one credit buys.
+# are policy decisions, resettled on 2026-10-14 for the A2UI console (layer 8).
+#
+# The window is fixed from creation, so the retention promise is about the age of
+# a conversation rather than its idleness. It moved from 24 hours to seven days
+# because a day is shorter than an inpatient episode and shorter than the interval
+# over which a clinician works a case, and the console now holds several patients
+# in parallel. The ceiling is a hard limit rather than a polite one, because only
+# the first turn of a conversation spends a credit, which leaves it as the only
+# bound on what one credit buys; it moved from six to twenty along with the daily
+# allowance, the six having been chosen as a starting point rather than derived
+# from use.
 DEMO_CONVERSATION_TTL_HOURS = int(
-    os.environ.get('DEMO_CONVERSATION_TTL_HOURS', '24')
+    os.environ.get('DEMO_CONVERSATION_TTL_HOURS', '168')
 )
 DEMO_CONVERSATION_TURN_CEILING = int(
-    os.environ.get('DEMO_CONVERSATION_TURN_CEILING', '6')
+    os.environ.get('DEMO_CONVERSATION_TURN_CEILING', '20')
 )
 # Refunds for failures that DID incur model spend (agent timeouts, tool
 # errors) are capped per user per day, or a request engineered to always fail

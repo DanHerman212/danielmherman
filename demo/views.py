@@ -24,13 +24,27 @@ from .agent_client import (
     ask_stream as ask_agent_stream,
     trace_id,
 )
-from .conversations import record_answer, replay_turns
+from .conversations import (
+    MAX_ASKED_CHARS,
+    record_answer,
+    replay_turns,
+    turn_payloads,
+)
 from .fixtures import CHIP_NAMES, SLASH_COMMANDS, fixture_ask
-from .models import Conversation, DemoPatient, DemoQuota, Profile
+from .models import Conversation, DemoPatient, DemoQuota, Profile, Turn
 
 logger = logging.getLogger(__name__)
 
 MAX_QUESTION_CHARS = 2000
+
+# How long a thread's own name may be. The `asked` bound lives with the store,
+# which is what enforces it on the way in.
+MAX_CONVERSATION_TITLE_CHARS = 120
+
+# How many conversations the History list offers. The retention window bounds it
+# in practice; the cap is here so a demo account that has been used heavily does
+# not answer a page load with an unbounded list.
+HISTORY_LIMIT = 50
 
 # The `@` selector. One character matches most of the cohort, so the lookup waits
 # for a second; the cap keeps the payload small enough to read at a glance.
@@ -44,7 +58,7 @@ PATIENT_LOOKUP_LIMIT = 5
 # a browser can actually reach. Refusing is what keeps a single-turn demo honest
 # about being single-turn.
 APPROVED_REQUEST_FIELDS = frozenset(
-    {'question', 'hadm_id', 'chip', 'conversation_id'}
+    {'question', 'hadm_id', 'chip', 'conversation_id', 'asked'}
 )
 
 # Names a caller reaches for when it expects the copilot to remember the
@@ -106,13 +120,27 @@ def _resolve_conversation(request, payload, hadm_id):
     are spent. A conversation that belongs to somebody else is reported exactly
     as one that does not exist, because the difference is not the caller's
     business.
+
+    One thread per patient (UX ruling 2026-10-14). A question about a patient
+    whose thread is still live continues that thread whether or not the browser
+    named it: asking about the same patient twice is not two conversations, and a
+    browser that has lost its place — a new tab, a cleared store, a reload after
+    the id was swept — must not open a second one beside the first. The lookup is
+    what makes the id an optimisation rather than the thing that decides.
+
+    A full thread is returned rather than skipped, so the ceiling refuses the turn
+    with its own message instead of silently starting a second thread that would
+    spend the credit the ceiling exists to bound.
     """
     raw = payload.get('conversation_id')
     if raw is None:
         if hadm_id is None:
             return None, False, None
-        return Conversation.objects.create(
-            user=request.user, patient_id=hadm_id), True, None
+        conversation, created = _thread_for(request, hadm_id)
+        # `created` rather than `True`: this branch continues an existing thread
+        # whenever the patient has one, and only opening a thread spends a credit.
+        # The id is an optimisation on top of this, not the thing that decides.
+        return conversation, created, None
 
     try:
         pk = int(raw)
@@ -148,6 +176,32 @@ def _resolve_conversation(request, payload, hadm_id):
     return conversation, False, None
 
 
+def _thread_for(request, hadm_id):
+    """This account's live thread with this patient, and whether it is a new one.
+
+    The one place a conversation is created by the ask path, so the one-thread-per-
+    patient rule has a single implementation rather than one per caller. Any *live*
+    thread with this patient is reused, full or not — see `_resolve_conversation`
+    for why a full one is returned instead of passed over.
+
+    The flag matters as much as the thread: only opening a thread spends a credit,
+    and a question that continues one is already paid for.
+
+    A patient with no live thread has none because the thread expired rather than
+    because it was deleted, so the new one inherits nothing either way.
+    """
+    existing = (
+        Conversation.objects
+        .filter(user=request.user, patient_id=hadm_id,
+                expires_at__gt=timezone.now())
+        .order_by('-created_at')
+        .first()
+    )
+    if existing is not None:
+        return existing, False
+    return Conversation.objects.create(user=request.user, patient_id=hadm_id), True
+
+
 def _record_turn(conversation):
     """Count a turn that produced an answer.
 
@@ -177,6 +231,25 @@ def _with_replay(intent, conversation):
     if turns:
         intent['turns'] = turns
     return intent
+
+
+def _asked_from(payload):
+    """The clinician's own words for this turn, as the console drew them.
+
+    Sent by the console rather than derived here, because deriving it would mean
+    this side knowing which command a request came from — and the command
+    vocabulary is the agent's to own (`routing.py`). The console already knows
+    what it put on screen; this side only bounds it.
+
+    Absent is not an error. A caller that does not draw a heading — a script, a
+    test — gets the composed question as its heading, which is what
+    `record_answer` falls back to.
+    """
+    asked = payload.get('asked')
+    if not isinstance(asked, str):
+        return ''
+    asked = ' '.join(asked.split())
+    return asked[:MAX_ASKED_CHARS]
 
 
 def _intent_for(payload):
@@ -287,6 +360,14 @@ def a2ui_console(request):
         # no conversation at all, so the page says so rather than letting a
         # follow-up look like it was remembered.
         'fixture_mode': settings.DEMO_FIXTURE_MODE,
+        # The ceiling the turn counter is out of ("Turn 3 of 20"). Sent with the
+        # page rather than fetched, because it is a policy value and the label is
+        # on screen before any conversation exists.
+        'turn_ceiling': settings.DEMO_CONVERSATION_TURN_CEILING,
+        # The window the thread is kept for, from the same policy. The console
+        # states it up front: a thread that disappears without the reader having
+        # been told how long it lasts reads as data loss, not as retention.
+        'retention_days': settings.DEMO_CONVERSATION_TTL_HOURS // 24,
     })
 
 
@@ -383,7 +464,8 @@ async def _remaining(user):
     return await sync_to_async(DemoQuota.remaining)(user)
 
 
-async def _stream_frames(user, trace, period, first, rest, conversation=None):
+async def _stream_frames(user, trace, period, first, rest, conversation=None,
+                        asked=''):
     """Relay the agent's frames to the browser, then close.
 
     ASYNC on purpose, and this is not a style choice. A synchronous iterator
@@ -406,6 +488,10 @@ async def _stream_frames(user, trace, period, first, rest, conversation=None):
     The error frame keeps the same shape as the blocking path's 502 body —
     `error` holds the user-facing message, plus `remaining` — so the browser
     renders a streamed failure and a blocking failure identically.
+
+    `asked` is the console's own heading for the turn, carried through to the
+    store. It is a parameter of this generator because the generator is where the
+    turn is written, and the caller is where the heading is known.
     """
     pending = first
     try:
@@ -436,10 +522,14 @@ async def _stream_frames(user, trace, period, first, rest, conversation=None):
                 # that an answer exists, and stores it so the next question can
                 # be answered as a follow-up.
                 await sync_to_async(_record_turn)(conversation)
-                await sync_to_async(record_answer)(conversation, data)
+                await sync_to_async(record_answer)(conversation, data, asked)
                 data['remaining'] = await _remaining(user)
                 if conversation is not None:
                     data['conversation_id'] = conversation.pk
+                    # The same two facts the recall endpoint sends, so the console's
+                    # context bar reads the same after a live turn as after a
+                    # restored one.
+                    data['expires_at'] = conversation.expires_at.isoformat()
                 yield _sse('answer', data)
                 return
 
@@ -469,6 +559,217 @@ async def _stream_frames(user, trace, period, first, rest, conversation=None):
         # the agent slot and drops the connection to the agent, instead of
         # reading it to the end for an answer nobody will see.
         rest.close()
+
+
+# --- conversation recall ------------------------------------------------------
+#
+# The store has always held the turns. What it could not do until now is hand them
+# back as the console draws them; `turn_payloads` is the one shape for that, so a
+# restored thread and a live one are rendered by the same code (Phase 3).
+
+
+def _conversation_payload(conversation):
+    """One conversation, as the console hydrates it."""
+    return {
+        'conversation_id': conversation.pk,
+        'hadm_id': conversation.patient_id,
+        'patient': conversation.patient.display_name,
+        'pinned': conversation.pinned,
+        'turns': turn_payloads(conversation),
+        'ceiling': settings.DEMO_CONVERSATION_TURN_CEILING,
+        # When the window closes, so the console can say when a thread will end
+        # rather than letting one disappear without notice.
+        'expires_at': conversation.expires_at.isoformat(),
+    }
+
+
+def _history_entry(conversation):
+    """One row of the sidebar: the thread's name, and what it takes to open it.
+
+    Deliberately thin. The row is a single line carrying a patient's name and
+    nothing else, so the payload carries the name and the id and nothing the row
+    would have to be talked out of drawing — a first question, a turn count and a
+    date were all here, and all three are things a reader scanning for a patient
+    does not want.
+
+    `title` is the thread's own name, and it is sent rather than dropped because
+    the rename endpoint answers with this shape and a response that omitted the
+    thing it changed would not be a response. Nothing draws it: the row is the
+    patient's name in every state (UX ruling 2026-10-14), including when a pin has
+    lifted it to the top of the list. `Conversation.title` is therefore a stored
+    capability with no surface yet — see the rename endpoint.
+    """
+    return {
+        'conversation_id': conversation.pk,
+        'hadm_id': conversation.patient_id,
+        'patient': conversation.patient.display_name,
+        'title': conversation.title,
+        'pinned': conversation.pinned,
+    }
+
+
+@login_required
+def conversation_detail(request, pk):
+    """A stored conversation, as the blocks the console renders.
+
+    Scoped to the account that owns it. A thread is clinical text with a patient
+    pinned to it, so an id is not a capability: another account's conversation is
+    answered as absent rather than as forbidden, because "this exists but is not
+    yours" is itself a fact about somebody else's activity.
+    """
+    conversation = (
+        Conversation.objects
+        .filter(pk=pk, user=request.user)
+        .select_related('patient')
+        .prefetch_related('turns')
+        .first()
+    )
+    if conversation is None:
+        return JsonResponse({'error': 'No such conversation.'}, status=404)
+    return JsonResponse(_conversation_payload(conversation))
+
+
+@login_required
+def conversation_history(request):
+    """The account's live conversations, most recently used first.
+
+    Expired threads are excluded rather than shown greyed out: a list that offers
+    a conversation the sweep is about to delete is an offer the system cannot keep.
+
+    `q` matches the patient's name, the admission, or the text of the questions and
+    answers in the thread. It is applied here rather than in the query because it
+    spans a related table, and the list is bounded by the retention window at demo
+    scale — if this ever needs to be fast it needs an index, not a different
+    contract at this endpoint.
+    """
+    conversations = list(
+        Conversation.objects
+        .filter(user=request.user, expires_at__gt=timezone.now())
+        .select_related('patient')
+        # Pinned first, then most recently used. A pinned thread is a deliberate
+        # "keep this where I can see it", so it outranks recency; within each
+        # group the ordering is the same.
+        .order_by('-pinned', '-last_turn_at', '-created_at')[:HISTORY_LIMIT]
+    )
+    entries = [_history_entry(conversation) for conversation in conversations]
+
+    needle = (request.GET.get('q') or '').strip().lower()
+    if needle:
+        text_by_conversation = {}
+        for conv_id, question, answer in Turn.objects.filter(
+            conversation__in=[c.pk for c in conversations]
+        ).values_list('conversation_id', 'question', 'answer'):
+            text_by_conversation.setdefault(conv_id, []).append(
+                f'{question or ""} {answer or ""}'
+            )
+
+        def matches(entry):
+            haystack = ' '.join((
+                entry['patient'], entry['title'], str(entry['hadm_id']),
+                ' '.join(text_by_conversation.get(entry['conversation_id'], [])),
+            )).lower()
+            return needle in haystack
+
+        entries = [entry for entry in entries if matches(entry)]
+
+    return JsonResponse({'conversations': entries})
+
+
+def _owned(request, pk):
+    """This account's conversation, or None.
+
+    One reader for the three management endpoints below, so they cannot disagree
+    about who may touch a thread. An id belonging to somebody else is None here
+    and a 404 at the caller, which is the same answer the detail endpoint gives
+    and for the same reason: "it exists but is not yours" is a fact about another
+    account's activity.
+    """
+    return Conversation.objects.filter(pk=pk, user=request.user).first()
+
+
+def _managed(request, pk):
+    """The thread a management call is about, or the error to answer with.
+
+    PUT rather than PATCH semantics: each of these sends the whole of the one
+    field it owns, so a repeated request is the same request rather than a second
+    change applied on top of the first.
+    """
+    conversation = _owned(request, pk)
+    if conversation is None:
+        return None, JsonResponse({'error': 'No such conversation.'}, status=404)
+    try:
+        body = json.loads(request.body or b'{}')
+    except (TypeError, ValueError):
+        return None, JsonResponse({'error': 'Body must be JSON.'}, status=400)
+    if not isinstance(body, dict):
+        return None, JsonResponse({'error': 'Body must be a JSON object.'},
+                                  status=400)
+    return (conversation, body), None
+
+
+@login_required
+@require_POST
+def conversation_rename(request, pk):
+    """Give a thread a name of its own.
+
+    Not reachable from the console. The sidebar's row is the patient's name in
+    every state — a pin lifts a thread to the top of the list, and it does not
+    rename it — so there is nowhere for a thread's own name to be shown yet, and
+    the row menu offers Pin and Delete only. The endpoint is kept because it is
+    the half that has no decision left in it: when a surface exists for a second
+    name, this is what it writes to.
+
+    An empty title means "no name of its own" rather than "the name is the empty
+    string, which is a name": the two are the same in the store, and the second is
+    not something a caller would ever mean.
+    """
+    parsed, error = _managed(request, pk)
+    if error is not None:
+        return error
+    conversation, body = parsed
+
+    raw = body.get('title')
+    if not isinstance(raw, str):
+        return JsonResponse({'error': "'title' must be a string."}, status=400)
+    title = ' '.join(raw.split())[:MAX_CONVERSATION_TITLE_CHARS]
+    Conversation.objects.filter(pk=conversation.pk).update(title=title)
+    conversation.title = title
+    return JsonResponse(_history_entry(conversation))
+
+
+@login_required
+@require_POST
+def conversation_pin(request, pk):
+    """Hold a thread at the top of the sidebar, or let it go."""
+    parsed, error = _managed(request, pk)
+    if error is not None:
+        return error
+    conversation, body = parsed
+
+    pinned = body.get('pinned')
+    if not isinstance(pinned, bool):
+        return JsonResponse({'error': "'pinned' must be true or false."},
+                            status=400)
+    Conversation.objects.filter(pk=conversation.pk).update(pinned=pinned)
+    conversation.pinned = pinned
+    return JsonResponse(_history_entry(conversation))
+
+
+@login_required
+@require_POST
+def conversation_delete(request, pk):
+    """Delete a thread, now rather than at the end of its window.
+
+    A real delete, not a hidden flag. The retention promise is that this store
+    holds a conversation for seven days; a thread the clinician has deleted is one
+    they expect gone, and a soft delete would leave clinical text in the database
+    while the interface said otherwise.
+    """
+    conversation = _owned(request, pk)
+    if conversation is None:
+        return JsonResponse({'error': 'No such conversation.'}, status=404)
+    conversation.delete()
+    return JsonResponse({'deleted': pk})
 
 
 @login_required
@@ -519,6 +820,8 @@ def a2ui_ask(request):
     if error:
         return JsonResponse({'error': error}, status=400)
 
+    asked = _asked_from(payload)
+
     conversation, opening, error = _resolve_conversation(
         request, payload, intent.get('hadm_id'))
     if error is not None:
@@ -544,7 +847,7 @@ def a2ui_ask(request):
     trace = trace_id(request)
     _with_replay(intent, conversation)
     if 'text/event-stream' in request.headers.get('Accept', ''):
-        return _streaming_ask(request, intent, trace, period, conversation)
+        return _streaming_ask(request, intent, trace, period, conversation, asked)
 
     try:
         result = ask_agent(intent, trace=trace)
@@ -590,17 +893,18 @@ def a2ui_ask(request):
     # tool evidence is visible. Django is a pass-through for it; only the
     # web-specific `remaining` quota is added here.
     _record_turn(conversation)
-    record_answer(conversation, result)
+    record_answer(conversation, result, asked)
     result['remaining'] = DemoQuota.remaining(request.user)
     if conversation is not None:
         # The browser keeps this and sends it back on the next question, which
         # is what turns the next question into a follow-up rather than a new
         # conversation (and therefore what keeps it from costing a credit).
         result['conversation_id'] = conversation.pk
+        result['expires_at'] = conversation.expires_at.isoformat()
     return JsonResponse(result)
 
 
-def _streaming_ask(request, intent, trace, period, conversation=None):
+def _streaming_ask(request, intent, trace, period, conversation=None, asked=''):
     """Start a streamed answer, or fail the way the blocking path fails.
 
     The first frame is pulled here, before the response is committed to being a
@@ -654,7 +958,8 @@ def _streaming_ask(request, intent, trace, period, conversation=None):
         }, status=502)
 
     response = StreamingHttpResponse(
-        _stream_frames(request.user, trace, period, first, stream, conversation),
+        _stream_frames(request.user, trace, period, first, stream, conversation,
+                       asked),
         content_type='text/event-stream',
     )
     response['Cache-Control'] = 'no-cache'

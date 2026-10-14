@@ -3,29 +3,25 @@
 {% comment %}
 Enterprise Clinical Copilot — the application, behind the front door.
 
-The shell is the frame the conversation will render inside: a collapsible menu
-on the left, and the working surface beside it. There is no patient list. The
-redesign moves patient selection into the ask bar as an `@` command, so a rail
-of every patient would be the legacy layout rebuilt rather than a step away
-from it.
+The shell is a collapsible menu on the left and the conversation beside it. There
+is no patient rail. Patient selection lives in the ask bar as an `@` command, and
+the sidebar lists the threads those selections produced — one thread per patient,
+because a conversation is about exactly one patient.
 
-The menu carries four labels — New Conversation, Discover, Tools, History —
-from the reference interface. They are placeholders, rendered `disabled` so that
-a control doing nothing cannot be mistaken for a feature that is broken. Wiring
-them is a later phase.
+The menu carries three labels — New Conversation, Discover, Tools. Discover and
+Tools are placeholders, rendered `disabled` so that a control doing nothing cannot
+be mistaken for a feature that is broken. History is gone: there was a control
+that revealed the thread list, and a list a reader has to ask for is a list they
+have to know is there.
 
 Account actions are split. The user guide and the request count sit in the menu at
 the top right of the page — the same markup the front door uses, and the same
 script drives it, so the two menus cannot drift apart. Sign-out sits under the
-identity at the foot of the sidebar, beside the account it signs out of.
+identity at the foot of the sidebar.
 
-NOT YET WIRED, and inert on purpose:
-
-  * the ask bar accepts typing and submits nothing. copilot_shell.js cancels the
-    submit; an empty form falling through to a GET reload of this URL would look
-    like the question had been sent.
-  * the history-search control in the sidebar head.
-  * the four menu labels in the sidebar.
+The conversation is one continuous column. Turns are not cards and do not fold:
+each one is headed by the question that asked it, and the heading pins to the top
+of the scroll area while its own answer passes beneath it.
 {% endcomment %}
 
 {% block title %}Enterprise Clinical Copilot{% endblock %}
@@ -61,24 +57,26 @@ NOT YET WIRED, and inert on purpose:
         </svg>
       </button>
       {% comment %}
-      History search, a placeholder for a later phase. Rendered `disabled` for the
-      same reason the section labels are: a control that does nothing should not
-      look like one that is broken. Hidden when the menu is collapsed, where there
-      is no room for it beside the collapse arrow.
+      The magnifying glass, which reveals the thread filter below it. Not a
+      placeholder any more: the list it filters is on screen from the moment the
+      page loads, so there is something for it to act on.
       {% endcomment %}
       <button type="button" class="cp-icon-btn cp-side-search" id="cp-search-btn"
-              disabled aria-label="Search history"
-              title="Search history — not built yet">
+              aria-expanded="false" aria-controls="cp-thread-search"
+              aria-label="Search threads" title="Search threads">
         <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
       </button>
     </div>
 
     <nav class="cp-side-nav" aria-label="Copilot sections">
       {% comment %}
-      Placeholders. `disabled` is the honest rendering: these are labels reserved
-      for a later phase, not controls that failed.
+      New Conversation and the thread list are controls; Discover and Tools are
+      labels reserved for a later phase, rendered `disabled` for the same reason
+      as before: a control that does nothing should not look like one that is
+      broken.
       {% endcomment %}
-      <button type="button" class="cp-nav-item" disabled>
+      <button type="button" class="cp-nav-item" id="cp-new-btn"
+              title="Start a new conversation">
         <i class="fa-regular fa-pen-to-square" aria-hidden="true"></i>
         <span>New Conversation</span>
       </button>
@@ -89,14 +87,35 @@ NOT YET WIRED, and inert on purpose:
       <button type="button" class="cp-nav-item" disabled>
         <i class="fa-solid fa-screwdriver-wrench" aria-hidden="true"></i>
         <span>Tools</span>
-        <i class="fa-solid fa-chevron-right cp-nav-caret" aria-hidden="true"></i>
-      </button>
-      <button type="button" class="cp-nav-item" disabled>
-        <i class="fa-regular fa-clock" aria-hidden="true"></i>
-        <span>History</span>
-        <i class="fa-solid fa-chevron-right cp-nav-caret" aria-hidden="true"></i>
       </button>
     </nav>
+
+    {% comment %}
+    The search field, revealed by the magnifying glass in the sidebar's head. An
+    input that is always there spends a row of the sidebar on a question nobody
+    asked yet; one that arrives when its control is pressed spends nothing.
+    {% endcomment %}
+    <div class="cp-thread-search" id="cp-thread-search" hidden>
+      <label class="cp-sr-only" for="cp-thread-filter">Filter threads</label>
+      <input type="search" id="cp-thread-filter" class="cp-thread-input"
+             placeholder="Search patients" autocomplete="off">
+    </div>
+
+    {% comment %}
+    The thread list, populated on load rather than hidden behind a control. There
+    is one thread per patient (a thread is about exactly one patient, and asking
+    about the same patient again continues theirs), so a row is a patient: the
+    name, and a menu for the three things that can be done to it.
+
+    The rows are built by the client because the list changes as threads are
+    opened, renamed, pinned and deleted, and the store is the only thing that
+    knows which of those happened.
+    {% endcomment %}
+    <section class="cp-threads" id="cp-threads" aria-labelledby="cp-threads-label">
+      <p class="cp-threads-label" id="cp-threads-label">Patients</p>
+      <p class="cp-threads-empty" id="cp-threads-empty" hidden></p>
+      <ul class="cp-thread-list" id="cp-thread-list"></ul>
+    </section>
 
     <div class="cp-side-foot">
       {% comment %}
@@ -188,44 +207,55 @@ NOT YET WIRED, and inert on purpose:
       </div>
 
       {% comment %}
-      The question, once asked. The composer is emptied by the next question, so
-      the one being answered is held here instead — above the status, and clear
-      of the answer that follows it.
+      The question and the run used to sit here, as one box and one status row for
+      the page. They are now part of a turn: the question is that turn's header and
+      the status row is its footer, so a conversation can show twenty of each
+      without one turn's row standing in for another's. The client builds them
+      (`createTurn`) for a live turn and for a turn restored from the store alike.
       {% endcomment %}
-      <div class="cp-question" id="cp-question" hidden>
-        <p class="cp-question-text" id="cp-question-text"></p>
-      </div>
-
-      {% comment %}
-      The run, as it happens: one row naming the stage it is on, preceded by the
-      dots that say something is happening at all, and followed by the caret that
-      opens the full span once there is an answer to account for. Every stage is
-      kept in the list below the row, which is closed until the caret asks for it.
-      {% endcomment %}
-      <div class="cp-status" id="cp-status" hidden>
-        <button type="button" class="cp-status-row" id="cp-status-toggle"
-                aria-expanded="false" aria-controls="cp-stages">
-          <span class="typing-dots" id="cp-status-dots" aria-hidden="true">
-            <span></span><span></span><span></span>
-          </span>
-          <span class="cp-status-text" id="cp-status-text">Reading the question</span>
-          <i class="fa-solid fa-chevron-down cp-status-caret" aria-hidden="true"></i>
-        </button>
-        <ol class="cp-stages" id="cp-stages" hidden></ol>
-      </div>
     </div>
 
     {% comment %}
-    The answer surface. The canvas is where the agent's A2UI messages are mounted,
-    and the text below it is the same answer as prose. The renderer is named by
-    `data-renderer-url` and fetched on demand — never at page load, because its
-    graph is large and nothing on first paint needs it.
+    The context bar: what the whole thread is about, and how long the store will
+    keep it. The patient is a property of the conversation rather than of the turn
+    being read, so it is stated once above the feed.
+
+    Deliberately not here: the turn counter. "Turn 3 of 20" is the system's
+    bookkeeping, not the clinician's, and a limit they can run into without having
+    done anything wrong is not something to keep in front of them.
     {% endcomment %}
-    <section class="cp-answer" id="cp-answer" hidden aria-live="polite">
-      <div class="cp-canvas" id="cp-canvas"
-           data-renderer-url="{% static 'js/bundled/a2ui_clinical.js' %}?v=1"></div>
-      <div class="cp-answer-text" id="cp-answer-text"></div>
-    </section>
+    <div class="cp-context" id="cp-context">
+      <span class="cp-context-pill" id="cp-context-patient" hidden>
+        <i class="fa-solid fa-user" aria-hidden="true"></i>
+        <span id="cp-context-name"></span>
+        <span class="cp-context-hadm" id="cp-context-hadm"></span>
+      </span>
+      <span class="cp-context-state" id="cp-context-state"></span>
+    </div>
+
+    {% comment %}
+    The conversation: one continuous column of turns, oldest first. This is the
+    only zone that scrolls, and the turns are constrained to a centred column so
+    they do not run flush against the sidebar.
+
+    There is no navigator above the composer and no card to fold away. Each turn's
+    question heads it and sticks to the top of the scroll area while its own answer
+    passes under it, so the reader always has the question that the text in front
+    of them is answering — which is what the navigator was for, without a second
+    control to keep in step with the first.
+
+    The blocks are built by the client and nothing in them is addressed by a
+    page-wide id, because a conversation holds several canvases, several citation
+    triggers and several status rows at once. `data-renderer-url` names the A2UI
+    bundle for the feed as a whole: it is fetched on demand, once, and mounted per
+    turn — never at page load, because its module graph is large and nothing on
+    first paint needs it.
+    {% endcomment %}
+    <section class="cp-feed" id="cp-feed" aria-live="polite" aria-label="Conversation"
+             data-renderer-url="{% static 'js/bundled/a2ui_clinical.js' %}?v=1"
+             data-conversation-url="{% url 'demo:conversation_detail' 0 %}"
+             data-history-url="{% url 'demo:conversation_history' %}"
+             data-retention-days="{{ retention_days }}"></section>
 
       {% comment %}
       The composer: the `@` patient selector and the `/` command menu.
@@ -272,5 +302,5 @@ NOT YET WIRED, and inert on purpose:
 <script src="{% static 'js/copilot_shell.js' %}?v=2"></script>
 <script src="{% static 'js/copilot_app.js' %}?v=2"></script>
 <script src="{% static 'js/copilot_composer.js' %}?v=2"></script>
-<script src="{% static 'js/copilot_canvas.js' %}?v=9"></script>
+<script src="{% static 'js/copilot_canvas.js' %}?v=14"></script>
 {% endblock %}
