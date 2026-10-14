@@ -217,11 +217,6 @@ class Conversation(models.Model):
     )
     created_at = models.DateTimeField(default=timezone.now)
     last_turn_at = models.DateTimeField(null=True, blank=True)
-    # What the sidebar calls this thread. Empty means "use the patient's name",
-    # which is the right label for a thread that is about exactly one patient and
-    # the wrong one for a thread a clinician has renamed. Stored rather than
-    # derived so a rename is a fact about the thread and not about the patient.
-    title = models.CharField(max_length=120, blank=True, default='')
     # Held at the top of the sidebar. Ordering is a preference about the list, so
     # it belongs to the conversation rather than to the browser that set it.
     pinned = models.BooleanField(default=False)

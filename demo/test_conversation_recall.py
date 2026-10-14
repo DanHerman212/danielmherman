@@ -145,7 +145,6 @@ class ConversationRecallTests(TestCase):
         # The first question, the turn count and the date used to be here and are
         # not: a reader scanning for a patient reads past all three.
         self.assertEqual(row['patient'], 'Cynthia Petrov')
-        self.assertEqual(row['title'], '', 'no name of its own yet')
         self.assertFalse(row['pinned'])
         self.assertNotIn('turns', row)
 
@@ -216,62 +215,10 @@ class ThreadActionTests(TestCase):
             data=json.dumps(body), content_type='application/json',
         )
 
-    # --- rename --------------------------------------------------------------
-
-    def test_a_thread_can_be_named(self):
-        """The endpoint writes the name; nothing draws it yet.
-
-        The sidebar's row is the patient's name in every state (UX ruling
-        2026-10-14), so a thread's own name has no surface — a pin lifts a thread to
-        the top of the list and does not rename it. This is the half with no
-        decision left in it, kept for the surface that does not exist yet.
-        """
-        response = self._post('conversation_rename', self.conversation.pk,
-                              {'title': 'Sepsis workup'})
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()['title'], 'Sepsis workup')
-        # The row is still the patient.
-        self.assertEqual(response.json()['patient'], 'Cynthia Petrov')
-        self.conversation.refresh_from_db()
-        self.assertEqual(self.conversation.title, 'Sepsis workup')
-
-    def test_a_stored_name_does_not_reach_the_sidebar(self):
-        """A named thread is offered under the patient's name, not the name it was
-        given — the label is how the reader finds the patient again."""
-        self._post('conversation_rename', self.conversation.pk,
-                   {'title': 'Sepsis workup'})
-
-        body = self.client.get(reverse('demo:conversation_history')).json()
-
-        self.assertEqual([row['patient'] for row in body['conversations']],
-                         ['Cynthia Petrov'])
-
-    def test_an_empty_name_clears_it(self):
-        self._post('conversation_rename', self.conversation.pk, {'title': 'Named'})
-
-        response = self._post('conversation_rename', self.conversation.pk,
-                              {'title': '   '})
-
-        self.assertEqual(response.json()['title'], '')
-
-    def test_a_name_is_trimmed_and_bounded(self):
-        response = self._post('conversation_rename', self.conversation.pk,
-                              {'title': '  a\n\nb  ' + 'x' * 400})
-
-        self.assertEqual(response.status_code, 200)
-        self.conversation.refresh_from_db()
-        self.assertFalse(self.conversation.title.startswith(' '))
-        self.assertNotIn('\n', self.conversation.title)
-        self.assertLessEqual(len(self.conversation.title), 120)
-
-    def test_a_name_that_is_not_a_string_is_refused(self):
-        response = self._post('conversation_rename', self.conversation.pk,
-                              {'title': ['Sepsis']})
-
-        self.assertEqual(response.status_code, 400)
-        self.conversation.refresh_from_db()
-        self.assertEqual(self.conversation.title, '')
+    # Thread naming was here and is not. `Conversation.title` and the rename
+    # endpoint were removed on 2026-10-14: the row is the patient's name in every
+    # state, so a second name had nowhere to appear. The tests went with the code
+    # rather than staying to describe a capability the system does not have.
 
     # --- pin -----------------------------------------------------------------
 
@@ -323,11 +270,10 @@ class ThreadActionTests(TestCase):
 
     # --- scoping -------------------------------------------------------------
 
-    def test_another_accounts_thread_cannot_be_renamed_pinned_or_deleted(self):
+    def test_another_accounts_thread_cannot_be_pinned_or_deleted(self):
         theirs = _store(self.other, self.patient)
 
         for name, body in (
-            ('conversation_rename', {'title': 'Mine now'}),
             ('conversation_pin', {'pinned': True}),
             ('conversation_delete', {}),
         ):
@@ -335,7 +281,6 @@ class ThreadActionTests(TestCase):
                 self.assertEqual(self._post(name, theirs.pk, body).status_code, 404)
 
         theirs.refresh_from_db()
-        self.assertEqual(theirs.title, '')
         self.assertFalse(theirs.pinned)
 
     def test_the_thread_actions_are_not_reachable_without_signing_in(self):

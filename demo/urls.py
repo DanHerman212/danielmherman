@@ -15,13 +15,11 @@ urlpatterns = [
     path('a2ui/patients/', views.patient_autocomplete, name='patient_autocomplete'),
     path('a2ui/ask/', views.a2ui_ask, name='a2ui_ask'),
     # Conversation recall: the sidebar's thread list, one thread's stored turns,
-    # and the three things a clinician may do to a thread of their own.
+    # and the two things a clinician may do to a thread of their own.
     path('a2ui/conversations/', views.conversation_history,
          name='conversation_history'),
     path('a2ui/conversations/<int:pk>/', views.conversation_detail,
          name='conversation_detail'),
-    path('a2ui/conversations/<int:pk>/rename/', views.conversation_rename,
-         name='conversation_rename'),
     path('a2ui/conversations/<int:pk>/pin/', views.conversation_pin,
          name='conversation_pin'),
     path('a2ui/conversations/<int:pk>/delete/', views.conversation_delete,

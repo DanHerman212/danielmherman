@@ -37,10 +37,6 @@ logger = logging.getLogger(__name__)
 
 MAX_QUESTION_CHARS = 2000
 
-# How long a thread's own name may be. The `asked` bound lives with the store,
-# which is what enforces it on the way in.
-MAX_CONVERSATION_TITLE_CHARS = 120
-
 # How many conversations the History list offers. The retention window bounds it
 # in practice; the cap is here so a demo account that has been used heavily does
 # not answer a page load with an unbounded list.
@@ -592,18 +588,17 @@ def _history_entry(conversation):
     date were all here, and all three are things a reader scanning for a patient
     does not want.
 
-    `title` is the thread's own name, and it is sent rather than dropped because
-    the rename endpoint answers with this shape and a response that omitted the
-    thing it changed would not be a response. Nothing draws it: the row is the
-    patient's name in every state (UX ruling 2026-10-14), including when a pin has
-    lifted it to the top of the list. `Conversation.title` is therefore a stored
-    capability with no surface yet — see the rename endpoint.
+    A thread carries no name of its own. `Conversation.title` and the rename
+    endpoint that wrote to it were removed rather than left waiting for a surface:
+    the row is the patient's name in every state, including when a pin has lifted
+    it to the top of the list, so a second name had nowhere to appear. A stored
+    field nothing reads is a capability the system does not have and a reader
+    cannot tell is missing.
     """
     return {
         'conversation_id': conversation.pk,
         'hadm_id': conversation.patient_id,
         'patient': conversation.patient.display_name,
-        'title': conversation.title,
         'pinned': conversation.pinned,
     }
 
@@ -665,7 +660,7 @@ def conversation_history(request):
 
         def matches(entry):
             haystack = ' '.join((
-                entry['patient'], entry['title'], str(entry['hadm_id']),
+                entry['patient'], str(entry['hadm_id']),
                 ' '.join(text_by_conversation.get(entry['conversation_id'], [])),
             )).lower()
             return needle in haystack
@@ -678,7 +673,7 @@ def conversation_history(request):
 def _owned(request, pk):
     """This account's conversation, or None.
 
-    One reader for the three management endpoints below, so they cannot disagree
+    One reader for the two management endpoints below, so they cannot disagree
     about who may touch a thread. An id belonging to somebody else is None here
     and a 404 at the caller, which is the same answer the detail endpoint gives
     and for the same reason: "it exists but is not yours" is a fact about another
@@ -705,36 +700,6 @@ def _managed(request, pk):
         return None, JsonResponse({'error': 'Body must be a JSON object.'},
                                   status=400)
     return (conversation, body), None
-
-
-@login_required
-@require_POST
-def conversation_rename(request, pk):
-    """Give a thread a name of its own.
-
-    Not reachable from the console. The sidebar's row is the patient's name in
-    every state — a pin lifts a thread to the top of the list, and it does not
-    rename it — so there is nowhere for a thread's own name to be shown yet, and
-    the row menu offers Pin and Delete only. The endpoint is kept because it is
-    the half that has no decision left in it: when a surface exists for a second
-    name, this is what it writes to.
-
-    An empty title means "no name of its own" rather than "the name is the empty
-    string, which is a name": the two are the same in the store, and the second is
-    not something a caller would ever mean.
-    """
-    parsed, error = _managed(request, pk)
-    if error is not None:
-        return error
-    conversation, body = parsed
-
-    raw = body.get('title')
-    if not isinstance(raw, str):
-        return JsonResponse({'error': "'title' must be a string."}, status=400)
-    title = ' '.join(raw.split())[:MAX_CONVERSATION_TITLE_CHARS]
-    Conversation.objects.filter(pk=conversation.pk).update(title=title)
-    conversation.title = title
-    return JsonResponse(_history_entry(conversation))
 
 
 @login_required
