@@ -553,17 +553,28 @@ button.cp-menu-item {
 .cp-icon-btn[disabled] { cursor: default; opacity: 0.45; }
 
 /* Collapsed: the labels go and the icons stay, so the rail still says what the
-   menu holds without spending the width on saying it. */
-.cp-app.is-collapsed .cp-side { width: 64px; }
-.cp-app.is-collapsed .cp-side-head { justify-content: center; }
-.cp-app.is-collapsed .cp-side-search,
-.cp-app.is-collapsed .cp-thread-search,
-.cp-app.is-collapsed .cp-threads { display: none; }
-.cp-app.is-collapsed .cp-nav-item span,
-.cp-app.is-collapsed .cp-user-text,
-.cp-app.is-collapsed .cp-user-caret { display: none; }
-.cp-app.is-collapsed .cp-nav-item,
-.cp-app.is-collapsed .cp-user { justify-content: center; }
+   menu holds without spending the width on saying it.
+
+   Scoped above the drawer breakpoint on purpose. A rail is the answer to a column
+   that is too wide, and below 700px there is no column — the menu is an overlay —
+   so the collapsed state is switched off wholesale across the breakpoint rather
+   than overridden rule by rule at it. */
+@media (min-width: 701px) {
+  .cp-app.is-collapsed .cp-side { width: 64px; }
+  .cp-app.is-collapsed .cp-side-head { justify-content: center; }
+  .cp-app.is-collapsed .cp-side-search,
+  .cp-app.is-collapsed .cp-thread-search,
+  .cp-app.is-collapsed .cp-threads { display: none; }
+  .cp-app.is-collapsed .cp-nav-item span,
+  .cp-app.is-collapsed .cp-user-text,
+  .cp-app.is-collapsed .cp-user-caret { display: none; }
+  .cp-app.is-collapsed .cp-nav-item,
+  .cp-app.is-collapsed .cp-user { justify-content: center; }
+}
+
+/* The drawer's scrim: in the document at every width, displayed only by the
+   narrow-viewport rules below. */
+.cp-scrim { display: none; }
 
 .cp-app-main {
   flex: 1; min-width: 0; height: 100%; overflow: hidden;
@@ -603,19 +614,51 @@ button.cp-menu-item {
 
 /* ---- narrow viewports ---------------------------------------------------------
    The sidebar and the conversation side by side need about 700px before the
-   composer starts losing room to the sidebar. Below that the sidebar is not
-   shrunk to an icon rail, because 64px of rail plus a working composer does not fit
-   either — it is put away, and the composer keeps the width. This surface is a
-   desktop clinical tool; what a narrower one should do with navigation is a
-   question for a layout that has a drawer, not for a rule that squeezes the thing
-   the reader types into. */
+   composer starts losing room to the sidebar. Below that the sidebar leaves the
+   flow and becomes an overlay drawer: it is not shrunk to an icon rail, because
+   64px of rail plus a working composer does not fit either, and it is not put away
+   without a trace, because navigation that cannot be reached is not a layout
+   decision but a missing one.
+
+   The same control drives both states and it does not move: above 700px it
+   collapses the column, below it slides the drawer, and it stays pinned to the
+   top-left corner either way so the panel arrives behind the control that summoned
+   it. That is why the drawer travels on `left` and not on `transform` — a
+   transform would make this element the containing block for its own
+   fixed-position button, and the button would ride off the screen with the panel. */
 /* The middle band: the sidebar gives up its width before the conversation does. */
 @media (max-width: 900px) {
   .cp-side { width: 200px; }
 }
 
 @media (max-width: 700px) {
-  .cp-side { display: none; }
+  /* Out of the flex flow and past the left edge. The main column therefore has the
+     full width, which is the point: the composer keeps the room. */
+  .cp-side {
+    position: fixed; top: 0; bottom: 0; left: -280px; width: 264px;
+    z-index: 50; transition: left 180ms ease;
+    box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.06), 0 18px 40px rgba(15, 23, 42, 0.18);
+  }
+  .cp-app.is-drawer-open .cp-side { left: 0; }
+
+  /* Pinned to the viewport, so it holds one place open and closed. */
+  #cp-side-toggle { position: fixed; top: 14px; left: 12px; z-index: 60; }
+
+  /* The toggle has left the flow, so space-between has nothing to push against and
+     the magnifier would fall to the left edge with it. */
+  .cp-side-head { justify-content: flex-end; }
+
+  /* The first row of the main column now starts under the pinned control, so it
+     steps aside rather than sitting beneath it. */
+  .cp-top { padding-left: 54px; }
+
+  /* Laid out at drawer width, revealed only while the drawer is open. */
+  .cp-scrim {
+    position: fixed; inset: 0; z-index: 40;
+    background: rgba(15, 23, 42, 0.45);
+  }
+  .cp-app.is-drawer-open .cp-scrim { display: block; }
+
   .cp-feed { padding: 0 16px; }
   .cp-turn-head { margin: 0 -16px; padding: 14px 16px 10px; }
   .cp-context { padding: 10px 16px; }

@@ -584,6 +584,10 @@ class A2uiConsolePageTests(TestCase):
         self.assertContains(response, 'id="copilot-shell"')
         self.assertContains(response, 'id="cp-side"')
         self.assertContains(response, 'id="cp-side-toggle"')
+        # The drawer that same control slides in below 700px, and the scrim that
+        # closes it. Both are in the document at every width; the stylesheet
+        # decides which of them means anything, and at which width.
+        self.assertContains(response, 'id="cp-scrim"')
         # The three labels the reference interface reserves, present as
         # placeholders so the layout is honest about what is coming. History was
         # the fourth and is gone: the thread list is on screen from the moment the
@@ -677,7 +681,7 @@ class A2uiConsolePageTests(TestCase):
         self.assertNotContains(response, 'id="a2ui-host"')
         # Cache-busted asset links, asserted exactly so a forgotten bump fails
         # here rather than serving a stale page out of a browser's cache.
-        self.assertContains(response, 'demo_shell.css?v=18')
+        self.assertContains(response, 'demo_shell.css?v=19')
         self.assertContains(response, 'copilot_shell.js')
         self.assertContains(response, 'copilot_app.js')
 

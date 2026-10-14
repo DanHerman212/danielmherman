@@ -29,12 +29,20 @@ of the scroll area while its own answer passes beneath it.
 {% block content %}
 <div class="cp cp-app" id="copilot-shell" data-ask-url="{% url 'demo:a2ui_ask' %}">
 
+  {% comment %}
+  The drawer's scrim. It is in the document at every width and displayed only by
+  the narrow-viewport rule that turns the menu into an overlay, so there is no
+  state in which a visible scrim has nothing to dismiss. Tapping it is what makes
+  the drawer temporary rather than a second column.
+  {% endcomment %}
+  <div class="cp-scrim" id="cp-scrim" aria-hidden="true"></div>
+
   {# ---------------- left: the menu ---------------- #}
   <aside class="cp-side" id="cp-side">
     <div class="cp-side-head">
       <button type="button" class="cp-icon-btn" id="cp-side-toggle"
               aria-expanded="true" aria-controls="cp-side"
-              aria-label="Collapse the menu" title="Collapse the menu">
+              aria-label="Collapse navigation" title="Collapse navigation">
         {% comment %}
         Drawn rather than taken from the icon font: the reference is a panel with
         a divider and a chevron, and no free FontAwesome glyph matches it exactly.
@@ -300,7 +308,7 @@ of the scroll area while its own answer passes beneath it.
 
 {% block extra_js %}
 <script src="{% static 'js/copilot_shell.js' %}?v=2"></script>
-<script src="{% static 'js/copilot_app.js' %}?v=2"></script>
+<script src="{% static 'js/copilot_app.js' %}?v=4"></script>
 <script src="{% static 'js/copilot_composer.js' %}?v=2"></script>
 <script src="{% static 'js/copilot_canvas.js' %}?v=14"></script>
 {% endblock %}
