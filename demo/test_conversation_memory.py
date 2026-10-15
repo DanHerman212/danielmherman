@@ -252,7 +252,7 @@ class StoredPresentationTests(_AskTestCase):
         self._post({'hadm_id': 90000009, 'chip': 'risk'})
 
         stored = Turn.objects.filter(role=Turn.Role.AGENT).latest('ordinal')
-        self.assertEqual(stored.presentation, A2UI_ENVELOPE)
+        self.assertEqual(stored.presentation['a2ui'], A2UI_ENVELOPE)
 
     @patch('demo.views.ask_agent')
     def test_a_turn_with_no_canvas_stores_an_empty_presentation(self, mocked):
@@ -261,7 +261,7 @@ class StoredPresentationTests(_AskTestCase):
         self._post({'hadm_id': 90000009, 'chip': 'risk'})
 
         stored = Turn.objects.filter(role=Turn.Role.AGENT).latest('ordinal')
-        self.assertEqual(stored.presentation, {})
+        self.assertEqual(stored.presentation['a2ui'], {})
 
     @patch('demo.views.ask_agent')
     def test_a_payload_that_is_not_an_envelope_is_not_stored_as_one(self, mocked):
@@ -273,7 +273,45 @@ class StoredPresentationTests(_AskTestCase):
         self._post({'hadm_id': 90000009, 'chip': 'risk'})
 
         stored = Turn.objects.filter(role=Turn.Role.AGENT).latest('ordinal')
-        self.assertEqual(stored.presentation, {})
+        self.assertEqual(stored.presentation['a2ui'], {})
+
+    @patch('demo.views.ask_agent')
+    def test_the_turns_own_facts_are_stored_beside_the_canvas(self, mocked):
+        """Scope, references and follow-ups are kept with the turn, not recomputed.
+
+        The console draws all three after a thread is replayed, so a turn that lost them
+        would come back as an answer with no evidence list and no next questions.
+        """
+        mocked.return_value = {
+            **AGENT_REPLY,
+            'a2ui': dict(A2UI_ENVELOPE),
+            'scope': 'patient_chart',
+            'references': [{'index': 1, 'source': 'Discharge note', 'title': 'Course'}],
+            'follow_ups': ['What changed overnight?', 'Which medications were held?'],
+        }
+
+        self._post({'hadm_id': 90000009, 'chip': 'risk'})
+
+        stored = Turn.objects.filter(role=Turn.Role.AGENT).latest('ordinal')
+        self.assertEqual(stored.presentation['scope'], 'patient_chart')
+        self.assertEqual(len(stored.presentation['references']), 1)
+        self.assertEqual(len(stored.presentation['follow_ups']), 2)
+
+    def test_a_turn_stored_before_the_presentation_held_more_still_reads(self):
+        """The bare envelope is still a shape this reads, and there is no migration.
+
+        Every turn written before 4A-2 holds the envelope itself. Reading one has to
+        yield the envelope and empty defaults rather than a scope nobody recorded — so a
+        thread that spans the change renders as one thing, not two.
+        """
+        from demo.conversations import _presentation_parts
+
+        envelope, scope, references, follow_ups = _presentation_parts(A2UI_ENVELOPE)
+
+        self.assertEqual(envelope, A2UI_ENVELOPE)
+        self.assertIsNone(scope)
+        self.assertEqual(references, [])
+        self.assertEqual(follow_ups, [])
 
     @patch('demo.views.ask_agent')
     def test_the_canonical_turn_carries_what_the_console_renders(self, mocked):

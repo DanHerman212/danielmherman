@@ -96,7 +96,7 @@ def record_answer(conversation, result, asked=''):
             code_revision=result.get('code_revision') or '',
             langfuse_trace_id=_stored_trace_id(result.get('langfuse_trace_id')),
             citations=_stored_citations(result.get('sources')),
-            presentation=_stored_presentation(result.get('a2ui')),
+            presentation=_stored_presentation(result),
             tool_calls=_stored_calls(result.get('tool_calls')),
             guardrail_flags=_stored_flags(result.get('guardrail_flags')),
         )
@@ -116,16 +116,71 @@ def _stored_flags(flags):
     return [flag for flag in flags or [] if isinstance(flag, str)]
 
 
-def _stored_presentation(envelope):
-    """The composed A2UI payload as it will be stored, or {} when there is none.
+def _strings(value):
+    """The non-empty strings in `value`, or [].
 
-    Validated as a dict rather than trusted: this value is mounted by the browser as
-    a surface, so a list or a string here would reach the renderer as a malformed
-    envelope and draw nothing — which reads on screen as an answer that failed rather
-    than as a payload that was mis-stored. A turn with no canvas stores {}, and the
-    empty default is what the column already means.
+    The agent's list is already cleaned, and this is not a second implementation of
+    that: it is the boundary refusing to put a non-string into the column, because
+    everything read back out of it is written into the DOM.
     """
-    return envelope if isinstance(envelope, dict) else {}
+    return [item for item in value or [] if isinstance(item, str) and item.strip()]
+
+
+def _records(value):
+    """The dicts in `value`, or []. Same reasoning as `_strings`."""
+    return [item for item in value or [] if isinstance(item, dict)]
+
+
+def _stored_presentation(result):
+    """The turn's presentation as it will be stored.
+
+    This column used to hold the A2UI envelope itself. It now holds every fact the
+    console presents around the answer — the canvas, the scope label, the references the
+    markers resolve to, and the follow-up questions — because they are one thing: what
+    this turn presented, composed once in the agent and replayed rather than recomputed.
+    The store already kept the envelope for exactly that reason, and these are the same
+    kind of fact about the same moment.
+
+    The envelope is still validated as a dict rather than trusted: the browser mounts it
+    as a surface, so a list or a string here would reach the renderer as a malformed
+    envelope and draw nothing, which reads on screen as an answer that failed rather than
+    as a payload that was mis-stored.
+    """
+    envelope = result.get('a2ui')
+    scope = result.get('scope')
+    return {
+        'a2ui': envelope if isinstance(envelope, dict) else {},
+        'scope': scope if isinstance(scope, str) and scope else None,
+        'references': _records(result.get('references')),
+        'follow_ups': _strings(result.get('follow_ups')),
+    }
+
+
+def _presentation_parts(stored):
+    """(envelope, scope, references, follow_ups) out of whatever a turn stored.
+
+    Two shapes are readable at once, and no marker says which is which. A turn stored
+    since 4A-2 holds the dict of facts above; a turn stored before it holds the bare A2UI
+    envelope, because the envelope was all there was to present. They are told apart by
+    the envelope's own keys — a canvas always has `messages` and a `surface_id` — rather
+    than by a version field, so no migration is owed for rows already written.
+
+    Every added field is defaulted. A reader of a thread that spans the change gets an
+    empty list and a null scope for the old turns and cannot tell the difference, which
+    is the point: the client has one shape to draw rather than two.
+    """
+    if not isinstance(stored, dict):
+        return {}, None, [], []
+    if 'messages' in stored or 'surface_id' in stored:
+        return stored, None, [], []
+    envelope = stored.get('a2ui')
+    scope = stored.get('scope')
+    return (
+        envelope if isinstance(envelope, dict) else {},
+        scope if isinstance(scope, str) and scope else None,
+        _records(stored.get('references')),
+        _strings(stored.get('follow_ups')),
+    )
 
 
 def turn_payloads(conversation):
@@ -161,13 +216,21 @@ def turn_payloads(conversation):
             continue
         if not asked and not row.answer:
             continue
+        envelope, scope, references, follow_ups = _presentation_parts(row.presentation)
         payloads.append({
             'asked': label,
             'answer': row.answer,
-            'a2ui': row.presentation or {},
+            'a2ui': envelope,
             'flags': list(row.guardrail_flags or []),
             'citations': list(row.citations or []),
             'ordinal': row.ordinal,
+            # Phase 4A-2. Defaulted for every turn stored before these existed, so a
+            # thread spanning the change needs no special case anywhere downstream: a
+            # turn without them sends an empty list and a null scope, and the console
+            # draws nothing for those rather than guessing.
+            'scope': scope,
+            'references': references,
+            'follow_ups': follow_ups,
         })
         asked = ''
     return payloads

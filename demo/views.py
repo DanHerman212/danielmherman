@@ -58,8 +58,12 @@ PATIENT_LOOKUP_LIMIT = 5
 # `prose_settled` frames are relayed unaltered, so a client that draws a progress row
 # per unrecognised event would print the answer as a log. The decision belongs to the
 # layer that has to draw it, and a page loaded before this existed simply never asks.
+# `follow_ups` is the browser asking for the next questions to be proposed under the
+# answer. Opt-in for the same reason, and a sharper one: it costs a model call on every
+# turn, and a caller that does not draw the rows should not pay for them.
 APPROVED_REQUEST_FIELDS = frozenset(
-    {'question', 'hadm_id', 'chip', 'conversation_id', 'asked', 'stream_prose'}
+    {'question', 'hadm_id', 'chip', 'conversation_id', 'asked', 'stream_prose',
+     'follow_ups'}
 )
 
 # Names a caller reaches for when it expects the copilot to remember the
@@ -823,6 +827,9 @@ def a2ui_ask(request):
             # `"true"` has got the type wrong, and answering that by turning prose
             # streaming on is a guess about what it meant.
             prose_stream=payload.get('stream_prose') is True,
+            # Strict identity here too: this one buys a model call per turn, so a
+            # caller sending the string "true" gets nothing rather than a guess.
+            follow_ups=payload.get('follow_ups') is True,
         )
 
     try:
@@ -881,7 +888,7 @@ def a2ui_ask(request):
 
 
 def _streaming_ask(request, intent, trace, period, conversation=None, asked='',
-                   prose_stream=False):
+                   prose_stream=False, follow_ups=False):
     """Start a streamed answer, or fail the way the blocking path fails.
 
     The first frame is pulled here, before the response is committed to being a
@@ -903,10 +910,15 @@ def _streaming_ask(request, intent, trace, period, conversation=None, asked='',
         # generator today, so a failure surfaces on the first `next()`, but
         # nothing enforces that, and a raise from the call itself would
         # otherwise escape the view as a 500.
-        stream = ask_agent_stream(
-            {**intent, 'stream_prose': True} if prose_stream else intent,
-            trace=trace,
-        )
+        # Both flags are merged here rather than folded into `intent` upstream, because
+        # neither is intent: they are what this page asked to be shown, and the agent
+        # treats them as capabilities rather than as part of the question.
+        requested = dict(intent)
+        if prose_stream:
+            requested['stream_prose'] = True
+        if follow_ups:
+            requested['follow_ups'] = True
+        stream = ask_agent_stream(requested, trace=trace)
         first = next(stream, None)
     except AgentRefused as exc:
         # Same reasoning as the blocking path: the refusal is guidance rather
