@@ -239,6 +239,12 @@
        did. Built here, before the heading, because the heading is where it goes; the
        footer would not do, because the footer is retired when the run ends, and the
        heading is the one part of a turn that outlives the run. */
+    /* What the answer rested on, as a quiet pill beside the question. Read from the tool
+       calls the agent actually made, so it is a fact about the run rather than a claim
+       the model made about itself. Absent for a redirect, which rested on nothing. */
+    var scopeEl = el('span', 'cp-scope');
+    scopeEl.hidden = true;
+
     var evidence = el('span', 'cp-evidence');
     evidence.setAttribute('role', 'status');
     evidence.setAttribute(
@@ -255,15 +261,36 @@
     var title = document.createElement('h2');
     title.className = 'cp-turn-title';
     title.textContent = asked || '';
-    head.appendChild(title);
-    head.appendChild(evidence);
+    head.append(title, scopeEl, evidence);
 
     var body = el('div', 'cp-turn-body');
     var answerSection = el('section', 'cp-answer');
     var canvas = el('div', 'cp-canvas');
     var prose = el('div', 'cp-answer-text');
     answerSection.append(canvas, prose);
-    body.appendChild(answerSection);
+
+    /* The records the markers resolve to, and the next questions. Both are chrome under
+       the answer rather than part of it, and both are absent on most turns. */
+    var trail = el('div', 'cp-turn-trail');
+    var references = el('details', 'cp-references');
+    references.hidden = true;
+    var followUps = el('div', 'cp-follow-ups');
+    followUps.hidden = true;
+    trail.append(references, followUps);
+
+    body.append(answerSection, trail);
+
+    /* Opening a turn retires the previous turn's follow-up rows.
+
+       The rows are a prompt to ask the next question, so they belong to the turn being
+       read and to no other. Doing it here rather than in `fillTurn` makes the rule
+       structural: turns are created oldest-first whether they arrive live or are
+       replayed from the store, so the newest one's rows are laid down last and survive,
+       and no path has to know which turn is current. */
+    [].forEach.call(feed.querySelectorAll('.cp-follow-ups'), function (older) {
+      older.hidden = true;
+      older.textContent = '';
+    });
 
     /* The run, while it is running. The dots say it is still going and the label
        says where it is; each stage replaces the label as it arrives, so what the
@@ -462,6 +489,180 @@
       evidence.hidden = false;
     }
 
+    /* Ask a follow-up by putting it in the composer and submitting, rather than by a
+       path of its own. A question built here would be a second way into the chain, with
+       its own handling of intent, clearing and the in-flight guard — and the two would
+       drift. Typed into the box, it is asked exactly as the reader would have asked it. */
+    function askFollowUp(question, buttons) {
+      // Every row goes at once, not just the one clicked: two clicks on different rows
+      // would otherwise send both questions, and the second would be answered as a
+      // follow-up to something the reader never read the answer to.
+      buttons.forEach(function (button) { button.disabled = true; });
+      if (!input || !form) return;
+      input.value = question;
+      form.requestSubmit();
+    }
+
+    /* The inline marker a drawer row answers to. The prose lives inside the renderer's
+       shadow root, so this reaches through it by hand: no selector crosses a shadow
+       boundary, and the marker the reader clicked and the row they opened have to be the
+       same record — which is the whole reason the row is built from the marker's own
+       citation rather than from a second list. */
+    function inlineMarker(node, index) {
+      var markers = node.querySelectorAll
+        ? node.querySelectorAll('button.cite[data-cite]') : [];
+      for (var i = 0; i < markers.length; i++) {
+        if (markers[i].getAttribute('data-cite') === String(index)) return markers[i];
+      }
+      var hosts = node.querySelectorAll ? node.querySelectorAll('*') : [];
+      for (var j = 0; j < hosts.length; j++) {
+        if (!hosts[j].shadowRoot) continue;
+        var found = inlineMarker(hosts[j].shadowRoot, index);
+        if (found) return found;
+      }
+      return null;
+    }
+
+    /* Show which sentence the passage just opened belongs to. The outline is set inline
+       because the marker is a shadow-DOM node and this stylesheet cannot reach it. */
+    function revealMarker(index) {
+      var marker = inlineMarker(root, index);
+      if (!marker) return;
+      marker.scrollIntoView({
+        block: 'center',
+        behavior: reduceMotion.matches ? 'auto' : 'smooth',
+      });
+      marker.style.outline = '2px solid #1f2937';
+      marker.style.outlineOffset = '2px';
+      setTimeout(function () {
+        marker.style.outline = '';
+        marker.style.outlineOffset = '';
+      }, 1400);
+    }
+
+    /* One row of the drawer, and the two kinds of evidence a reference record can carry.
+
+       A published record is a destination: the identifier and the link are all a reader
+       needs to go and read it, so the row opens a tab and stops there. Today this drawer
+       is only given note passages — a literature turn draws its records in the canvas
+       bibliography instead — so this branch is the general case rather than the reached
+       one, and it exists so a record the contract allows cannot arrive as a broken row.
+
+       A note passage cannot be a destination, because the passage is already in hand —
+       the agent sent the text itself. So the row opens instead, showing the passage the
+       answer was drawn from and pointing at the sentence it supports. A row that only
+       named the section would be an audit trail that lists claims to go and check
+       somewhere else, which is not an audit trail. */
+    function referenceRow(row) {
+      var item = el('li', 'cp-reference-item');
+      var label = '[' + (row.index === undefined ? '?' : row.index) + '] '
+        + (row.source || 'Source') + (row.title ? ' · ' + row.title : '');
+
+      if (row.url || row.pmid) {
+        var head = el('span', 'cp-reference-head');
+        head.textContent = label;
+        var link = document.createElement('a');
+        link.className = 'cp-reference-link';
+        link.href = row.url || ('https://pubmed.ncbi.nlm.nih.gov/' + row.pmid + '/');
+        link.target = '_blank';
+        link.rel = 'noopener';
+        link.textContent = row.pmid ? 'PMID ' + row.pmid : 'Open the record';
+        item.append(head, link);
+        return item;
+      }
+
+      var toggle = document.createElement('button');
+      toggle.type = 'button';
+      toggle.className = 'cp-reference-toggle';
+      toggle.setAttribute('aria-expanded', 'false');
+      var text = el('span', 'cp-reference-head');
+      text.textContent = label;
+      var chevron = el('span', 'cp-reference-chevron');
+      chevron.setAttribute('aria-hidden', 'true');
+      chevron.textContent = '›';
+      toggle.append(text, chevron);
+
+      var body = el('p', 'cp-reference-excerpt');
+      body.textContent = row.excerpt ? String(row.excerpt) : '';
+      body.hidden = true;
+
+      toggle.addEventListener('click', function () {
+        var opening = body.hidden;
+        body.hidden = !opening;
+        toggle.setAttribute('aria-expanded', String(opening));
+        item.classList.toggle('is-open', opening);
+        if (opening) revealMarker(row.index);
+      });
+
+      item.append(toggle, body);
+      return item;
+    }
+
+    function presentReferences(rows) {
+      // No rows means no drawer. An accordion that opens onto nothing promises
+      // evidence and then shows its absence, which is worse than not offering it.
+      if (!rows.length) {
+        references.hidden = true;
+        return;
+      }
+      var summary = document.createElement('summary');
+      summary.textContent = rows.length === 1
+        ? '1 reference' : rows.length + ' references';
+      references.appendChild(summary);
+      var list = el('ol', 'cp-reference-list');
+      rows.forEach(function (row) { list.appendChild(referenceRow(row)); });
+      references.appendChild(list);
+      references.hidden = false;
+    }
+
+    function presentFollowUps(questions) {
+      if (!questions.length) return;
+      var buttons = questions.map(function (question) {
+        var row = document.createElement('button');
+        row.type = 'button';
+        row.className = 'cp-follow-up';
+        var text = el('span', 'cp-follow-up-text');
+        text.textContent = question;
+        var chevron = el('span', 'cp-follow-up-chevron');
+        chevron.setAttribute('aria-hidden', 'true');
+        chevron.textContent = '›';
+        row.append(text, chevron);
+        row.addEventListener('click', function () { askFollowUp(question, buttons); });
+        followUps.appendChild(row);
+        return row;
+      });
+      followUps.hidden = false;
+    }
+
+    /* The chrome a turn carries besides its answer: what the answer rested on, the
+       records its markers resolve to, and the next questions.
+
+       Every field is defaulted, because a thread spans the change that introduced them:
+       a turn stored before 4A-2 replays with none of the three, and it has to draw as an
+       ordinary turn rather than as a broken one. `scope: null` in particular is a real
+       value — a redirect rested on nothing — so it shows no pill rather than a guess.
+
+       The references drawer is a CHART-turn affordance and is deliberately not drawn for
+       a literature turn. A literature turn already has its primary evidence surface: the
+       canvas draws the retrieved records themselves, with their journal, date and PMID
+       links. Listing the same articles again in a drawer beneath that is the same
+       evidence twice, and two renderings of one source read as two sources — which is
+       exactly the misreading the citation contract exists to prevent. */
+    function presentFacts(payload) {
+      var scope = payload.scope || null;
+      if (scope) {
+        scopeEl.textContent = scope === 'patient_chart'
+          ? 'Patient Chart Synthesis'
+          : 'General Medical Evidence';
+        scopeEl.hidden = false;
+      }
+      // A note passage has no surface of its own — the canvas shows the answer, not the
+      // notes it was drawn from — so on a chart turn the drawer is the only place the
+      // passage behind a marker can be read, and it is the row that carries it.
+      presentReferences(scope === 'patient_chart' ? (payload.references || []) : []);
+      presentFollowUps(payload.follow_ups || []);
+    }
+
     return {
       root: root,
       canvas: canvas,
@@ -473,6 +674,7 @@
       appendProse: appendProse,
       hasProse: hasProse,
       settleProse: settleProse,
+      presentFacts: presentFacts,
       answer: function (message) { say(message || ''); },
     };
   }
@@ -552,6 +754,9 @@
   async function fillTurn(block, payload) {
     var envelope = payload.a2ui || null;
     var drawsProse = !!(envelope && envelope.renders_prose);
+    // Before the answer is drawn, so the turn's chrome and its text arrive together
+    // rather than the chrome appearing under text that is already being read.
+    block.presentFacts(payload);
     if (!drawsProse) {
       block.answer(payload.answer || '');
     } else {
@@ -1158,7 +1363,7 @@
           'Accept': 'text/event-stream',
           'X-CSRFToken': csrfToken(),
         },
-        body: JSON.stringify(Object.assign({}, request, { stream_prose: true })),
+        body: JSON.stringify(Object.assign({}, request, { stream_prose: true, follow_ups: true })),
       });
 
       if (!response.ok) {

@@ -398,6 +398,69 @@ button.cp-menu-item {
 }
 .cp-evidence[hidden] { display: none; }
 
+/* The scope pill: what the answer rested on. Quieter than the correction notice, because
+   it is not news — it is the standing answer to "is this about my patient?" — but it is
+   the one label that stops a claim about the literature being read as a chart finding. */
+.cp-scope {
+  flex: none; display: inline-flex; align-items: center;
+  padding: 3px 10px; border-radius: 999px;
+  font-size: 0.72rem; font-weight: 600; letter-spacing: 0.01em;
+  color: #1e40af; background: #eff6ff; border: 1px solid #bfdbfe;
+}
+.cp-scope[hidden] { display: none; }
+
+/* ---------- the foot of a turn: its references and its next questions ---------- */
+.cp-turn-trail { display: flex; flex-direction: column; gap: 12px; margin-top: 14px; }
+
+/* The references drawer, closed by default. It exists to be opened by a reader who wants
+   to check a marker, not to be read through on the way past the answer. */
+.cp-references { font-size: 0.85rem; }
+.cp-references[hidden] { display: none; }
+.cp-references > summary {
+  width: fit-content; padding: 4px 0; cursor: pointer;
+  font-weight: 600; color: #475569; list-style: none;
+}
+.cp-references > summary::-webkit-details-marker { display: none; }
+.cp-references > summary::before { content: '› '; color: #94a3b8; }
+.cp-references[open] > summary::before { content: '⌄ '; }
+.cp-reference-list {
+  margin: 6px 0 0; padding: 0; list-style: none;
+  display: flex; flex-direction: column; gap: 10px;
+}
+/* The left rule is the whole audit trail: every row hangs off it in the order the
+   answer cites them, so the list reads as provenance rather than as a menu. */
+.cp-reference-item { padding-left: 12px; border-left: 2px solid #e2e8f0; }
+.cp-reference-head { font-weight: 600; color: #334155; }
+.cp-reference-link { display: block; margin-top: 3px; color: #1d4ed8; }
+.cp-reference-excerpt { margin: 6px 0 0; color: #475569; line-height: 1.55; }
+.cp-reference-excerpt[hidden] { display: none; }
+
+/* A note row is a control, not a label: it opens the passage behind the claim. */
+.cp-reference-toggle {
+  display: flex; align-items: baseline; gap: 12px; width: 100%;
+  padding: 0; border: 0; background: none; cursor: pointer;
+  font: inherit; color: inherit; text-align: left;
+}
+.cp-reference-toggle .cp-reference-head { flex: 1 1 auto; min-width: 0; }
+.cp-reference-toggle:hover .cp-reference-head { color: #1d4ed8; }
+.cp-reference-chevron { flex: none; color: #94a3b8; font-size: 1.05rem; line-height: 1; }
+.cp-reference-item.is-open .cp-reference-chevron { transform: rotate(90deg); }
+
+/* The follow-up rows: one control per row, full width, hairline-separated, with the
+   chevron saying what a click does. Disabled once one is taken — see `askFollowUp`. */
+.cp-follow-ups { display: flex; flex-direction: column; border-top: 1px solid #e2e8f0; }
+.cp-follow-ups[hidden] { display: none; }
+.cp-follow-up {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  padding: 11px 4px; border: 0; border-bottom: 1px solid #e2e8f0;
+  background: none; cursor: pointer; text-align: left;
+  font: inherit; font-size: 0.9rem; color: #1d4ed8;
+}
+.cp-follow-up:hover { color: #1e3a8a; }
+.cp-follow-up:disabled { color: #94a3b8; cursor: default; }
+.cp-follow-up-text { flex: 1 1 auto; min-width: 0; }
+.cp-follow-up-chevron { flex: none; color: #94a3b8; font-size: 1.05rem; line-height: 1; }
+
 /* ---------- application: the menu and the surface beside it ---------- */
 /* The shell becomes a row: the menu takes a fixed column, the working surface
    takes the rest. `.cp` stays a column for the front door and the sign-in form,

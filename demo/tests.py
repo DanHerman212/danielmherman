@@ -688,7 +688,7 @@ class A2uiConsolePageTests(TestCase):
         self.assertNotContains(response, 'id="a2ui-host"')
         # Cache-busted asset links, asserted exactly so a forgotten bump fails
         # here rather than serving a stale page out of a browser's cache.
-        self.assertContains(response, 'demo_shell.css?v=23')
+        self.assertContains(response, 'demo_shell.css?v=25')
         self.assertContains(response, 'copilot_shell.js')
         self.assertContains(response, 'copilot_app.js')
 
