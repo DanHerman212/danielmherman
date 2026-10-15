@@ -373,4 +373,62 @@
       form.removeAttribute('data-command');
     });
   }
+
+  // ---------- the box's own height, and what Enter does ----------
+  //
+  // The composer is a `<textarea>` rather than an `<input>`, which is what lets a long
+  // clinical question wrap and stay readable while it is being written instead of
+  // scrolling sideways out of sight. Two consequences arrive with that change and
+  // neither is free: a textarea does not size itself to its content, and it does not
+  // submit on Enter.
+
+  var composerCeiling = parseFloat(window.getComputedStyle(input).maxHeight) || 200;
+
+  /* The height of an empty box, measured once. Held rather than recomputed because the
+     empty box is the only moment its natural height is what the stylesheet says it is:
+     afterwards it is whatever the last measurement left behind. */
+  var composerBaseline = input.offsetHeight;
+
+  function autosize() {
+    // An empty box is one line, whatever its placeholder does. Sizing from
+    // `scrollHeight` first would let a placeholder long enough to wrap set the height of
+    // a box that is holding nothing — and on a narrow viewport this one wraps.
+    var empty = !input.value;
+    form.classList.toggle('is-empty', empty);
+    if (empty) {
+      input.style.height = '';
+      input.style.overflowY = 'hidden';
+      form.classList.remove('is-multiline');
+      return;
+    }
+    input.style.height = 'auto';
+    var wanted = Math.min(input.scrollHeight, composerCeiling);
+    input.style.height = wanted + 'px';
+    // Past the ceiling the box scrolls instead of growing, so the composer can never
+    // take the feed's height away from the answer it is asking about.
+    input.style.overflowY = input.scrollHeight > composerCeiling ? 'auto' : 'hidden';
+    // The bar is a pill while it holds one line, and a tall pill is a lozenge: the class
+    // relaxes the radius and drops the controls to the baseline once the text wraps.
+    form.classList.toggle('is-multiline',
+                          composerBaseline > 0 && wanted > composerBaseline + 1);
+  }
+
+  // The class is applied here rather than in the template so that it cannot disagree
+  // with the value the sizing was computed from.
+  autosize();
+  input.addEventListener('input', autosize);
+
+  /* Enter sends, Shift+Enter breaks the line — the opposite of what a `<textarea>` does
+     on its own, and the reason this handler exists at all.
+
+     It is bound to the form rather than to the box so that it runs after the `@` and
+     `/` menus have had their say: both claim Enter while they are open, and both mark
+     the event handled. Reading `defaultPrevented` is what stops a question being sent
+     at the moment the reader was still choosing the patient it is about. */
+  form.addEventListener('keydown', function (event) {
+    if (event.key !== 'Enter' || event.shiftKey || event.isComposing) return;
+    if (event.defaultPrevented) return;
+    event.preventDefault();
+    form.requestSubmit();
+  });
 })();

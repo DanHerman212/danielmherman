@@ -269,10 +269,17 @@ of the scroll area while its own answer passes beneath it.
       The composer: the `@` patient selector and the `/` command menu.
 
       The bar is the flex container. A chosen patient and a chosen command are
-      pills that are siblings of the input rather than children of it: an
-      `<input>` holds text and nothing else. Each pill shows what was chosen; a
-      hidden field carries its value (`hadm_id`, `chip`), so nothing has to be
-      parsed back out of the text box and what a submit would send is in the DOM.
+      pills that are siblings of the text box rather than children of it: a box that
+      holds text holds text and nothing else, so the bar is what holds both. Each pill
+      shows what was chosen; a hidden field carries its value (`hadm_id`, `chip`), so
+      nothing has to be parsed back out of the text box and what a submit would send is
+      in the DOM.
+
+      The box is a `<textarea>` with `rows="1"` rather than an `<input>`, so a long
+      question wraps and grows upward instead of scrolling sideways (Phase 4 §6).
+      Enter still sends and Shift+Enter breaks the line — that is script, because a
+      textarea would otherwise insert a newline. `aria-multiline` is deliberately not
+      set: it would tell assistive technology the opposite of what Enter does.
       {% endcomment %}
       <form class="cp-ask" id="cp-ask" role="search" autocomplete="off"
             data-submit="live"
@@ -286,10 +293,10 @@ of the scroll area while its own answer passes beneath it.
           </button>
         </span>
         <label class="cp-sr-only" for="cp-ask-input">Ask the copilot</label>
-        <input type="text" id="cp-ask-input" class="cp-ask-input"
+        <textarea id="cp-ask-input" class="cp-ask-input" rows="1"
                placeholder="Search for patient using @ command or /slash commands for agent requests"
                role="combobox" aria-expanded="false" aria-controls="cp-patient-list"
-               aria-autocomplete="list" aria-haspopup="listbox">
+               aria-autocomplete="list" aria-haspopup="listbox"></textarea>
         <input type="hidden" name="hadm_id" id="cp-patient-id" value="">
         <input type="hidden" name="chip" id="cp-command-intent" value="">
         <button type="submit" class="cp-send" aria-label="Send">
@@ -309,6 +316,6 @@ of the scroll area while its own answer passes beneath it.
 {% block extra_js %}
 <script src="{% static 'js/copilot_shell.js' %}?v=2"></script>
 <script src="{% static 'js/copilot_app.js' %}?v=4"></script>
-<script src="{% static 'js/copilot_composer.js' %}?v=2"></script>
-<script src="{% static 'js/copilot_canvas.js' %}?v=16"></script>
+<script src="{% static 'js/copilot_composer.js' %}?v=3"></script>
+<script src="{% static 'js/copilot_canvas.js' %}?v=20"></script>
 {% endblock %}

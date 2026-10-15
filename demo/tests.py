@@ -628,6 +628,13 @@ class A2uiConsolePageTests(TestCase):
         self.assertContains(response, 'class="cp-brand-name"')
         self.assertContains(response, 'id="cp-ask-input"')
         self.assertContains(response, 'class="cp-send"')
+        # The box is a textarea with one row, which is what lets a long question wrap
+        # and grow upward rather than scroll sideways out of sight (§6). An `<input>`
+        # satisfies the assertion above just as well, so the growth this feature is made
+        # of is pinned by type and by `rows`. What the box then does with its height is
+        # script, and script is verified in the browser rather than from here.
+        self.assertContains(response, '<textarea id="cp-ask-input"')
+        self.assertContains(response, 'rows="1"')
         # The `@` selector: the pill, the list it fills, and the lookup it calls.
         self.assertContains(response, 'class="patient-pill"')
         self.assertContains(response, 'id="cp-patient-list"')
@@ -681,7 +688,7 @@ class A2uiConsolePageTests(TestCase):
         self.assertNotContains(response, 'id="a2ui-host"')
         # Cache-busted asset links, asserted exactly so a forgotten bump fails
         # here rather than serving a stale page out of a browser's cache.
-        self.assertContains(response, 'demo_shell.css?v=20')
+        self.assertContains(response, 'demo_shell.css?v=23')
         self.assertContains(response, 'copilot_shell.js')
         self.assertContains(response, 'copilot_app.js')
 

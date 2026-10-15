@@ -164,12 +164,32 @@ button.cp-menu-item {
 .cp-ask-input {
   flex: 1; min-width: 0; padding: 10px 0;
   border: none; outline: none; background: transparent;
-  font: inherit; font-size: 1rem; color: #0f172a;
-  /* The placeholder is longer than a narrow viewport can show. The input is
-     already width-bounded by the flex row above, so the text is clipped at the
-     edge; the ellipsis is what makes the clipping read as deliberate. */
-  text-overflow: ellipsis;
+  font: inherit; font-size: 1rem; line-height: 1.45; color: #0f172a;
+  /* A `<textarea>`, not an `<input>`, so a long clinical question wraps and stays
+     readable while it is being written. `rows="1"` and this rule are what make the
+     one-line case look exactly as the input did. The ceiling lives here, once, and the
+     script reads it from here; the height itself is set from `scrollHeight`.
+
+     Past the ceiling the box scrolls internally rather than growing, so it can never
+     take the feed's height away from the answer it is asking about. */
+  display: block; resize: none; overflow-y: hidden;
+  max-height: 200px;
 }
+/* An empty box is one line, and the placeholder is longer than a narrow viewport can
+   show. `nowrap` with the ellipsis is what keeps that box one line and makes the
+   clipping read as deliberate — the same treatment the `<input>` had. The moment there
+   is something to read, the text wraps and the box grows instead. */
+.cp-ask.is-empty .cp-ask-input {
+  white-space: nowrap; text-overflow: ellipsis; overflow: hidden;
+}
+/* One line is a pill; several lines would make a lozenge, so the radius relaxes once the
+   box has wrapped. The send button drops to the baseline with the last line, because
+   that is where the reader's eye is. The patient pill centres against the whole box
+   instead: it names what the question is about rather than belonging to its last line,
+   and against a half-screen-tall composer a pill pinned to the bottom reads as though it
+   had slid out of place. */
+.cp-ask.is-multiline { align-items: flex-end; border-radius: 24px; }
+.cp-ask.is-multiline .patient-pill { align-self: center; }
 /* A placeholder is drawn by the browser rather than as this element's own text,
    so the ellipsis has to be declared on the pseudo-element too. */
 .cp-ask-input::placeholder { color: #94a3b8; text-overflow: ellipsis; }
@@ -338,12 +358,14 @@ button.cp-menu-item {
    past its left and right edges would read as text bleeding through. */
 .cp-turn-head {
   position: sticky; top: 0; z-index: 10;
+  display: flex; align-items: baseline; gap: 12px;
   margin: 0 -32px; padding: 16px 32px 10px;
   background: rgba(255, 255, 255, 0.92);
   -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
 }
 .cp-turn-title {
+  flex: 1 1 auto; min-width: 0;
   margin: 0; font-size: 1rem; font-weight: 600; line-height: 1.45;
   color: #0f172a; letter-spacing: -0.005em;
 }
@@ -356,20 +378,23 @@ button.cp-menu-item {
 .cp-canvas:empty { display: none; }
 
 .cp-answer-text { font-size: 0.95rem; line-height: 1.65; color: #0f172a; }
-.cp-answer-text p { margin: 0 0 0.9em; }
+.cp-answer-text p { margin: 0 0 0.75rem; }
 .cp-answer-error {
   margin: 0; padding: 10px 14px; font-size: 0.88rem; color: #991b1b;
   background: #fef2f2; border: 1px solid #fecaca; border-radius: 10px;
 }
 
-/* The Evidence-Check notice: shown only when a guardrail removed something from prose
-   the reader has already watched arrive. Amber rather than red — the answer is not
-   broken, it is corrected — and it belongs to the turn rather than to the run, which
-   is why it is not the status row: the footer is retired when the run ends, and a
-   correction the reader is owed has to outlive the thing that announced it. */
+/* The verification notice: a quiet pill beside the question rather than a banner over
+   the answer. Muted slate, not amber — the previous full-width amber box read as a
+   hazard alarm for what is a routine reconciliation against the record. `cursor: help`
+   is the only affordance it needs, because the title carries the full account of what
+   was removed. */
 .cp-evidence {
-  margin: 10px 0 0; padding: 9px 13px; font-size: 0.85rem;
-  color: #78350f; background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px;
+  flex: none; display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 10px; border-radius: 999px;
+  font-size: 0.75rem; font-weight: 500; color: #475569;
+  background: #f1f5f9; border: 1px solid #e2e8f0;
+  cursor: help;
 }
 .cp-evidence[hidden] { display: none; }
 

@@ -28,7 +28,13 @@
    this file acts on: a `visible` swap replaces the text and says so in the turn's
    Evidence-Check notice, because a dose or a probability that appears on screen and is
    then withdrawn is something the reader is owed rather than something to tidy up
-   quietly. A `silent` swap reconciles without comment — nothing was taken away. */
+   quietly. A `silent` swap reconciles without comment — nothing was taken away.
+
+   Characters arrive faster than they can be read, so they are released to the screen
+   at a reading cadence. That pacing lives here and nowhere earlier: a byte held at the
+   agent or at the Django proxy would buy smoothness with time to first token, which is
+   the one number worth protecting. Held at the last stop before the DOM, the answer
+   arrives as fast as the network allows and is drawn at a speed a person can follow. */
 (function () {
   'use strict';
 
@@ -185,6 +191,34 @@
     return found;
   }
 
+  // --- streaming cadence (Phase 4 §1.4) ------------------------------------------
+
+  /* The cadence the draft is drawn at, once it is here.
+
+     The baseline is a reading speed rather than a wire speed: 45 characters a second
+     is conversational prose read aloud. It is deliberately slower than the model
+     writes, and that is the point — a paced draft is one the reader actually reads,
+     which is also why the swap protocol now has a reader who has read the span that
+     may be withdrawn.
+
+     Two things follow. A long synthesis would leave the reader hundreds of characters
+     behind the model, so a backlog past `catchUpQueue` drains at
+     `catchUpMultiplier`; and when the settled answer lands it replaces the draft
+     outright, so the tail is never something the reader has to wait out. */
+  var PACING = {
+    charsPerSecond: 45,
+    catchUpQueue: 350,
+    catchUpMultiplier: 3,
+    tickMs: 40,
+  };
+
+  /* Reduced motion skips the pacing rather than shortening it — the request is for no
+     animated text, not for faster animated text. Read on each use rather than once,
+     because the setting can change while the page is open. */
+  var reduceMotion = window.matchMedia
+    ? window.matchMedia('(prefers-reduced-motion: reduce)')
+    : { matches: false };
+
   // --- one turn -----------------------------------------------------------------
 
   /* One turn: the question, whatever that turn drew, and the run while it runs.
@@ -196,6 +230,23 @@
   function createTurn(asked) {
     var root = el('article', 'cp-turn');
 
+    /* The verification notice, present in every turn and shown only by the one case that
+       earns it. It sits in the heading beside the question rather than over the answer:
+       it is a note about the turn, not a banner across what the clinician is reading.
+
+       The full account lives on the title so the pill can stay small without
+       withholding it — the label says a check was applied, and the hover says what it
+       did. Built here, before the heading, because the heading is where it goes; the
+       footer would not do, because the footer is retired when the run ends, and the
+       heading is the one part of a turn that outlives the run. */
+    var evidence = el('span', 'cp-evidence');
+    evidence.setAttribute('role', 'status');
+    evidence.setAttribute(
+      'title',
+      'Part of what was shown while this answer was being written was removed after it '
+        + 'was checked against the record. The answer below is the verified version.');
+    evidence.hidden = true;
+
     // A heading, not a toggle. A clinician must never have to click to read an
     // earlier turn, so there is nothing here to click: the question is text, and the
     // stylesheet pins it to the top of the scroll area while its answer passes
@@ -205,19 +256,13 @@
     title.className = 'cp-turn-title';
     title.textContent = asked || '';
     head.appendChild(title);
+    head.appendChild(evidence);
 
     var body = el('div', 'cp-turn-body');
     var answerSection = el('section', 'cp-answer');
     var canvas = el('div', 'cp-canvas');
     var prose = el('div', 'cp-answer-text');
-    /* The Evidence-Check notice, present in every turn and shown only by the one case
-       that earns it. It lives here rather than in the footer because the footer is
-       retired when the run ends, and this note is about the answer that outlives the
-       run — a correction the reader has to still be able to see after the fact. */
-    var evidence = el('div', 'cp-evidence');
-    evidence.setAttribute('role', 'status');
-    evidence.hidden = true;
-    answerSection.append(canvas, prose, evidence);
+    answerSection.append(canvas, prose);
     body.appendChild(answerSection);
 
     /* The run, while it is running. The dots say it is still going and the label
@@ -272,6 +317,10 @@
     }
 
     function say(message, isError) {
+      // The settled answer is the authority on this turn's text, so it is written over
+      // the draft and the draft's remainder is dropped rather than drained. A character
+      // released after this line would append to the settled answer and corrupt it.
+      stopPacing();
       prose.textContent = message;
       if (isError) prose.classList.add('cp-answer-error');
       // No correction to the status row here: every path that reports a failure also
@@ -279,21 +328,137 @@
       // a detached node would be a line that runs and does nothing.
     }
 
-    /* The answer as it is written. `say` replaces, which is what a settled answer
-       needs; a delta appends, which is what a stream of them needs. Both write the same
-       node, so the reader watches one body of text grow rather than a second one
-       appear beside it — and the settled answer overwrites the lot, so a delta that
-       arrived after the answer cannot survive it. */
+    /* The answer as it is written, held to a reading cadence.
+
+       `say` replaces, which is what a settled answer needs; a delta appends, which is
+       what a stream of them needs. Both write the same node, so the reader watches one
+       body of text grow rather than a second one appear beside it — and the settled
+       answer overwrites the lot, so a delta that arrived after the answer cannot
+       survive it.
+
+       The queue exists because the two speeds do not match: the model emits in a few
+       seconds what takes half a minute to read. Draining it on a timer is what turns
+       the arrival into a cadence. */
+    var pending = '';         // received, not yet drawn
+    var ticker = null;        // the drain timer, alive only while there is a backlog
+    var budget = 0;           // fractional characters carried between ticks
+    var releasePrefix = true; // the agent's held lookahead, drawn on the first tick
+
+    function draw(text) {
+      prose.appendChild(document.createTextNode(text));
+    }
+
+    /* Markdown emphasis and citation markers are both markup, and the draft is a draft of
+       the text rather than of its markup. `**Hospital course.**` reaches the reader as
+       literal asterisks and `^[1]` as three literal characters, and both become bold and
+       a citation pill a moment later when the answer settles. The words are drawn now and
+       the markup is applied at settle, which is the smaller of the two visible changes.
+
+       A marker that has not closed is held rather than drawn: `^[1` is not a citation
+       until its bracket arrives, and drawing it would put raw syntax in front of the
+       reader only to delete it on the next tick — the flash this exists to prevent. The
+       held fragment goes back on the queue and is drawn, or stripped, when the rest of
+       it lands.
+
+       Only the draft is affected. What the guardrails compared, and what the settled
+       answer is rendered from, is the server's own text and never this. */
+    var OPEN_MARKER = /\^(\[[^\]]*)?$/;
+    function drawn(text) {
+      var open = OPEN_MARKER.exec(text);
+      var hold = '';
+      if (open) {
+        hold = open[0];
+        text = text.slice(0, open.index);
+      }
+      return {
+        text: text.replace(/\*/g, '').replace(/\^\[[^\]]*\]/g, ''),
+        hold: hold,
+      };
+    }
+
+    function stopPacing() {
+      if (ticker !== null) {
+        window.clearInterval(ticker);
+        ticker = null;
+      }
+      pending = '';
+      budget = 0;
+    }
+
+    function drain() {
+      if (!pending) {
+        if (ticker !== null) {
+          window.clearInterval(ticker);
+          ticker = null;
+        }
+        budget = 0;
+        return;
+      }
+      // The lookahead the agent holds is released in one burst, and holding it a
+      // second time here would spend on the first paint exactly the latency that hold
+      // was paid to avoid. Everything that arrived with it is drawn now; the cadence
+      // governs what comes after. Once per turn, not once per drain: after a pause in
+      // the stream the queue refills a delta at a time, and those are paces apart.
+      if (releasePrefix) {
+        releasePrefix = false;
+        var burst = drawn(pending);
+        draw(burst.text);
+        pending = burst.hold;
+        budget = 0;
+        return;
+      }
+      var rate = PACING.charsPerSecond;
+      if (pending.length > PACING.catchUpQueue) {
+        rate *= PACING.catchUpMultiplier;
+      }
+      budget += rate * (PACING.tickMs / 1000);
+      var take = Math.floor(budget);
+      if (take < 1) return;
+      if (take > pending.length) take = pending.length;
+      var paced = drawn(pending.slice(0, take));
+      // Only what was actually drawn is consumed. A held fragment stays at the front of
+      // the queue, so the next tick draws it together with whatever follows it.
+      var consumed = take - paced.hold.length;
+      if (consumed < 1) return;
+      draw(paced.text);
+      pending = pending.slice(consumed);
+      budget -= consumed;
+    }
+
     function appendProse(piece) {
-      prose.appendChild(document.createTextNode(piece));
+      if (reduceMotion.matches) {
+        // No cadence, but the same filtering: everything that is not the fragment of an
+        // unclosed marker is drawn at once, and that fragment waits for its bracket.
+        pending += piece;
+        var whole = drawn(pending);
+        draw(whole.text);
+        pending = whole.hold;
+        return;
+      }
+      pending += piece;
+      if (ticker === null) ticker = window.setInterval(drain, PACING.tickMs);
+    }
+
+    /* Whether this turn holds any prose at all, drawn or still queued. The caller needs
+       the difference: a turn whose stream ended without an answer frame is a failure,
+       but a turn with characters still waiting to be drawn is a draft, and treating it
+       as a failure would replace a partial answer with an apology. */
+    function hasProse() {
+      return prose.textContent.length > 0 || pending.length > 0;
     }
 
     /* What the server said about the prose it announced, once it settled. `visible`
-       means a guardrail removed something from what the reader has just read. */
+       means a guardrail removed something from what the reader has just read.
+
+       The wording is deliberately quiet and the detail is on the title. The previous
+       text stated outright that part of the answer had been removed; that is the fact,
+       but a full-width amber box stating it read as a hazard alarm for what is a routine
+       reconciliation against the record. What has NOT changed is that the reader is
+       told: the pill appears for this case and no other, and says on hover exactly what
+       happened. */
     function settleProse(swap) {
       if (swap !== 'visible') return;
-      evidence.textContent = 'Corrected after verification: part of what was shown while '
-        + 'this answer was being written was removed.';
+      evidence.textContent = '🛡️ Reconciled with medical record';
       evidence.hidden = false;
     }
 
@@ -306,6 +471,7 @@
       restore: restore,
       say: say,
       appendProse: appendProse,
+      hasProse: hasProse,
       settleProse: settleProse,
       answer: function (message) { say(message || ''); },
     };
@@ -338,6 +504,22 @@
     return rendererPromise;
   }
 
+  /* The markdown provider the surface reads, wrapped to space its paragraphs.
+
+     The surface renders inside nested shadow roots, so no rule in `demo_shell.css` can
+     reach the paragraphs it produces — and the element it emits carries no margin of
+     its own, which is why consecutive sections rendered flush against each other. The
+     spacing therefore has to travel with the HTML: an inline style is the one thing a
+     shadow boundary does not filter.
+
+     Applied after the renderer's own sanitizer has run, and to a literal this file owns
+     — nothing that came from the model or the user passes through this substitution. */
+  function proseMarkdown(value) {
+    return renderer.module.renderMarkdown(value).then(function (html) {
+      return String(html).replace(/<p>/g, '<p style="margin:0 0 0.75rem">');
+    });
+  }
+
   /* Mount one turn's envelope into that turn's canvas host.
 
      The markdown provider sits on the host: the basic Text component renders
@@ -347,7 +529,7 @@
     var sceneRenderer = await scene();
     new sceneRenderer.module.ContextProvider(host, {
       context: sceneRenderer.module.Context.markdown,
-      initialValue: sceneRenderer.module.renderMarkdown,
+      initialValue: proseMarkdown,
     });
     // A fresh processor per turn: reusing one would carry the previous surface into
     // the new one and draw both.
@@ -957,6 +1139,10 @@
       input.value = '';
       input.setSelectionRange(0, 0);
       input.focus();
+      // Clearing a field in code fires no `input` event, and the composer sizes itself
+      // from that event — so without this the box would keep the height of the question
+      // it just sent instead of collapsing back to one line.
+      input.dispatchEvent(new Event('input', { bubbles: true }));
     }
 
     try {
@@ -1015,7 +1201,7 @@
         // The list is re-read because asking about a new patient is what creates their
         // thread, so the sidebar is one patient out of date otherwise.
         loadThreads();
-      } else if (!block.prose.textContent) {
+      } else if (!block.hasProse()) {
         block.finish();
         block.say('The clinical copilot is unavailable. Please try again.', true);
       }

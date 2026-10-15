@@ -20,7 +20,7 @@ from axes.models import AccessAttempt
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
 from content.models import Project
 
@@ -62,6 +62,20 @@ class AxesLockoutTests(TestCase):
         cache.clear()
         super().tearDown()
 
+    # The login page extends the shell, which links its stylesheet through `{% static %}`.
+    # Under the production STORAGES backend that call is a manifest lookup, and the test
+    # environment has no manifest — so rendering the page raised before this test could
+    # assert anything about lockout, and the failure looked like an axes problem rather
+    # than a storage one. Swapped for the plain backend, which resolves paths without a
+    # manifest, exactly as `LandingPageTests` already does for the same reason.
+    @override_settings(
+        STORAGES={
+            **settings.STORAGES,
+            "staticfiles": {
+                "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"
+            },
+        }
+    )
     def test_login_locks_out_after_failure_limit(self):
         User = get_user_model()
         User.objects.create_user(username='axes-target', password='correct-pw')
