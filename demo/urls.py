@@ -24,6 +24,8 @@ urlpatterns = [
          name='conversation_pin'),
     path('a2ui/conversations/<int:pk>/delete/', views.conversation_delete,
          name='conversation_delete'),
+    # How the reader rated a turn. Logged, not stored: see `views.feedback`.
+    path('api/feedback/', views.feedback, name='feedback'),
     # Demo User Guide — static, journey-structured.
     path('guide/', guide_views.guide, name='guide'),
 ]

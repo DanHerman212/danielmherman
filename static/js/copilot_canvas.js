@@ -64,12 +64,18 @@
   var rendererUrl = feed.getAttribute('data-renderer-url');
   var conversationBase = feed.getAttribute('data-conversation-url');
   var historyUrl = feed.getAttribute('data-history-url');
+  var feedbackUrl = feed.getAttribute('data-feedback-url');
   var retentionDays = feed.getAttribute('data-retention-days');
   if (!askUrl) return;
 
   var renderer = null;          // resolved on the first answer, then reused
   var rendererPromise = null;   // one import, however many turns ask for it
   var inFlight = false;
+
+  /* Turns carry no server id in the browser, so one is minted here: the conversation it
+     belongs to and its ordinal within that conversation. Stable for as long as the
+     thread is on screen, which is as long as a rating can be given. */
+  var turnOrdinal = 0;
 
   /* The thread on screen, and the patient it belongs to. Both are kept because a
      request sends the id and the admission, and the two have to agree: the server
@@ -227,6 +233,96 @@
      two turns cannot reach into each other, and nothing in here is addressed by a
      page-wide id — a conversation holds several canvases and several status rows at
      once. */
+  /* A rating is a telemetry event, not a stored record. It is sent with the turn it
+     belongs to so a later evals pass can join it to a trace, and nothing waits on the
+     answer: a reader who rates and closes the tab is the normal case, and `keepalive` is
+     what lets the request outlive the page. */
+  function postFeedback(turnId, score) {
+    if (!feedbackUrl) return;
+    fetch(feedbackUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': csrfToken(),
+      },
+      body: JSON.stringify({
+        turn_id: turnId, score: score, timestamp: Date.now(),
+      }),
+      keepalive: true,
+    }).catch(function () {
+      // A rating that could not be sent is not worth an error in the reader's face.
+    });
+  }
+
+  function markChosen(chosen) {
+    [].forEach.call(chosen.parentNode.children, function (sibling) {
+      sibling.classList.remove('is-chosen');
+    });
+    chosen.classList.add('is-chosen');
+  }
+
+  /* One control in the turn's action strip: an outline glyph and a tooltip.
+
+     Outline rather than filled, and the same muted grey as the rest of the turn's
+     chrome, so the row reads as an affordance beside the answer rather than as a
+     reaction to it. The label lives on `title` and `aria-label` both — the glyph is
+     the whole visible control, so the accessible name cannot be the glyph. */
+  function iconButton(glyph, label) {
+    var button = el('button', 'cp-turn-action');
+    button.type = 'button';
+    var icon = document.createElement('i');
+    icon.className = 'fa-regular ' + glyph;
+    icon.setAttribute('aria-hidden', 'true');
+    button.appendChild(icon);
+    button.title = label;
+    button.setAttribute('aria-label', label);
+    return button;
+  }
+
+  function ratingButton(glyph, label, score, turnIdOf) {
+    var button = iconButton(glyph, label);
+    button.addEventListener('click', function () {
+      postFeedback(turnIdOf(), score);
+      markChosen(button);
+    });
+    return button;
+  }
+
+  /* Confirmation on the control itself, so the strip does not gain a second element:
+     the glyph becomes a check for a moment and returns, which also leaves the button
+     ready to be used again. */
+  function flash(button, className) {
+    if (button.dataset.busy) return;
+    button.dataset.busy = '1';
+    var icon = button.querySelector('i');
+    var was = icon ? icon.className : '';
+    if (icon) icon.className = className;
+    window.setTimeout(function () {
+      if (icon) icon.className = was;
+      delete button.dataset.busy;
+    }, 1400);
+  }
+
+  function copyButton(source) {
+    var button = iconButton('fa-copy', 'Copy this answer');
+    button.addEventListener('click', function () {
+      var text = source ? source.textContent : '';
+      if (!text) return;
+      // Clipboard access can be refused — an insecure origin, a denied permission — and
+      // a copy that silently did nothing is worse than one that admits it.
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () {
+          flash(button, 'fa-solid fa-check');
+        }, function () {
+          flash(button, 'fa-solid fa-triangle-exclamation');
+        });
+      } else {
+        flash(button, 'fa-solid fa-triangle-exclamation');
+      }
+    });
+    return button;
+  }
+
   function createTurn(asked) {
     var root = el('article', 'cp-turn');
 
@@ -269,14 +365,49 @@
     var prose = el('div', 'cp-answer-text');
     answerSection.append(canvas, prose);
 
-    /* The records the markers resolve to, and the next questions. Both are chrome under
-       the answer rather than part of it, and both are absent on most turns. */
+    /* The records the markers resolve to, the next questions, and what the reader
+       thought of the answer. All three are chrome under the answer rather than part of
+       it, and all three are absent on most turns. */
     var trail = el('div', 'cp-turn-trail');
     var references = el('details', 'cp-references');
     references.hidden = true;
     var followUps = el('div', 'cp-follow-ups');
     followUps.hidden = true;
-    trail.append(references, followUps);
+
+    /* What the reader thought of this answer, and a copy of it.
+
+       Held in the trail rather than in the status footer, because the footer does not
+       survive the run: `retire` removes it the moment the answer is settled, and a
+       rating control that vanishes as the answer lands is one nobody can use. The rule
+       is the same one the Evidence-Check notice follows, and for the same reason — the
+       parts of a turn that outlive the run are the heading and the trail. */
+    var actions = el('div', 'cp-turn-actions');
+    actions.hidden = true;
+    /* A turn's own id is composed when a rating is sent, not when the turn is built.
+
+       The conversation's id arrives with the first answer rather than before it, so a
+       turn that minted its id on creation logged `unsaved:1` — a rating that identifies
+       nothing and cannot be joined to a trace, which is the only thing it is for. */
+    var ordinal = ++turnOrdinal;
+    function thisTurnId() {
+      return (conversationId || 'unsaved') + ':' + ordinal;
+    }
+    actions.append(
+      ratingButton('fa-thumbs-up', 'Helpful answer', 1, thisTurnId),
+      ratingButton('fa-thumbs-down', 'Unhelpful answer', -1, thisTurnId),
+      copyButton(prose)
+    );
+
+    trail.append(references, followUps, actions);
+
+    /* A clicked risk driver asks its own question, through the same door a clicked
+       follow-up row uses. The event is composed, so it leaves the renderer's shadow
+       root and arrives here; the alternative — reaching into that root for the click —
+       would couple this file to a component's internals. */
+    canvas.addEventListener('a2ui-follow-up', function (event) {
+      var question = event.detail && event.detail.question;
+      if (question) askFollowUp(question, []);
+    });
 
     body.append(answerSection, trail);
 
@@ -320,6 +451,11 @@
        and the hairline that closes the turn already separates it from the next one. */
     function retire() {
       if (foot.parentNode) foot.remove();
+      // The run is over and the turn is settled. Both paths land here — `finish` for a
+      // live run, `restore` for a turn read back from the store — so this is the one
+      // place that means "the answer is final", which is the moment a rating becomes a
+      // statement about an answer rather than about a question.
+      actions.hidden = false;
     }
 
     function stage(label) {

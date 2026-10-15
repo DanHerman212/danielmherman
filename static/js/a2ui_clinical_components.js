@@ -106,6 +106,13 @@ const INFLUENCER_STYLES = css`
      the bar carries magnitude only, so it must not borrow the band's colour and
      imply it is asserting direction or threshold state (see the UX rulings). */
   .bar-fill { height: 8px; border-radius: 999px; background: #64748b; }
+  /* A driver is a control now. It stays a div carrying a button role rather than
+     becoming a <button>, because the row's children are blocks and a button may hold
+     only phrasing content — which would mean re-declaring the label and the bar as
+     spans and rebuilding a layout this stylesheet already gets right. */
+  .factor { cursor: pointer; border-radius: 6px; transition: background 120ms ease; }
+  .factor:hover { background: rgba(100, 116, 139, 0.07); }
+  .factor:focus-visible { outline: 2px solid #1f2937; outline-offset: 2px; }
   .mismatch { font-size: 0.75rem; font-style: italic; margin-top: 10px; opacity: 0.8; }
   /* An empty group is a state, not a fault. Italic and muted so it recedes instead
      of reading as a factor whose value failed to arrive. */
@@ -129,6 +136,16 @@ const RiskInfluencersApi = {
     })),
   }).strict(),
 };
+
+/* The question a clicked driver asks.
+
+   Composed here because this is the only place that knows the factor's name. It asks
+   what supports the driver rather than restating it: the bar already shows how much the
+   factor moved the estimate, and a question built from that number would be arithmetic
+   the reader did not ask for. */
+function driverQuestion(label) {
+  return `What in this patient's chart explains ${label} as a readmission risk driver?`;
+}
 
 class RiskInfluencersElement extends A2uiLitElement {
   static styles = INFLUENCER_STYLES;
@@ -163,13 +180,37 @@ class RiskInfluencersElement extends A2uiLitElement {
     // one group look like the largest of the other.
     const widest = Math.max(...factors.map((f) => Math.abs(f.contribution)), 0);
 
+    /* Each driver is a control, not a label. The number says how much a factor moved
+       the estimate and the only useful next question is what stands behind it, so the
+       row asks that question when it is clicked.
+
+       The event is `composed` because it has to leave this shadow root. The composer
+       is outside it, and the canvas listens for this rather than reaching in here for
+       the click — the same direction of travel the citation markers use, for the same
+       reason. */
+    const ask = (row) => {
+      this.dispatchEvent(new CustomEvent('a2ui-follow-up', {
+        bubbles: true,
+        composed: true,
+        detail: { question: driverQuestion(row.label) },
+      }));
+    };
+
     const group = (title, rows) => html`
       <div class="group">
         <div class="group-title">${title}</div>
         ${rows.length === 0
           ? html`<div class="empty">None.</div>`
           : rows.map((row) => html`
-              <div class="factor">
+              <div class="factor" role="button" tabindex="0"
+                   title="Ask what supports ${row.label} as a driver"
+                   @click=${() => ask(row)}
+                   @keydown=${(event) => {
+                     if (event.key === 'Enter' || event.key === ' ') {
+                       event.preventDefault();
+                       ask(row);
+                     }
+                   }}>
                 <div class="factor-label">${row.label}</div>
                 <div class="bar-track">
                   <div class="bar-fill"

@@ -298,6 +298,73 @@ class A2uiFixtureContractTests(TestCase):
             'The literature search returned no records for this question.')
 
 
+class FeedbackEndpointTests(TestCase):
+    """How a clinician rated a turn: telemetry, and it must never fail the reader.
+
+    There is no table behind it, so what these tests hold is the contract rather than
+    the storage: 204 with no body in every case, and a log line that a later evals pass
+    can join to a stored turn. The refusals are for the two things an unauthenticated
+    GET is, and nothing else is refused — a reader has already moved on by the time we
+    would be telling them their thumbs-up was malformed.
+    """
+
+    def setUp(self):
+        self.user = User.objects.create_user('rater', password='x')
+        self.client.force_login(self.user)
+        self.url = reverse('demo:feedback')
+
+    def _rate(self, payload):
+        return self.client.post(self.url, data=json.dumps(payload),
+                                content_type='application/json')
+
+    def test_a_rating_is_logged_and_answered_with_no_body(self):
+        with self.assertLogs('demo.views', level='INFO') as captured:
+            response = self._rate({'turn_id': 'c1:1', 'score': 1, 'timestamp': 123})
+
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(response.content)
+        joined = ' '.join(captured.output)
+        self.assertIn('c1:1', joined)
+        self.assertIn('+1', joined)
+
+    def test_a_negative_rating_is_logged_as_negative(self):
+        with self.assertLogs('demo.views', level='INFO') as captured:
+            self._rate({'turn_id': 'c1:2', 'score': -1, 'timestamp': 1})
+
+        self.assertIn('-1', ' '.join(captured.output))
+
+    def test_an_unreadable_score_is_accepted_and_ignored(self):
+        """Accepted, not refused. The reader has moved on; a 400 helps nobody.
+
+        `True` is in the list because `bool` is an `int` in Python, so a naive check
+        would have recorded it as a rating of +1.
+        """
+        for bad in ('yes', 0, 7, True, None, 1.0):
+            with self.subTest(score=bad):
+                with self.assertLogs('demo.views', level='INFO') as captured:
+                    response = self._rate({'turn_id': 'c1:3', 'score': bad})
+
+                self.assertEqual(response.status_code, 204)
+                self.assertIn('ignored', ' '.join(captured.output))
+
+    def test_a_malformed_body_is_not_an_error(self):
+        with self.assertLogs('demo.views', level='INFO'):
+            response = self.client.post(self.url, data='not json',
+                                        content_type='application/json')
+
+        self.assertEqual(response.status_code, 204)
+
+    def test_a_get_is_refused(self):
+        self.assertEqual(self.client.get(self.url).status_code, 405)
+
+    def test_an_anonymous_rating_is_refused(self):
+        self.client.logout()
+
+        response = self._rate({'turn_id': 'x', 'score': 1})
+
+        self.assertEqual(response.status_code, 302)
+
+
 class ConversationStoreTests(TestCase):
     """The conversation store enforces the policy, not just the schema."""
 
@@ -724,7 +791,7 @@ class A2uiConsolePageTests(TestCase):
         self.assertNotContains(response, 'id="a2ui-host"')
         # Cache-busted asset links, asserted exactly so a forgotten bump fails
         # here rather than serving a stale page out of a browser's cache.
-        self.assertContains(response, 'demo_shell.css?v=25')
+        self.assertContains(response, 'demo_shell.css?v=27')
         self.assertContains(response, 'copilot_shell.js')
         self.assertContains(response, 'copilot_app.js')
 

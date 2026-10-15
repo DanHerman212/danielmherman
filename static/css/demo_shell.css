@@ -461,6 +461,33 @@ button.cp-menu-item {
 .cp-follow-up-text { flex: 1 1 auto; min-width: 0; }
 .cp-follow-up-chevron { flex: none; color: #94a3b8; font-size: 1.05rem; line-height: 1; }
 
+/* What the reader thought of a settled turn, and a copy of it.
+
+   Icon-only with a tooltip, the way a chat transcript does it: the affordance is learned
+   once and then costs nothing, where a labelled button would put three words of chrome
+   under every answer. Outline glyphs in the same muted grey as the turn's other chrome,
+   so the row reads as an affordance beside the answer rather than a reaction to it. */
+.cp-turn-actions { display: flex; align-items: center; gap: 2px; margin-top: 12px; }
+/* `display: flex` above beats the user agent's `[hidden] { display: none }`, so the
+   attribute the script sets to keep this strip hidden until the answer settles would
+   otherwise do nothing at all — and the controls would sit beside the live status row,
+   offering a rating for an answer that has not been written yet. */
+.cp-turn-actions[hidden] { display: none; }
+.cp-turn-action {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 28px; height: 28px; padding: 0 6px;
+  border: 0; border-radius: 6px; background: none; cursor: pointer;
+  font: inherit; font-size: 0.82rem; line-height: 1;
+  color: #8b949e; transition: color 120ms ease, background 120ms ease;
+}
+.cp-turn-action:hover { color: #24292f; background: #f3f4f6; }
+.cp-turn-action:focus-visible { outline: 2px solid #1f2937; outline-offset: 1px;
+                                color: #24292f; }
+/* The reader's own rating, held quietly. Not a badge and not a score shown back to them:
+   it is a record of what they said, and it stays re-choosable because a reader who
+   changes their mind is telling us something more useful than the first click was. */
+.cp-turn-action.is-chosen { color: #1f2937; background: #eef1f5; }
+
 /* ---------- application: the menu and the surface beside it ---------- */
 /* The shell becomes a row: the menu takes a fixed column, the working surface
    takes the rest. `.cp` stays a column for the front door and the sign-in form,

@@ -12,7 +12,7 @@ from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.db.models import F
-from django.http import JsonResponse, StreamingHttpResponse
+from django.http import HttpResponse, JsonResponse, StreamingHttpResponse
 from django.shortcuts import render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
@@ -966,3 +966,37 @@ def _streaming_ask(request, intent, trace, period, conversation=None, asked='',
     # exactly like no streaming at all.
     response['X-Accel-Buffering'] = 'no'
     return response
+
+
+@login_required
+@require_POST
+def feedback(request):
+    """How the reader rated one turn. Telemetry, and deliberately nothing more.
+
+    There is no table behind this and no migration with it: the event is written to the
+    log stream where the rest of a request's trace already goes, and a later evals pass
+    joins it to a stored turn by `turn_id`. A table here would mean a schema this phase
+    does not need and a second home for one event.
+
+    It never fails the reader. A malformed rating is logged and accepted, because the
+    reader has already moved on and there is nothing they could do about a 400 on a
+    thumbs-up. 204 either way, so the client has one case to handle rather than two.
+    """
+    try:
+        body = json.loads(request.body or b'{}')
+    except ValueError:
+        body = {}
+    if not isinstance(body, dict):
+        body = {}
+
+    turn_id = str(body.get('turn_id') or '')[:200]
+    score = body.get('score')
+    # `bool` is an `int` in Python, so an explicit exclusion: `True` is not a rating.
+    if isinstance(score, bool) or not isinstance(score, int) or score not in (-1, 1):
+        logger.info('a2ui feedback ignored turn=%s score=%r', turn_id or '-',
+                    body.get('score'))
+        return HttpResponse(status=204)
+
+    logger.info('a2ui feedback turn=%s score=%+d at=%s', turn_id or '-', score,
+                body.get('timestamp'))
+    return HttpResponse(status=204)
