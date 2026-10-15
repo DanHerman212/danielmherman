@@ -242,14 +242,15 @@ class A2uiFixtureContractTests(TestCase):
         self.assertEqual(body['source'], 'fixture')
         self.assertIn('remaining', body)
 
-    def test_fixture_mode_refuses_the_literature_chip_rather_than_faking_it(self):
-        """No captured PubMed payload exists, and inventing one is not an option.
+    def test_fixture_mode_answers_the_literature_chip_from_captured_records(self):
+        """`/pubmed` left FIXTURE_UNAVAILABLE_CHIPS when its records were captured.
 
-        The chip is on the console's list and in the live allowlist, so it arrives at
-        fixture mode as a *known* chip — which is exactly why the refusal has to be
-        explicit. Without it the flow falls through to "ask a specific question, or
-        use a starter chip" in reply to a chip the user just clicked, and a fixture
-        answer that looked like a real literature search would be worse still.
+        4B needs the Literature Risk Matrix to be demonstrable offline, and a demo that
+        depends on NCBI being reachable — and on nobody else having hit the rate limit
+        from the same address — is a demo that fails on stage. The records are real
+        PubMed records, captured once by the agent repository's
+        scripts/demo/capture_synthetic_literature_fixtures.py. The honesty marker is the
+        `source` field and the note, not a refusal.
         """
         response = self.client.post(
             reverse('demo:a2ui_ask'),
@@ -258,8 +259,43 @@ class A2uiFixtureContractTests(TestCase):
         )
         body = response.json()
 
-        self.assertEqual(body['error'], 'unsupported_in_fixture_mode')
-        self.assertIn('PubMed', body['message'])
+        self.assertNotIn('error', body)
+        self.assertEqual(body['source'], 'fixture')
+        # The records the answer rests on, passed through whole.
+        self.assertEqual(body['literature']['returned'], 10)
+        self.assertEqual(len(body['literature']['articles']), 10)
+        self.assertTrue(body['literature']['articles'][0]['pmid'])
+
+        # A literature turn swaps the risk widgets for the records rather than showing
+        # both: the question was about published evidence, not about this patient.
+        comps = body['a2ui']['messages'][1]['updateComponents']['components']
+        types = {c['component'] for c in comps}
+        self.assertIn('LiteratureList', types)
+        self.assertNotIn('RiskInfluencers', types)
+
+    def test_fixture_mode_never_invents_a_literature_synthesis(self):
+        """With no capture for the query, the answer states the absence.
+
+        The rule the refusal used to enforce has not gone away, it moved. Fixture mode
+        may now answer a literature chip, but it may never compose prose about abstracts
+        that nothing read — the live path's synthesis is written by a model reading the
+        records, and there is no model here. An empty result is a real answer and is
+        reported as one.
+        """
+        from unittest.mock import patch
+
+        with patch('demo.fixtures._captured_literature', return_value={}):
+            response = self.client.post(
+                reverse('demo:a2ui_ask'),
+                data=json.dumps({'hadm_id': 90000017, 'chip': 'literature'}),
+                content_type='application/json',
+            )
+        body = response.json()
+
+        self.assertNotIn('error', body)
+        self.assertEqual(
+            body['answer'],
+            'The literature search returned no records for this question.')
 
 
 class ConversationStoreTests(TestCase):

@@ -10,6 +10,12 @@ chips from captured payloads in demo/data/demo_fixtures/:
   - rag passages: SYNTHETIC — passages from the synthetic notes corpus, captured
     from the synthetic index once deployed. Until then, patients fall back to
     the honest-empty path below.
+  - literature records: LIVE — real PubMed records captured once by
+    `scripts/demo/capture_synthetic_literature_fixtures.py` in the agent repository,
+    so `/pubmed` answers offline without depending on NCBI being reachable or on a
+    shared IP not having hit the rate limit. Keyed by query, with no admission: the
+    tool takes none, because the same clinical question returns the same articles
+    whoever the patient is.
 
 The response shape is identical to the live agent's /ask response — including
 the full presentation contract (`a2ui`, `sources`) —
@@ -93,9 +99,13 @@ CHIPS = {
 CHIP_NAMES = tuple(CHIPS)
 
 # Chips whose answer needs a live service that captured payloads cannot stand in for.
-# Fixture mode says so rather than composing something that reads as though the feature
-# worked offline — the one thing fixtures must never do.
-FIXTURE_UNAVAILABLE_CHIPS = frozenset({'literature'})
+#
+# Empty as of 2026-10-15: `/pubmed` was the last member and it left when its records
+# were captured to disk. The set is kept rather than deleted because the rule it
+# enforces has not gone away — a chip added later that needs a live service belongs
+# here, and an empty set is a cheaper thing to add to than a deleted one is to
+# remember.
+FIXTURE_UNAVAILABLE_CHIPS = frozenset()
 
 # The slash commands the composer offers.
 #
@@ -129,6 +139,11 @@ _CHIP_QUERY = {
     'risk': 'sepsis and elevated lactate on broad-spectrum antibiotics',
     'meds': 'medications',
     'summarize': 'summarize the hospital course and discharge diagnosis',
+    # The condition `/pubmed` answers with in fixture mode. Three captures on disk
+    # cover the demo cohort's conditions; this names the one the chip uses, and the
+    # fixture note says so, because a chip that silently answered a different
+    # condition than the patient has would read as evidence about them.
+    'literature': 'congestive heart failure 30-day readmission risk',
 }
 
 
@@ -164,6 +179,35 @@ def _rag_response(hadm_id: int, query: str) -> dict:
     if captured and captured.get('hadm_id') == hadm_id:
         return captured
     return _empty_rag(hadm_id, query)
+
+
+@lru_cache(maxsize=1)
+def _captured_literature() -> dict[str, dict]:
+    """query-key -> captured search_literature response."""
+    out = {}
+    for path in FIXTURES_DIR.glob('literature_*.json'):
+        payload = json.loads(path.read_text())
+        out[payload['query']] = payload
+    return out
+
+
+def _literature_response(query: str) -> dict:
+    """A search_literature tool response: the captured records, or the honest empty.
+
+    The capture's own `provenance` key is dropped here. The live tool does not return
+    one, and the fixture response has to be a response the browser could not tell
+    apart from the live one — a key that appears only offline is exactly the
+    difference this module exists to prevent.
+    """
+    captured = _captured_literature().get(query)
+    if captured:
+        return {k: v for k, v in captured.items() if k != 'provenance'}
+    return {
+        'query': query,
+        'returned': 0,
+        'articles': [],
+        'note': 'No captured records for this query in fixture mode.',
+    }
 
 
 def _tool_call(name: str, args: dict, response: dict) -> dict:
@@ -222,6 +266,21 @@ def _compose_answer(chip: str, tool_calls: list[dict]) -> str:
             return f"{lead}: {labels}."
         return 'No supporting note passage was found for this question.'
 
+    if chip == 'literature':
+        literature = next((tc['response'] for tc in tool_calls
+                           if tc['name'] == 'search_literature'), None)
+        articles = (literature or {}).get('articles') or []
+        if not articles:
+            # The empty result is a real answer and says only what happened: the
+            # records a summary would rest on are not there, so no summary is made.
+            return ('The literature search returned no records for this question.')
+        # A caption, not a synthesis. The synthesis in the live path is written by a
+        # model reading the abstracts; nothing here reads them, and prose composed
+        # from a title list would be an assertion about the evidence that no one
+        # actually made. What the fixture can honestly state is what was retrieved.
+        return (f"{len(articles)} PubMed records were retrieved for this "
+                f"question.^[1]")
+
     return 'Ask a specific question, or use a starter chip.'
 
 
@@ -245,8 +304,9 @@ def fixture_ask(payload: dict) -> dict:
 
     if chip in FIXTURE_UNAVAILABLE_CHIPS:
         return {'error': 'unsupported_in_fixture_mode',
-                'message': 'Literature search runs against PubMed and has no '
-                           'offline fixture. Run with DEMO_FIXTURE_MODE=false.'}
+                'message': 'This chip needs a live service that captured '
+                           'payloads cannot stand in for. Run with '
+                           'DEMO_FIXTURE_MODE=false.'}
 
     try:
         hadm_id = int(hadm_id)
@@ -267,6 +327,12 @@ def fixture_ask(payload: dict) -> dict:
         tool_calls.append(_tool_call(
             'rag_search', {'hadm_id': hadm_id, 'query': query, 'top_k': 5},
             _rag_response(hadm_id, query)))
+    if chip == 'literature':
+        # No rag call beside it: a literature answer rests on the records, and the
+        # canvas swaps the risk widgets out for them rather than showing both.
+        query = _CHIP_QUERY[chip]
+        tool_calls.append(_tool_call(
+            'search_literature', {'query': query}, _literature_response(query)))
 
     question = CHIPS[chip]['question']
     answer = _compose_answer(chip, tool_calls)
