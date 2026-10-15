@@ -436,11 +436,7 @@
     toolbar.hidden = true;
     var copyAll = iconButton('fa-copy', 'Copy the answer');
     copyAll.addEventListener('click', function () { copyText(answerText(), copyAll); });
-    var exportAll = iconButton('fa-file-arrow-down', 'Export the table rows');
-    exportAll.addEventListener('click', function () {
-      copyText(structuredRows(latest && latest.a2ui), exportAll);
-    });
-    toolbar.append(copyAll, exportAll);
+    toolbar.append(copyAll);
 
     // A heading, not a toggle. A clinician must never have to click to read an
     // earlier turn, so there is nothing here to click: the question is text, and the

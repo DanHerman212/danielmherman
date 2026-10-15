@@ -278,32 +278,26 @@ const NARRATIVE_STYLES = css`
   .narrative { font-size: 0.95rem; line-height: 1.55; }
   .prose > :first-child { margin-top: 0; }
   .prose > :last-child { margin-bottom: 0; }
-  /* A section of the answer, named on its own line.
+  /* A section of the answer.
 
-     The narrative is one markdown string, so a section heading arrives as a paragraph
-     whose only content is a bold run. Set as a block, with the type a subheading earns:
-     the margin above closes the section before it, the smaller one below binds the
-     heading to the prose it names.
-
-     There is no class to hang this on, because the prose is written by a model from a
-     prompt rather than assembled here — so the rule keys on the shape of the paragraph
-     via :has. Where :has is unsupported the rule is ignored and the heading falls back
-     to the inline bold it renders as today, which is legible and is exactly why this is
-     a styling change and not an envelope-contract change. */
-  .prose > p:has(> strong:only-child) {
-    display: block;
+     The heading is a markdown heading, not a bold run. The first attempt keyed this on a
+     paragraph whose only child was a <strong>, and the model promptly bolded an entire
+     section — one strong holding the heading and every sentence under it — which that rule
+     then set at 600 weight in its whole. A level-2 heading cannot be misread that way:
+     markdown makes the heading a block element before this stylesheet ever sees it, so a
+     heading and the prose beneath it can never end up as one run of text. */
+  .prose > h1, .prose > h2, .prose > h3, .prose > h4 {
     font-size: 0.95rem;
     font-weight: 600;
-    margin-top: 1rem;
-    margin-bottom: 0.25rem;
+    line-height: 1.45;
+    color: #0f172a;
+    margin: 1.1rem 0 0.35rem;
   }
-  /* The bold is the heading's weight, not a second weight inside it. */
-  .prose > p:has(> strong:only-child) strong { font-weight: inherit; }
-  /* Re-asserted after the rule above, which would otherwise out-specify it and open the
-     answer with a gap. The heading that leads a turn should sit flush with its top. */
-  .prose > p:has(> strong:only-child):first-child { margin-top: 0; }
-  /* One rhythm for the prose the headings sit above. */
-  .prose > p { margin: 0 0 0.6rem; }
+  /* The heading that opens a turn sits flush with the top of the answer. */
+  .prose > h1:first-child, .prose > h2:first-child,
+  .prose > h3:first-child, .prose > h4:first-child { margin-top: 0; }
+  /* Enough air that two paragraphs read as two readings rather than one block. */
+  .prose > p { margin: 0 0 0.75rem; }
   .cite {
     font: inherit;
     font-size: 0.72em;

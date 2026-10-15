@@ -260,7 +260,7 @@ of the scroll area while its own answer passes beneath it.
     first paint needs it.
     {% endcomment %}
     <section class="cp-feed" id="cp-feed" aria-live="polite" aria-label="Conversation"
-             data-renderer-url="{% static 'js/bundled/a2ui_clinical.js' %}?v=3"
+             data-renderer-url="{% static 'js/bundled/a2ui_clinical.js' %}?v=4"
              data-conversation-url="{% url 'demo:conversation_detail' 0 %}"
              data-history-url="{% url 'demo:conversation_history' %}"
              data-feedback-url="{% url 'demo:feedback' %}"
@@ -318,5 +318,5 @@ of the scroll area while its own answer passes beneath it.
 <script src="{% static 'js/copilot_shell.js' %}?v=2"></script>
 <script src="{% static 'js/copilot_app.js' %}?v=4"></script>
 <script src="{% static 'js/copilot_composer.js' %}?v=3"></script>
-<script src="{% static 'js/copilot_canvas.js' %}?v=24"></script>
+<script src="{% static 'js/copilot_canvas.js' %}?v=25"></script>
 {% endblock %}
