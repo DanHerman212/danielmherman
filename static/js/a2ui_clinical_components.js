@@ -278,6 +278,32 @@ const NARRATIVE_STYLES = css`
   .narrative { font-size: 0.95rem; line-height: 1.55; }
   .prose > :first-child { margin-top: 0; }
   .prose > :last-child { margin-bottom: 0; }
+  /* A section of the answer, named on its own line.
+
+     The narrative is one markdown string, so a section heading arrives as a paragraph
+     whose only content is a bold run. Set as a block, with the type a subheading earns:
+     the margin above closes the section before it, the smaller one below binds the
+     heading to the prose it names.
+
+     There is no class to hang this on, because the prose is written by a model from a
+     prompt rather than assembled here — so the rule keys on the shape of the paragraph
+     via :has. Where :has is unsupported the rule is ignored and the heading falls back
+     to the inline bold it renders as today, which is legible and is exactly why this is
+     a styling change and not an envelope-contract change. */
+  .prose > p:has(> strong:only-child) {
+    display: block;
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin-top: 1rem;
+    margin-bottom: 0.25rem;
+  }
+  /* The bold is the heading's weight, not a second weight inside it. */
+  .prose > p:has(> strong:only-child) strong { font-weight: inherit; }
+  /* Re-asserted after the rule above, which would otherwise out-specify it and open the
+     answer with a gap. The heading that leads a turn should sit flush with its top. */
+  .prose > p:has(> strong:only-child):first-child { margin-top: 0; }
+  /* One rhythm for the prose the headings sit above. */
+  .prose > p { margin: 0 0 0.6rem; }
   .cite {
     font: inherit;
     font-size: 0.72em;
@@ -689,10 +715,11 @@ class CitedNarrativeElement extends A2uiLitElement {
     const citation =
       citations.find((entry) => Number(entry.index) === Number(digits)) ||
       citations.find((entry) => String(entry.pmid || '') === String(digits));
-    // What the marker says. On a literature turn it is the PMID, because the marker is
-    // an identifier the reader can act on rather than a count of evidence; on a note
-    // turn it is the index its popover answers to.
-    const label = citation?.pmid || digits;
+    // What the marker says, resolved by the server so the clinical vocabulary lives in one
+    // module: `1 · Hospital Course` on a note turn, the journal on a literature turn. The
+    // fallbacks are for a payload from an agent that predates the label — a bare number
+    // still answers its popover, so nothing breaks, it just reads the way it used to.
+    const label = citation?.label || citation?.pmid || digits;
 
     if (streaming) {
       const inert = document.createElement('span');
@@ -723,7 +750,7 @@ class CitedNarrativeElement extends A2uiLitElement {
     button.type = 'button';
     button.className = citation ? 'cite' : 'cite missing';
     button.dataset.cite = digits;
-    button.textContent = digits;
+    button.textContent = label;
     if (citation) {
       button.setAttribute('aria-haspopup', 'dialog');
       button.setAttribute('aria-expanded', 'false');
