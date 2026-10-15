@@ -323,6 +323,78 @@
     return button;
   }
 
+  /* Put text on the clipboard, and say on the control whether it worked.
+
+     Clipboard access can be refused — an insecure origin, a denied permission — and a
+     copy that silently did nothing is worse than one that admits it. An empty string
+     gets its own refusal: it means the turn carried nothing to copy, which is a
+     different failure from the browser saying no, and it must not look like success. */
+  function copyText(text, button) {
+    if (!text) {
+      flash(button, 'fa-solid fa-ban');
+      return;
+    }
+    if (!navigator.clipboard || !navigator.clipboard.writeText) {
+      flash(button, 'fa-solid fa-triangle-exclamation');
+      return;
+    }
+    navigator.clipboard.writeText(text).then(function () {
+      flash(button, 'fa-solid fa-check');
+    }, function () {
+      flash(button, 'fa-solid fa-triangle-exclamation');
+    });
+  }
+
+  /* The turn's structured rows as tab-separated text, or '' when it drew none.
+
+     Tab rather than comma: a clinical value may contain a comma and may not contain a
+     tab, so the delimiter cannot collide with a field. Read from the surface the agent
+     composed rather than from the DOM, because the DOM is where these rows are drawn,
+     not where they are defined — a reader who exports a grid should get the rows the
+     tool returned, not what the widget happened to paint.
+
+     One block per structured component, blank line between, so a turn carrying more
+     than one table exports as more than one table rather than as one run-on sheet. */
+  function structuredRows(surface) {
+    var messages = (surface || {}).messages;
+    var components = messages && messages[1] && messages[1].updateComponents
+      && messages[1].updateComponents.components;
+    if (!Array.isArray(components)) return '';
+
+    var key = function (value) { return String(value == null ? '' : value); };
+    var blocks = [];
+
+    components.forEach(function (component) {
+      var rows = null;
+      if (component.component === 'RiskInfluencers') {
+        rows = [['driver', 'contribution', 'direction']];
+        (component.factors || []).forEach(function (factor) {
+          var value = Number(factor.contribution) || 0;
+          rows.push([factor.label, value.toFixed(4),
+                     value >= 0 ? 'increases' : 'decreases']);
+        });
+      } else if (component.component === 'MedicationGrid') {
+        rows = [['medication', 'dosage', 'frequency']];
+        (component.medications || []).forEach(function (row) {
+          rows.push([row.medication, row.dosage, row.frequency]);
+        });
+      } else if (component.component === 'LiteratureList') {
+        rows = [['pmid', 'title', 'journal', 'pub_date', 'url']];
+        (component.articles || []).forEach(function (article) {
+          rows.push([article.pmid, article.title, article.journal,
+                     article.pub_date, article.url]);
+        });
+      }
+      if (rows && rows.length > 1) {
+        blocks.push(rows.map(function (row) {
+          return row.map(key).join('\t');
+        }).join('\n'));
+      }
+    });
+
+    return blocks.join('\n\n');
+  }
+
   function createTurn(asked) {
     var root = el('article', 'cp-turn');
 
@@ -349,6 +421,27 @@
         + 'was checked against the record. The answer below is the verified version.');
     evidence.hidden = true;
 
+    /* The turn's utility toolbar, opposite the title in the header.
+
+       One toolbar per TURN rather than one per surface, because a unified `/ehr` turn
+       carries two surfaces in one answer and two toolbars would be two places to look for
+       the same two actions. It sits in the header rather than under the answer because
+       these are actions on the answer as a whole, and the header is the part of a turn
+       that outlives the run — the same reason the Evidence-Check notice lives here and
+       the status row does not.
+
+       Revealed by `retire`, like the rating strip: copying or exporting an answer that is
+       still being written would either be empty or export a half-composed surface. */
+    var toolbar = el('div', 'cp-turn-toolbar');
+    toolbar.hidden = true;
+    var copyAll = iconButton('fa-copy', 'Copy the answer');
+    copyAll.addEventListener('click', function () { copyText(answerText(), copyAll); });
+    var exportAll = iconButton('fa-file-arrow-down', 'Export the table rows');
+    exportAll.addEventListener('click', function () {
+      copyText(structuredRows(latest && latest.a2ui), exportAll);
+    });
+    toolbar.append(copyAll, exportAll);
+
     // A heading, not a toggle. A clinician must never have to click to read an
     // earlier turn, so there is nothing here to click: the question is text, and the
     // stylesheet pins it to the top of the scroll area while its answer passes
@@ -357,13 +450,21 @@
     var title = document.createElement('h2');
     title.className = 'cp-turn-title';
     title.textContent = asked || '';
-    head.append(title, scopeEl, evidence);
+    head.append(title, scopeEl, evidence, toolbar);
 
     var body = el('div', 'cp-turn-body');
     var answerSection = el('section', 'cp-answer');
     var canvas = el('div', 'cp-canvas');
     var prose = el('div', 'cp-answer-text');
     answerSection.append(canvas, prose);
+
+    /* The last presentation this turn was given.
+
+       Held because the answer text is not always in this turn's DOM: when the agent
+       composes a surface that renders the prose, the console is told not to draw the
+       answer again (`renders_prose`), so `.cp-answer-text` is empty by design and both
+       the text to copy and the rows to export live in the payload. */
+    var latest = null;
 
     /* The records the markers resolve to, the next questions, and what the reader
        thought of the answer. All three are chrome under the answer rather than part of
@@ -394,9 +495,17 @@
     }
     actions.append(
       ratingButton('fa-thumbs-up', 'Helpful answer', 1, thisTurnId),
-      ratingButton('fa-thumbs-down', 'Unhelpful answer', -1, thisTurnId),
-      copyButton(prose)
+      ratingButton('fa-thumbs-down', 'Unhelpful answer', -1, thisTurnId)
     );
+
+    /* The answer as text, for the toolbar's Copy.
+
+       The surface's own copy first: for a turn that draws its prose, this element is
+       empty and reading it would put nothing on the clipboard while the control said
+       "Copied". The element is still the answer for the turns where this file draws it. */
+    function answerText() {
+      return (latest && latest.answer) || prose.textContent || '';
+    }
 
     trail.append(references, followUps, actions);
 
@@ -454,8 +563,10 @@
       // The run is over and the turn is settled. Both paths land here — `finish` for a
       // live run, `restore` for a turn read back from the store — so this is the one
       // place that means "the answer is final", which is the moment a rating becomes a
-      // statement about an answer rather than about a question.
+      // statement about an answer rather than about a question, and the moment there is
+      // something to copy or export at all.
       actions.hidden = false;
+      toolbar.hidden = false;
     }
 
     function stage(label) {
@@ -785,6 +896,7 @@
        evidence twice, and two renderings of one source read as two sources — which is
        exactly the misreading the citation contract exists to prevent. */
     function presentFacts(payload) {
+      latest = payload;
       var scope = payload.scope || null;
       if (scope) {
         scopeEl.textContent = scope === 'patient_chart'

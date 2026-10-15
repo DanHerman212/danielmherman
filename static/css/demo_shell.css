@@ -467,12 +467,24 @@ button.cp-menu-item {
    once and then costs nothing, where a labelled button would put three words of chrome
    under every answer. Outline glyphs in the same muted grey as the turn's other chrome,
    so the row reads as an affordance beside the answer rather than a reaction to it. */
-.cp-turn-actions { display: flex; align-items: center; gap: 2px; margin-top: 12px; }
+.cp-turn-actions {
+  display: flex; align-items: center; justify-content: flex-end;
+  gap: 2px; margin-top: 12px;
+}
 /* `display: flex` above beats the user agent's `[hidden] { display: none }`, so the
    attribute the script sets to keep this strip hidden until the answer settles would
    otherwise do nothing at all — and the controls would sit beside the live status row,
    offering a rating for an answer that has not been written yet. */
 .cp-turn-actions[hidden] { display: none; }
+
+/* The turn's utility toolbar, opposite the title in the sticky header. `margin-left:
+   auto` is what pins it to the right of the header's flex row: the title already grows,
+   so the pills sit between the two and Export lands at the edge. */
+.cp-turn-toolbar {
+  display: flex; align-items: center; gap: 2px;
+  margin-left: auto; flex: none;
+}
+.cp-turn-toolbar[hidden] { display: none; }
 .cp-turn-action {
   display: inline-flex; align-items: center; justify-content: center;
   min-width: 28px; height: 28px; padding: 0 6px;
