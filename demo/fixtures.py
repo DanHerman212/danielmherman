@@ -113,8 +113,16 @@ FIXTURE_UNAVAILABLE_CHIPS = frozenset()
 # Keeping both means the visible vocabulary and the wire vocabulary can differ
 # without either becoming a second list to hold in step. Every `chip` here must
 # be a key of `CHIPS` — `test_chips.py` fails if one is not.
+#
+# `hidden` is the third thing an entry can say, and it arrived 2026-10-16 (Phase 1.1
+# §3): a command that is real but no longer worth a button. `/risk` is the first,
+# because the anchor turn `/ehr` now carries the same score beside the narrative
+# that explains it. Hidden is not removed — the flag is read where the MENU is
+# drawn, and the list itself still resolves a typed `/risk` and still feeds the
+# record printed above an answer — because hiding a control and deleting a
+# capability are different acts, and only one of them was asked for.
 SLASH_COMMANDS = (
-    {'command': 'risk', 'chip': 'risk',
+    {'command': 'risk', 'chip': 'risk', 'hidden': True,
      'description': 'Run the 30-day readmission risk model'},
     {'command': 'meds', 'chip': 'meds',
      'description': 'Extract the discharge medications'},
@@ -123,6 +131,16 @@ SLASH_COMMANDS = (
     {'command': 'pubmed', 'chip': 'literature',
      'description': 'Search the medical literature'},
 )
+
+
+def offered_commands() -> list[dict]:
+    """The commands the composer's `/` menu offers: `SLASH_COMMANDS` minus the hidden.
+
+    Separate from `SLASH_COMMANDS` on purpose, and only by this much. Two lists would
+    drift; one list and a flag cannot, because a command that is in the list but not
+    offered is still a command.
+    """
+    return [entry for entry in SLASH_COMMANDS if not entry.get('hidden')]
 
 
 def chip_buttons() -> list[dict]:
@@ -330,9 +348,18 @@ def fixture_ask(payload: dict) -> dict:
     if chip == 'literature':
         # No rag call beside it: a literature answer rests on the records, and the
         # canvas swaps the risk widgets out for them rather than showing both.
+        #
+        # The risk call IS made, because `/pubmed` gained it as a supplementary call
+        # (Phase 2, 2026-10-16) so the comparative matrix can pin this patient's own
+        # estimate above the published cohorts. It is not a second surface — the widgets
+        # stay swapped out — the estimate is the baseline row of the comparison, and a
+        # comparison with no patient in it would be a table about strangers. Served from
+        # the same captured payload the risk chip uses, so the two cannot disagree.
         query = _CHIP_QUERY[chip]
         tool_calls.append(_tool_call(
             'search_literature', {'query': query}, _literature_response(query)))
+        tool_calls.append(_tool_call(
+            'predict_readmission', {'hadm_id': hadm_id}, pred))
 
     question = CHIPS[chip]['question']
     answer = _compose_answer(chip, tool_calls)

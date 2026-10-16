@@ -219,6 +219,17 @@
     commands = [];
   }
 
+  /* The commands the `/` menu offers, which is not every command that exists.
+
+     `/risk` is hidden (UX ruling 2026-10-16): the anchor turn `/ehr` now carries the same
+     score beside the narrative that explains it, so a second control for it is a second
+     thing to keep in step. Hidden rather than removed, and the difference is exactly what
+     `commands` above still holds — the submit handler resolves a TYPED `/risk` against the
+     full list, so the command keeps working for a reader who knows it is there. */
+  function offered() {
+    return commands.filter(function (entry) { return !entry.hidden; });
+  }
+
   var matches = [];
   var commandActive = -1;
 
@@ -292,7 +303,7 @@
         return;
       }
       var prefix = typed[1].toLowerCase();
-      matches = commands.filter(function (entry) {
+      matches = offered().filter(function (entry) {
         return entry.command.indexOf(prefix) === 0;
       });
       commandActive = matches.length ? 0 : -1;

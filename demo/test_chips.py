@@ -21,7 +21,7 @@ from pathlib import Path
 
 from django.test import SimpleTestCase
 
-from demo.fixtures import CHIP_NAMES, CHIPS, SLASH_COMMANDS, chip_buttons
+from demo.fixtures import CHIP_NAMES, CHIPS, SLASH_COMMANDS, chip_buttons, offered_commands
 
 _ECC_ROOT = Path(__file__).resolve().parents[2] / 'enterprise_clinical_copilot'
 
@@ -92,6 +92,22 @@ class SlashCommandTests(SimpleTestCase):
             with self.subTest(command=entry['command']):
                 self.assertRegex(entry['command'], r'^[a-zA-Z]+$')
                 self.assertTrue(entry['description'].strip())
+
+    def test_the_risk_command_is_hidden_from_the_menu_and_still_a_command(self):
+        """Phase 1.1 §3 (2026-10-16): the redundant control leaves the bar, not the vocabulary.
+
+        `/ehr` carries the score and its drivers now, so a separate control for the same
+        number is one more thing to keep in step. The command stays declared, and so stays
+        resolvable when typed and accepted by the agent, because hiding a control and
+        deleting a capability are different acts — and only one of them was asked for.
+        """
+        hidden = [entry['command'] for entry in SLASH_COMMANDS if entry.get('hidden')]
+
+        self.assertEqual(hidden, ['risk'])
+        self.assertIn('risk', CHIP_NAMES,
+                      'the intent has to stay one the site accepts')
+        self.assertEqual([entry['command'] for entry in offered_commands()],
+                         ['meds', 'ehr', 'pubmed'])
 
 
 class ChipDriftTests(SimpleTestCase):

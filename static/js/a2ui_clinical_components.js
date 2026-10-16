@@ -46,6 +46,20 @@ export const CATALOG_ID = 'https://example.com/catalogs/readmission-risk-v1.json
  */
 const percent = (value) => `${(Number(value) * 100).toFixed(1)}%`;
 
+/** Which side of its threshold an estimate falls on, in words.
+ *
+ * `>= threshold` is the boundary, and the decision the model already made wins where the
+ * two could disagree: this must not be able to overrule the call the score was actually
+ * made under. Extracted the day the comparative matrix arrived, because its pinned row
+ * labels the patient with the same rule — two renderings of one estimate disagreeing
+ * about which side of the threshold it fell on is the failure this prevents.
+ */
+const bandLabel = (props) => {
+  const above = Number(props.decision) === 1
+    || Number(props.probability) >= Number(props.threshold);
+  return above ? 'Above threshold' : 'Below threshold';
+};
+
 /**
  * The threshold state's palette. The hue writes the score and the badge's text, the
  * wash fills the badge. Both are deliberately desaturated: the emphasis this widget
@@ -164,8 +178,7 @@ class RiskInfluencersElement extends A2uiLitElement {
     // already made and the comparison here cannot disagree. The threshold is read
     // from the payload, never pinned: a retrained model carrying a new threshold
     // must move this label with it.
-    const above = Number(props.decision) === 1 || probability >= threshold;
-    const label = above ? 'Above threshold' : 'Below threshold';
+    const label = bandLabel(props);
 
     const factors = (props.factors || []).map((factor) => ({
       label: factor.label,
@@ -275,7 +288,7 @@ const pubmedUrl = (pmid) => `https://pubmed.ncbi.nlm.nih.gov/${pmid}/`;
 
 const NARRATIVE_STYLES = css`
   :host { display: block; }
-  .narrative { font-size: 0.95rem; line-height: 1.55; }
+  .narrative { font-size: 0.95rem; line-height: 1.6; }
   .prose > :first-child { margin-top: 0; }
   .prose > :last-child { margin-bottom: 0; }
   /* A section of the answer.
@@ -285,13 +298,29 @@ const NARRATIVE_STYLES = css`
      section — one strong holding the heading and every sentence under it — which that rule
      then set at 600 weight in its whole. A level-2 heading cannot be misread that way:
      markdown makes the heading a block element before this stylesheet ever sees it, so a
-     heading and the prose beneath it can never end up as one run of text. */
+     heading and the prose beneath it can never end up as one run of text.
+
+     The 2026-10-16 directive restates this as a bold-run rule on a class called
+     .cp-narrative, in demo_shell.css, "to replace fragile markdown paragraph matching with
+     an explicit block selector". Three things about that do not hold here, and the numbers
+     below are the part of it that does. The class here is .prose, on an
+     a2ui-cited-narrative element that draws into a shadow root demo_shell.css cannot
+     reach — a rule written there would have styled nothing, and silently. The bold-run rule
+     is the one described above, and it is gone deliberately. And the selector it names
+     would have been narrower than the problem: the sections are real headings now, which is
+     the stronger guarantee. What the directive asks for in effect — a heading at
+     0.95rem/600 with 1.25rem above and 0.25rem below, and prose at a 1.6 line height — is
+     what is applied here.
+
+     No backticks anywhere in this block, and that is a rule rather than a preference: the
+     whole stylesheet is a template literal, so one backtick in a comment ends it, and the
+     parse error lands somewhere else entirely. That has now happened twice. */
   .prose > h1, .prose > h2, .prose > h3, .prose > h4 {
     font-size: 0.95rem;
     font-weight: 600;
     line-height: 1.45;
     color: #0f172a;
-    margin: 1.1rem 0 0.35rem;
+    margin: 1.25rem 0 0.25rem;
   }
   /* The heading that opens a turn sits flush with the top of the answer. */
   .prose > h1:first-child, .prose > h2:first-child,
@@ -310,6 +339,11 @@ const NARRATIVE_STYLES = css`
     background: #ffffff;
     color: #1f2937;
     cursor: pointer;
+    /* A pill is one line, always. A button wraps its own text by default, so a long label
+       broke the box across two lines and the rounded border read as a pill cut in half. The
+       agent now bounds what a label may be length-wise, and this is the half that holds
+       whatever it is handed. */
+    white-space: nowrap;
   }
   .cite:hover { background: #eef1f5; }
   .cite:focus-visible { outline: 2px solid #1f2937; outline-offset: 1px; }
@@ -871,6 +905,386 @@ export const LiteratureList = {
 customElements.define('a2ui-literature-list', LiteratureListElement);
 
 // ---------------------------------------------------------------------------
+// Comparative risk matrix
+
+//
+// This patient's estimate against the cohorts the search returned that someone has
+// curated a rate for. The difference from the list beneath it is the question being
+// answered: the list says what was retrieved, this says where she sits among it.
+//
+// The pinned row is first and is the only row that is not a peer — a reader who cannot
+// tell the patient's row from a cohort's has been handed a table about strangers and
+// told it is about her. The band words come from `bandLabel`, the same function the
+// widget uses, so the estimate cannot print one way in the row and another in the bar.
+//
+// The rate column is a string, not a number, and stays one: "≈20%" and "20%" are
+// different claims about the same paper, and a column that could hold only the second
+// would have to round the first into a certainty the abstract did not state.
+
+const _MATRIX_STYLES = css`
+  :host { display: block; }
+  /* The table is allowed to be wider than the column rather than squeezed into it: five
+     clinical columns compressed to a phone width are unreadable, and a reader who has to
+     scroll one table has lost less than a reader who cannot read it at all.
+
+     Nothing here sets a MINIMUM width, which is the distinction the first version missed.
+     A minimum on the cohort column pushed the table past its container, and a table that
+     overflows is one whose last column is clipped — a pill cut mid-word, which reads as a
+     rendering fault rather than as a table that continues. Text columns wrap, so the
+     browser sizes them from their longest word and the slack goes where it is useful. */
+  .wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.82rem; }
+  caption { caption-side: top; text-align: left; color: #64748b; font-size: 0.72rem;
+            letter-spacing: 0.04em; text-transform: uppercase; padding: 0 0 6px; }
+  th, td { text-align: left; vertical-align: top; padding: 8px 10px;
+           border-bottom: 1px solid rgba(17, 24, 39, 0.12); }
+  th { color: #64748b; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.04em;
+       text-transform: uppercase; white-space: nowrap; }
+  tr.baseline td { background: rgba(37, 99, 235, 0.06); }
+  tr.baseline td:first-child { box-shadow: inset 3px 0 0 #2563eb; }
+  .rate { font-weight: 600; white-space: nowrap; }
+  .under { display: block; font-weight: 400; font-size: 0.72rem; color: #475569;
+           margin-top: 2px; }
+  .pills { display: flex; flex-wrap: wrap; gap: 4px; }
+  .pill { border: 1px solid rgba(17, 24, 39, 0.18); border-radius: 999px;
+          font-size: 0.72rem; padding: 1px 8px; white-space: nowrap; }
+  /* The abstract sits under its cohort rather than in a fifth column, and is clamped to
+     three lines. Five text columns do not fit this console: measured at 759px, the excerpt
+     column squeezed the cohort summary into eleven lines and the provenance into six,
+     which is a hedge maze rather than a table. The full excerpt is still in the payload and
+     still in the export — only the drawing is clipped.
+
+     The clamp lives here and not in the data, because a clamp is a layout decision; a
+     reader who exports gets the whole text. */
+  .excerpt { color: #475569; font-size: 0.78rem; margin-top: 6px;
+             display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+             overflow: hidden; }
+  .tier { color: #64748b; font-size: 0.72rem; margin-top: 4px; }
+  /* An em dash, not an empty cell: the column is answered, and the answer is that the
+     record names none of her drivers. A blank would read as a value that failed to load. */
+  .none { color: #94a3b8; font-style: italic; }
+  .pmid { font-size: 0.72rem; margin-top: 4px; white-space: nowrap; }
+  .pmid a { color: inherit; }
+  .note { color: #475569; font-size: 0.85rem; margin-bottom: 6px; }
+`;
+
+const ComparativeRiskMatrixApi = {
+  name: 'ComparativeRiskMatrix',
+  schema: z.object({
+    // Absent when the turn had no estimate to pin. The row is then not drawn at all —
+    // see `baseline_note` — because a pinned row with no figure in it is a claim about
+    // this patient that says nothing.
+    baseline: z.object({
+      source: z.string(),
+      probability: z.number(),
+      threshold: z.number(),
+      decision: z.number(),
+      cohort: z.string(),
+      drivers: z.array(z.string()).default([]),
+      provenance: z.string(),
+    }).optional(),
+    baseline_note: z.string().default(''),
+    rows: z.array(z.object({
+      pmid: z.string(),
+      source: z.string(),
+      reported_rate: z.string(),
+      cohort_summary: z.string(),
+      matched_features: z.array(z.string()).default([]),
+      evidence_tier: z.string(),
+      horizon_days: z.number(),
+      url: z.string(),
+      excerpt: z.string(),
+    })).default([]),
+  }).strict(),
+};
+
+/** The shared factors, or an em dash saying the record names none of them. */
+function factorPills(labels) {
+  if (!labels || !labels.length) {
+    return html`<span class="none">—</span>`;
+  }
+  return html`<div class="pills">${labels.map(
+    (label) => html`<span class="pill">${label}</span>`)}</div>`;
+}
+
+class ComparativeRiskMatrixElement extends A2uiLitElement {
+  static styles = _MATRIX_STYLES;
+
+  createController() {
+    return new A2uiController(this, ComparativeRiskMatrixApi);
+  }
+
+  render() {
+    const props = this.controller?.props;
+    if (!props) return nothing;
+    const baseline = props.baseline;
+    const rows = props.rows || [];
+    const horizon = rows.length ? `${rows[0].horizon_days}-day` : '';
+
+    return html`
+      ${baseline ? nothing : html`<div class="note">${props.baseline_note}</div>`}
+      <div class="wrap">
+        <table>
+          <caption>
+            ${baseline
+              ? `This patient against published ${horizon} readmission rates`
+              : `Published ${horizon} readmission rates`}
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Source</th>
+              <th scope="col">Readmission rate</th>
+              <th scope="col">Cohort</th>
+              <th scope="col">Shared risk factors</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${baseline ? html`
+              <tr class="baseline">
+                <td>
+                  ${baseline.source}
+                  <div class="tier">${baseline.provenance}</div>
+                </td>
+                <td class="rate">
+                  ${percent(baseline.probability)}
+                  <span class="under">${bandLabel(baseline)}, threshold
+                    ${percent(baseline.threshold)}</span>
+                </td>
+                <td>${baseline.cohort}</td>
+                <td>${factorPills(baseline.drivers)}</td>
+              </tr>
+            ` : nothing}
+            ${rows.map((row) => html`
+              <tr>
+                <td>
+                  ${row.source}
+                  <div class="pmid">PMID <a href=${row.url || pubmedUrl(row.pmid)}
+                    target="_blank" rel="noopener noreferrer">${row.pmid}</a></div>
+                </td>
+                <td class="rate">${row.reported_rate}
+                  <span class="under">${row.horizon_days}-day</span></td>
+                <td>
+                  ${row.cohort_summary}
+                  <div class="tier">${row.evidence_tier}</div>
+                  <div class="excerpt">${row.excerpt}</div>
+                </td>
+                <td>${factorPills(row.matched_features)}</td>
+              </tr>
+            `)}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+}
+
+export const ComparativeRiskMatrix = {
+  ...ComparativeRiskMatrixApi, tagName: 'a2ui-comparative-risk-matrix',
+};
+customElements.define('a2ui-comparative-risk-matrix', ComparativeRiskMatrixElement);
+
+// ---------------------------------------------------------------------------
+// Lab trend card
+
+//
+// What a measurement did across the admission, one row per analyte. Phase 3 asks for a
+// sparkline, a reference range, a delta and abnormal flags in a compact table, and the
+// order they appear in is the order a reader needs them: what was measured, what normal is,
+// where this patient sat against it, and how far they moved.
+//
+// The card is a GLANCE, not the record. Every value is in the export, and the row here
+// carries the shape plus anything abnormal — because ten analytes times six timepoints is
+// sixty numbers, and a card that printed all of them is one nobody reads.
+//
+// Two things it must never do. It must not imply the model scored a measure it did not —
+// which is what the scored/generated marker on each row is for, driven by the payload's own
+// `anchored` list. And it must not present a generated value as a measured one: the note
+// under the title says where the numbers came from, and it is the agent's sentence rather
+// than a second wording written here.
+
+const _LAB_STYLES = css`
+  :host { display: block; }
+  .note { color: #475569; font-size: 0.78rem; margin-bottom: 8px; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.82rem; }
+  th, td { text-align: left; vertical-align: middle; padding: 6px 10px;
+           border-bottom: 1px solid rgba(17, 24, 39, 0.12); }
+  th { color: #64748b; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.04em;
+       text-transform: uppercase; white-space: nowrap; }
+  .measure { font-weight: 600; white-space: nowrap; }
+  .unit { display: block; font-weight: 400; font-size: 0.72rem; color: #64748b;
+          margin-top: 2px; }
+  .origin { display: block; font-size: 0.68rem; margin-top: 3px; }
+  .origin.scored { color: #2563eb; }
+  .origin.drawn { color: #94a3b8; }
+  .reference { white-space: nowrap; color: #475569; }
+  .course { min-width: 12rem; }
+  .spark { display: block; }
+  .band { fill: rgba(37, 99, 235, 0.10); }
+  .line { fill: none; stroke: #1f2937; stroke-width: 1.6;
+          stroke-linejoin: round; stroke-linecap: round; }
+  .dot { fill: #1f2937; }
+  .dot.abnormal { fill: #b91c1c; }
+  .delta { font-size: 0.72rem; color: #475569; margin-top: 4px; }
+  .flags { display: flex; flex-wrap: wrap; gap: 4px; }
+  .flag { border-radius: 4px; font-size: 0.68rem; font-weight: 600; padding: 1px 6px;
+          white-space: nowrap; }
+  .flag.low, .flag.high { background: rgba(180, 83, 9, 0.12); color: #92400e; }
+  .flag.critical { background: rgba(185, 28, 28, 0.12); color: #b91c1c; }
+  .normal { color: #64748b; font-size: 0.72rem; }
+`;
+
+const LabTrendCardApi = {
+  name: 'LabTrendCard',
+  schema: z.object({
+    trends: z.array(z.object({
+      key: z.string(),
+      label: z.string(),
+      unit: z.string(),
+      reference_low: z.number(),
+      reference_high: z.number(),
+      decimals: z.number(),
+      // The feature-row keys this series reproduces. Empty means the model never scored
+      // this measure, which is what the row's marker reports.
+      anchored: z.array(z.string()).default([]),
+      series: z.array(z.object({
+        day: z.number(),
+        value: z.number(),
+        flag: z.string(),
+      })).default([]),
+    })).default([]),
+    synthetic: z.boolean().default(false),
+    note: z.string().default(''),
+  }).strict(),
+};
+
+/** The flag vocabulary, as the letter or word a reader is shown. */
+const FLAG_TEXT = {
+  low: 'L',
+  high: 'H',
+  critical_low: 'Critical low',
+  critical_high: 'Critical high',
+};
+
+const _isAbnormal = (flag) => flag && flag !== 'normal';
+
+/**
+ * The course as a sparkline, with the reference interval shaded behind it.
+ *
+ * The vertical scale is the reference band UNION the values, never the band alone: a
+ * critical value outside the interval has to be visible as a departure from the band rather
+ * than clipped to the edge of the drawing, because the departure is the finding.
+ */
+function sparkline(series, low, high, decimals, label) {
+  const values = series.map((point) => Number(point.value));
+  const lo = Math.min(low, ...values);
+  const hi = Math.max(high, ...values);
+  const span = (hi - lo) || 1;
+  const width = 104;
+  const height = 26;
+  const pad = 3;
+  const x = (index) => pad + (index / Math.max(series.length - 1, 1)) * (width - 2 * pad);
+  const y = (value) => height - pad - ((value - lo) / span) * (height - 2 * pad);
+  const bandTop = y(high);
+  const bandHeight = Math.max(y(low) - y(high), 1);
+  const points = values.map((value, index) =>
+    x(index).toFixed(1) + ',' + y(value).toFixed(1)).join(' ');
+  const spoken = label + ' across ' + series.length + ' timepoints, from '
+    + values[0].toFixed(decimals) + ' to ' + values[values.length - 1].toFixed(decimals);
+
+  return html`
+    <svg class="spark" viewBox=${'0 0 ' + width + ' ' + height}
+         width=${width} height=${height} role="img" aria-label=${spoken}>
+      <rect class="band" x="0" y=${bandTop} width=${width} height=${bandHeight}></rect>
+      <polyline class="line" points=${points}></polyline>
+      ${values.map((value, index) => html`
+        <circle class="dot ${_isAbnormal(series[index].flag) ? 'abnormal' : ''}"
+                cx=${x(index)} cy=${y(value)} r="1.8"></circle>`)}
+    </svg>
+  `;
+}
+
+class LabTrendCardElement extends A2uiLitElement {
+  static styles = _LAB_STYLES;
+
+  createController() {
+    return new A2uiController(this, LabTrendCardApi);
+  }
+
+  render() {
+    const props = this.controller?.props;
+    if (!props) return nothing;
+    const trends = props.trends || [];
+    if (!trends.length) return nothing;
+
+    return html`
+      ${props.note ? html`<div class="note">${props.note}</div>` : nothing}
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Measurement</th>
+            <th scope="col">Reference</th>
+            <th scope="col">Course</th>
+            <th scope="col">Flags</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${trends.map((trend) => {
+            const series = trend.series || [];
+            const values = series.map((point) => Number(point.value));
+            const first = values[0];
+            const last = values[values.length - 1];
+            const direction = last > first ? 'higher' : (last < first ? 'lower' : 'unchanged');
+            const abnormal = series.filter((point) => _isAbnormal(point.flag));
+            const counts = {};
+            abnormal.forEach((point) => {
+              const key = point.flag.startsWith('critical') ? 'critical' : point.flag;
+              counts[key] = (counts[key] || 0) + 1;
+            });
+            return html`
+              <tr>
+                <td class="measure">
+                  ${trend.label}
+                  <span class="unit">${trend.unit}</span>
+                  ${trend.anchored.length
+                    ? html`<span class="origin scored"
+                             title=${'Reproduces the value the model was scored on: '
+                                    + trend.anchored.join(', ')}
+                           >scored</span>`
+                    : html`<span class="origin drawn"
+                             title="Generated for this admission; the model was not scored on it"
+                           >generated</span>`}
+                </td>
+                <td class="reference">${trend.reference_low}–${trend.reference_high}</td>
+                <td class="course">
+                  ${sparkline(series, trend.reference_low, trend.reference_high,
+                              trend.decimals, trend.label)}
+                  <div class="delta">
+                    ${first.toFixed(trend.decimals)} → ${last.toFixed(trend.decimals)}
+                    (${direction}), ${series.length} points over ${series[series.length - 1].day} days
+                  </div>
+                </td>
+                <td>
+                  ${abnormal.length
+                    ? html`<div class="flags">${Object.keys(counts).map((key) => html`
+                        <span class="flag ${key}">${FLAG_TEXT[key] || key}${
+                          counts[key] > 1 ? ' ×' + counts[key] : ''}</span>`)}</div>`
+                    : html`<span class="normal">Within range</span>`}
+                </td>
+              </tr>
+            `;
+          })}
+        </tbody>
+      </table>
+    `;
+  }
+}
+
+export const LabTrendCard = {
+  ...LabTrendCardApi, tagName: 'a2ui-lab-trend',
+};
+customElements.define('a2ui-lab-trend', LabTrendCardElement);
+
+// ---------------------------------------------------------------------------
 // Source card
 //
 // The cited note passage. It is here because switching the console to this
@@ -1047,6 +1461,8 @@ export function buildClinicalCatalog(basicCatalog) {
       ['RiskInfluencers', RiskInfluencers],
       ['CitedNarrative', CitedNarrative],
       ['LiteratureList', LiteratureList],
+      ['ComparativeRiskMatrix', ComparativeRiskMatrix],
+      ['LabTrendCard', LabTrendCard],
       ['SourceCard', SourceCard],
       ['MedicationGrid', MedicationGrid],
     ]),

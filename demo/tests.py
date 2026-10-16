@@ -273,6 +273,22 @@ class A2uiFixtureContractTests(TestCase):
         self.assertIn('LiteratureList', types)
         self.assertNotIn('RiskInfluencers', types)
 
+        # The comparative matrix is drawn above the records, with this patient's own
+        # estimate pinned first (Phase 2, 2026-10-16). Fixture mode makes the same two
+        # calls the live path makes — the search and the risk call — because a comparison
+        # with no patient in it is a table about strangers, and because the swap to live
+        # has to be a swap of the data rather than of the surface.
+        self.assertIn('ComparativeRiskMatrix', types)
+        order = [c['component'] for c in comps]
+        self.assertLess(order.index('ComparativeRiskMatrix'),
+                        order.index('LiteratureList'),
+                        'the comparison leads; the records are the sources beneath it')
+
+        matrix = next(c for c in comps if c['component'] == 'ComparativeRiskMatrix')
+        self.assertIn('probability', matrix['baseline'])
+        self.assertEqual(matrix['rows'][0]['pmid'], '37495280',
+                         'the CHF capture holds a curated 30-day cohort rate')
+
     def test_fixture_mode_never_invents_a_literature_synthesis(self):
         """With no capture for the query, the answer states the absence.
 
