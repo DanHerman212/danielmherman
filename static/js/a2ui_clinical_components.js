@@ -54,11 +54,12 @@ const percent = (value) => `${(Number(value) * 100).toFixed(1)}%`;
  * labels the patient with the same rule — two renderings of one estimate disagreeing
  * about which side of the threshold it fell on is the failure this prevents.
  */
-const bandLabel = (props) => {
-  const above = Number(props.decision) === 1
-    || Number(props.probability) >= Number(props.threshold);
-  return above ? 'Above threshold' : 'Below threshold';
-};
+const isAboveThreshold = (props) =>
+  Number(props.decision) === 1
+  || Number(props.probability) >= Number(props.threshold);
+
+const bandLabel = (props) =>
+  isAboveThreshold(props) ? 'Above threshold' : 'Below threshold';
 
 /**
  * The threshold state's palette. The hue writes the score and the badge's text, the
@@ -234,7 +235,7 @@ class RiskInfluencersElement extends A2uiLitElement {
       </div>
     `;
 
-    const band = BAND_HUE[above ? 'above' : 'below'];
+    const band = BAND_HUE[isAboveThreshold(props) ? 'above' : 'below'];
 
     return html`
       <div class="widget" style="--band-hue:${band.hue};--band-wash:${band.wash}">

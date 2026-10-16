@@ -100,14 +100,33 @@ class SlashCommandTests(SimpleTestCase):
         number is one more thing to keep in step. The command stays declared, and so stays
         resolvable when typed and accepted by the agent, because hiding a control and
         deleting a capability are different acts — and only one of them was asked for.
+
+        `/labs` joined the OFFERED list in Phase 4B, which is the other half of the same
+        rule rather than a reversal of it: `/risk` left the bar because `/ehr` swallowed
+        its answer, while `/labs` entered it because the capability had no bar entry at
+        all, and hiding it pushed clinicians into the free-text question that was the
+        unreliable path.
         """
         hidden = [entry['command'] for entry in SLASH_COMMANDS if entry.get('hidden')]
 
-        self.assertEqual(hidden, ['risk'])
+        # `risk` is the one that left the bar, and it must still be first in the hidden
+        # list only in the sense that matters: it is hidden. The assertion no longer pins
+        # the whole list, because hidden is where ALIASES live too (`/drugs` -> meds,
+        # 2026-10-16) and pinning it made every alias look like a regression.
+        self.assertIn('risk', hidden)
         self.assertIn('risk', CHIP_NAMES,
                       'the intent has to stay one the site accepts')
+        self.assertNotIn('risk', [e['command'] for e in offered_commands()])
         self.assertEqual([entry['command'] for entry in offered_commands()],
-                         ['meds', 'ehr', 'pubmed'])
+                         ['meds', 'ehr', 'labs', 'pubmed'])
+
+        # A hidden alias resolves to a real intent when typed, which is the whole point
+        # of having it: the menu stays at four macros and a clinician's `/drugs` still
+        # lands on the medication list instead of a dead end.
+        for alias in ('drugs', 'drug'):
+            entry = next(e for e in SLASH_COMMANDS if e['command'] == alias)
+            self.assertEqual(entry['chip'], 'meds')
+            self.assertIn(entry['chip'], CHIP_NAMES)
 
 
 class ChipDriftTests(SimpleTestCase):

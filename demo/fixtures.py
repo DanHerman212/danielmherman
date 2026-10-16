@@ -88,6 +88,14 @@ CHIPS = {
         'label': 'Search PubMed for recent literature',
         'question': 'Search PubMed for recent literature on this condition.',
     },
+    # Phase 4B. Fixture mode cannot answer this one (it needs a live agent to generate the
+    # trajectories), and it is listed anyway for the same reason `literature` was: the
+    # set is the allowlist the site checks before spending a credit, so a chip the
+    # console offers and this omits is refused at the site with no explanation.
+    'labs': {
+        'label': 'Show inpatient lab trajectories',
+        'question': "Describe the laboratory trajectories for this patient's admission.",
+    },
 }
 
 # Just the names, which is all the live path needs to reject an unknown chip before a
@@ -126,8 +134,24 @@ SLASH_COMMANDS = (
      'description': 'Run the 30-day readmission risk model'},
     {'command': 'meds', 'chip': 'meds',
      'description': 'Extract the discharge medications'},
+    # An alias, hidden so the menu keeps its four macros. `/drugs` is what a clinician
+    # types for the medication list, and an unrecognised slash command used to leave the
+    # composer hanging with nothing rendered (2026-10-16). The alias belongs HERE, with
+    # the typed vocabulary, rather than in the agent: the agent's contract is a chip and
+    # never a leading slash, so a fallback there would be a second command vocabulary in
+    # a service that deliberately has none.
+    {'command': 'drugs', 'chip': 'meds', 'hidden': True,
+     'description': 'Extract the discharge medications (alias of /meds)'},
+    {'command': 'drug', 'chip': 'meds', 'hidden': True,
+     'description': 'Extract the discharge medications (alias of /meds)'},
     {'command': 'ehr', 'chip': 'summarize',
-     'description': 'Summarize the discharge notes'},
+     'description': 'Chart summary, readmission risk and cohort comparison'},
+    # Phase 4B. The agent grew this command because hiding the capability forced a
+    # free-text question ("what are the lab trajectories for this patient?") down a
+    # path that could loop to a recursion failure, and the deterministic route has to
+    # be the one a clinician reaches for rather than the fallback.
+    {'command': 'labs', 'chip': 'labs',
+     'description': 'Inpatient laboratory trajectories'},
     {'command': 'pubmed', 'chip': 'literature',
      'description': 'Search the medical literature'},
 )

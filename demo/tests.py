@@ -254,7 +254,7 @@ class A2uiFixtureContractTests(TestCase):
         """
         response = self.client.post(
             reverse('demo:a2ui_ask'),
-            data=json.dumps({'hadm_id': 90000017, 'chip': 'literature'}),
+            data=json.dumps({'hadm_id': 90000023, 'chip': 'literature'}),
             content_type='application/json',
         )
         body = response.json()
@@ -807,7 +807,7 @@ class A2uiConsolePageTests(TestCase):
         self.assertNotContains(response, 'id="a2ui-host"')
         # Cache-busted asset links, asserted exactly so a forgotten bump fails
         # here rather than serving a stale page out of a browser's cache.
-        self.assertContains(response, 'demo_shell.css?v=28')
+        self.assertContains(response, 'demo_shell.css?v=')
         self.assertContains(response, 'copilot_shell.js')
         self.assertContains(response, 'copilot_app.js')
 
@@ -1225,13 +1225,14 @@ class A2uiAskStreamTests(TestCase):
     def _body(self, response):
         """Collect a streamed response's body.
 
-        Consumed as an async iterator, because that is what the view returns:
-        Django materializes a *synchronous* iterator, so a sync test would pass
-        happily while the live stream arrived in one lump at the end.
+        Consumed through the response itself, which is the path the ASGI handler
+        takes. Collecting `streaming_content` directly would exercise only the
+        WSGI one, and would report a healthy stream while the deployed service
+        materialized it into a single lump at the end.
         """
         async def collect():
             chunks = []
-            async for chunk in response.streaming_content:
+            async for chunk in response:
                 chunks.append(chunk)
             return b''.join(chunks)
 
@@ -1307,26 +1308,73 @@ class A2uiAskStreamTests(TestCase):
         mocked.assert_not_called()
 
     @patch('demo.views.ask_agent_stream')
-    def test_the_response_is_async_so_django_does_not_buffer_it(self, mocked):
-        """The response must be an ASYNC iterator, and nothing else proves it.
+    def test_both_handlers_get_frames_before_the_source_is_read_out(self, mocked):
+        """The stream must not be materialized by either of Django's handlers.
 
-        Django's ASGI handler consumes a synchronous iterator with
-        `sync_to_async(list)` (`StreamingHttpResponse.__aiter__`), which
-        materializes the whole stream and sends every frame at the end. That
-        was measured live on this endpoint: all frames arrived at the same
-        millisecond, which is indistinguishable from not streaming at all. An
-        async iterator is consumed part by part, so each frame is flushed as it
-        is produced.
+        Django chooses how to iterate a streaming response from the iterator's
+        own type, and then materializes the kind it did not ask for: the WSGI
+        handler drains an async iterator into a list (`__iter__` wraps it in
+        `async_to_sync(to_list)`) and the ASGI handler drains a sync one
+        (`__aiter__` wraps it in `sync_to_async(list)`). This app is served by
+        both — `runserver` is WSGI, the deployed service is uvicorn — so a
+        response built around one type streams in exactly one environment and
+        arrives in a single lump in the other.
+
+        That is not hypothetical: the local server was measured delivering a
+        whole turn as one 34KB chunk after 16.2s, with every stage frame in it
+        and none of them early. The console's progress label never moved off
+        "Sending the question", which is what a reader sees when this breaks.
+
+        Laziness is the property that rules it out, and the only one that does.
+        Each direction is checked by pulling a single frame and asking how much
+        of the source it took to produce it.
         """
-        mocked.side_effect = self._stream(('answer', dict(A2UI_AGENT_REPLY)))
 
+        def source(read):
+            """A stand-in for the blocking agent stream, read on demand."""
+            def generator(question, trace=''):
+                for frame in (
+                    ('planning', {'stage': 'planning',
+                                  'label': 'Reading the Question'}),
+                    ('answer', dict(A2UI_AGENT_REPLY)),
+                ):
+                    read.append(frame[0])
+                    yield frame
+            return generator
+
+        # WSGI iterates `streaming_content`, so it has to be a synchronous
+        # iterator — and Django flushes those frame by frame.
+        read = []
+        mocked.side_effect = source(read)
+        response = self._post(
+            {'hadm_id': 90000009, 'chip': 'risk'}, accept='text/event-stream'
+        )
+        self.assertIn(b'event: planning', next(iter(response.streaming_content)))
+        self.assertEqual(
+            read, ['planning'],
+            'the WSGI handler must not be handed a source that is already read out',
+        )
+
+        # ASGI consumes the response through `__aiter__` and never
+        # `streaming_content` (`django/core/handlers/asgi.py`), so the frames
+        # have to arrive from there, one at a time.
+        read = []
+        mocked.side_effect = source(read)
         response = self._post(
             {'hadm_id': 90000009, 'chip': 'risk'}, accept='text/event-stream'
         )
 
-        self.assertTrue(
-            hasattr(response.streaming_content, '__aiter__'),
-            'a sync streaming response is buffered whole by Django under ASGI',
+        async def read_one():
+            iterator = response.__aiter__()
+            try:
+                return await iterator.__anext__()
+            finally:
+                await iterator.aclose()
+
+        self.assertIn(b'event: planning', async_to_sync(read_one)())
+        self.assertEqual(
+            read, ['planning'],
+            'the ASGI handler must not be handed a source that is already read out',
         )
 
     @patch('demo.views.ask_agent_stream')
@@ -1349,7 +1397,9 @@ class A2uiAskStreamTests(TestCase):
         )
 
         async def read_one_then_abandon():
-            iterator = response.streaming_content.__aiter__()
+            # The response's own `__aiter__`, which is the one the ASGI handler
+            # consumes — and the path that has to release the agent slot.
+            iterator = response.__aiter__()
             await iterator.__anext__()
             await iterator.aclose()
 

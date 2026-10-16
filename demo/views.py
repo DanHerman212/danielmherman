@@ -454,36 +454,66 @@ def _sse(event, data):
     return f'event: {event}\ndata: {json.dumps(data)}\n\n'.encode('utf-8')
 
 
-async def _refund(user, period, spent=True):
-    """Give the credit back, off the event loop.
+class _StreamedResponse(StreamingHttpResponse):
+    """A frame stream that streams under either of Django's handlers.
 
-    This generator runs in an async context, where Django refuses synchronous
-    database access (`SynchronousOnlyOperation`) — so the quota calls have to
-    hop to a worker thread rather than being called directly.
+    Django chooses how to iterate a `StreamingHttpResponse` from the iterator's
+    own type, and then materialises the kind it did not ask for: the WSGI
+    handler drains an ASYNC iterator into a list before it sends anything
+    (`__iter__` wraps it in `async_to_sync(to_list)`), and the ASGI handler does
+    the same to a SYNC one (`__aiter__` wraps it in `sync_to_async(list)`).
+    This app is served both ways — `runserver` is WSGI by default and the
+    deployed uvicorn service is ASGI — so a response built around one kind
+    streams in exactly one environment and buffers in the other.
+
+    Keeping one kind and overruling the handler that would have buffered it is
+    the whole reason this class exists. `_stream_frames` is synchronous, because
+    the frames come from a blocking `requests` stream and because a synchronous
+    iterator is what WSGI already flushes frame by frame. Overriding `__aiter__`
+    to advance that same iterator one step at a time gives the ASGI handler what
+    its own implementation would have thrown away, without a second generator to
+    keep in step with the first.
+
+    Measured live before this: the local server delivered an entire turn as a
+    single 34KB chunk after 16.2s. Every stage frame was present and none of them
+    were early, so the console's progress label never moved off "Sending the
+    question" — indistinguishable from not streaming at all.
     """
-    await sync_to_async(DemoQuota.refund)(user, period, spent=spent)
+
+    async def __aiter__(self):
+        # `_set_streaming_content` has already taken `iter(value)`, so
+        # `self._iterator` is the synchronous generator itself. Each step is
+        # advanced in a worker thread rather than on the event loop, because
+        # reading the next frame blocks on the agent's socket.
+        try:
+            while True:
+                item = await sync_to_async(next)(self._iterator, _EXHAUSTED)
+                if item is _EXHAUSTED:
+                    return
+                yield self.make_bytes(item)
+        finally:
+            # The browser can go away mid-answer, and the ASGI handler closes
+            # this generator with `aclosing()` when it does. `_set_streaming_content`
+            # only files a closer for objects that have `close`, and an async
+            # generator has `aclose` instead, so the synchronous generator
+            # underneath would otherwise be left open with its `finally` never
+            # reached — which is where the upstream stream, and the agent slot
+            # it holds, are released.
+            self._iterator.close()
 
 
-async def _remaining(user):
-    """The quota left for this user, off the event loop (see `_refund`)."""
-    return await sync_to_async(DemoQuota.remaining)(user)
-
-
-async def _stream_frames(user, trace, period, first, rest, conversation=None,
-                        asked=''):
+def _stream_frames(
+    user, trace, period, first, rest, conversation=None, asked='',
+):
     """Relay the agent's frames to the browser, then close.
 
-    ASYNC on purpose, and this is not a style choice. A synchronous iterator
-    works, but Django's ASGI handler consumes it with `sync_to_async(list)`
-    (`StreamingHttpResponse.__aiter__`), which materializes the whole stream and
-    sends every frame at the end. Measured live: every frame arrived at the same
-    millisecond, which is indistinguishable from not streaming at all. An async
-    iterator is consumed part by part, so each frame is flushed as it is
-    produced.
-
-    The frames themselves come from a blocking `requests` stream, so each step
-    is advanced in a worker thread instead of on the event loop, and the quota
-    calls hop threads for the same reason (see `_refund`).
+    SYNCHRONOUS on purpose, and this is a correctness requirement rather than a
+    style choice: `_StreamedResponse` documents what each of Django's handlers
+    does to an iterator of the other kind, and why this generator is written the
+    way its source is read. The frames come from a blocking `requests` stream,
+    and the quota and turn-write calls below are ordinary synchronous database
+    work, which a synchronous generator running on the WSGI handler's own thread
+    can do directly.
 
     Quota policy is unchanged from the blocking path — it has only moved to
     where the answer now arrives. A tool error or a stream failure refunds the
@@ -504,7 +534,7 @@ async def _stream_frames(user, trace, period, first, rest, conversation=None,
             if pending is not None:
                 item, pending = pending, None
             else:
-                item = await sync_to_async(next)(rest, _EXHAUSTED)
+                item = next(rest, _EXHAUSTED)
                 if item is _EXHAUSTED:
                     break
             event, data = item
@@ -516,19 +546,19 @@ async def _stream_frames(user, trace, period, first, rest, conversation=None,
                 # materialised.
                 if _tools_errored(data):
                     logger.error('a2ui_ask: tool error in streamed answer trace=%s', trace or '-')
-                    await _refund(user, period)
+                    DemoQuota.refund(user, period)
                     yield _sse('error', {
                         'error': UNAVAILABLE,
-                        'remaining': await _remaining(user),
+                        'remaining': DemoQuota.remaining(user),
                     })
                     return
                 # The presentation contract is composed in the AGENT; Django
                 # adds only the web-specific quota figure, counts the turn now
                 # that an answer exists, and stores it so the next question can
                 # be answered as a follow-up.
-                await sync_to_async(_record_turn)(conversation)
-                await sync_to_async(record_answer)(conversation, data, asked)
-                data['remaining'] = await _remaining(user)
+                _record_turn(conversation)
+                record_answer(conversation, data, asked)
+                data['remaining'] = DemoQuota.remaining(user)
                 if conversation is not None:
                     data['conversation_id'] = conversation.pk
                     # The same two facts the recall endpoint sends, so the console's
@@ -540,10 +570,10 @@ async def _stream_frames(user, trace, period, first, rest, conversation=None,
 
             if event == 'error':
                 logger.error('a2ui_ask: stream failed mid-answer trace=%s: %s', trace or '-', data)
-                await _refund(user, period)
+                DemoQuota.refund(user, period)
                 yield _sse('error', {
                     'error': UNAVAILABLE,
-                    'remaining': await _remaining(user),
+                    'remaining': DemoQuota.remaining(user),
                 })
                 return
 
@@ -553,10 +583,10 @@ async def _stream_frames(user, trace, period, first, rest, conversation=None,
         # it ever becomes reachable, the credit comes back rather than staying
         # spent on an answer that never arrived, and the browser is told rather
         # than left on its pending turn.
-        await _refund(user, period)
+        DemoQuota.refund(user, period)
         yield _sse('error', {
             'error': UNAVAILABLE,
-            'remaining': await _remaining(user),
+            'remaining': DemoQuota.remaining(user),
         })
     finally:
         # Reached when the caller goes away (uvicorn closes the generator) as
@@ -955,7 +985,10 @@ def _streaming_ask(request, intent, trace, period, conversation=None, asked='',
             'remaining': DemoQuota.remaining(request.user),
         }, status=502)
 
-    response = StreamingHttpResponse(
+    # `_StreamedResponse`, not `StreamingHttpResponse`: the stock class streams
+    # under one of Django's handlers and buffers under the other, and this app is
+    # served by both (see the class for what each handler does).
+    response = _StreamedResponse(
         _stream_frames(request.user, trace, period, first, stream, conversation,
                        asked),
         content_type='text/event-stream',

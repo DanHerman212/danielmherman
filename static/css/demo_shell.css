@@ -104,9 +104,19 @@ button.cp-menu-item {
    and the run it produced belong to the turn that carries them, and are built by
    the client inside the feed. */
 .cp-top {
-  flex: none; width: 100%; max-width: 860px;
-  margin: 0 auto 26px; padding: 0 20px;
-  display: flex; flex-direction: column; align-items: center; gap: 18px;
+  flex: none; width: 100%;
+  /* Pane-relative, at the sidebar icon's own inset (2026-10-16). The ECC badge and the
+     sidebar's collapse icon are the two marks at the top-left of the page, and symmetry
+     between them means one number, not two columns that have to be kept equal by hand.
+     Measured: the aside is at 0 with 12px padding and its icon button adds 6px, so the
+     icon's left edge is 21px from the page. This block is at 264 (the main pane's edge)
+     and therefore starts at 264 + 21 = 285 — the same 21px, mirrored into the second
+     pane.
+     It used to be `max-width: 960px; margin: 0 auto`, a centred column: that put the
+     badge at 272 (8px inside the pane, because a 960 column centred in a 975px pane is
+     not flush) and left it matching neither the icon above it nor the content below. */
+  max-width: none; margin: 0 0 26px; padding: 0 20px 0 21px;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 18px;
 }
 .cp-brand { display: flex; align-items: center; gap: 12px; }
 .cp-logo { width: 44px; height: 44px; display: block; }
@@ -327,7 +337,13 @@ button.cp-menu-item {
 /* The context bar: what the thread is about, and how long it will be kept. */
 .cp-context {
   flex: 0 0 auto; display: flex; align-items: center; gap: 12px;
-  padding: 10px 32px; border-bottom: 1px solid #eceef1; flex-wrap: wrap;
+  /* Left inset matched to the brand above it, not 32px (2026-10-16). The ECC badge and
+     the patient pill are the first thing on each of the two top rows, and they read as
+     one column only if they begin at the same point: measured, the badge is at 285 and
+     this row's first child was at 296, eleven pixels to its right. Both are now 21px
+     from the pane's edge. The right inset is untouched — nothing on the right has an
+     opposite number to line up with. */
+  padding: 10px 32px 10px 21px; border-bottom: 1px solid #eceef1; flex-wrap: wrap;
 }
 .cp-context-pill {
   display: inline-flex; align-items: center; gap: 8px; background: #f3f4f6;

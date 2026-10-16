@@ -1745,6 +1745,15 @@
       } else if (!block.hasProse()) {
         block.finish();
         block.say('The clinical copilot is unavailable. Please try again.', true);
+      } else {
+        // Prose arrived and no settled answer followed: the stream closed early. Both
+        // branches above are skipped in that case — there is no answer payload, yet the
+        // block does have prose — so NOTHING finished the turn and the composer stayed
+        // pending with a half-written answer on screen and no error to explain it
+        // (reported 2026-10-16 from an unrecognised slash command). Finishing is the
+        // whole fix: the prose the reader already has is kept rather than replaced by a
+        // generic failure, because the failure was in the transport, not the answer.
+        block.finish();
       }
       scrollIntoView(block.root);
     } catch (error) {
