@@ -55,9 +55,19 @@ def configured() -> bool:
 def score(trace_id: str, value: int, *, comment: str = '') -> bool:
     """Attach one rating to one trace. True when Langfuse accepted it.
 
-    `value` is the sign of the rating, not its magnitude: the API is asked for a
-    BOOLEAN because a thumb has two states, and a numeric 1/-1 would invite the
-    question of what 0.5 was meant to mean.
+    A SIGNED NUMBER, not a boolean. The first version sent `dataType: BOOLEAN` with
+    `1`/`0`, and a thumbs-down therefore arrived as `0` — which the scored-trace
+    table either renders as nothing or as the absence of a score. A reader could not
+    tell a negative rating from an unrated trace, which makes the whole feature
+    useless for the one thing it exists for. `1` / `-1` cannot be confused with
+    missing, sorts correctly, and is what a numeric column is for.
+
+    ONE ROW PER TRACE, because a reader can change their mind. Scores are appended by
+    default, so a thumbs-up followed by a thumbs-down left two rows on the same trace
+    — and a review that averages them gets 0, which is a judgement nobody made. The id
+    is derived from the trace, so a second rating UPDATES the first. Verified against
+    the live API on 2026-10-17: two posts with one id leave exactly one row whose value
+    is the later one.
     """
     if not trace_id or not configured():
         return False
@@ -72,11 +82,16 @@ def score(trace_id: str, value: int, *, comment: str = '') -> bool:
         response = requests.post(
             host + '/api/public/scores',
             json={
+                # Deterministic, so the reader's latest judgement replaces the last
+                # one instead of standing beside it.
+                'id': f'{SCORE_NAME}-{trace_id}',
                 'traceId': trace_id,
                 'name': SCORE_NAME,
-                'value': 1 if value > 0 else 0,
-                'dataType': 'BOOLEAN',
-                'comment': comment,
+                'value': 1 if value > 0 else -1,
+                'dataType': 'NUMERIC',
+                # The number carries the sign; the comment carries the words, so the
+                # score is readable in a table without a legend.
+                'comment': comment or ('helpful' if value > 0 else 'not helpful'),
             },
             # Project-scoped keys, so a score can only land in the project that
             # issued them.

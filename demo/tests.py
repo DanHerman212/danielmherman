@@ -7,6 +7,7 @@ it does.
 """
 
 import json
+import os
 from datetime import timedelta
 from unittest.mock import patch
 
@@ -446,6 +447,34 @@ class FeedbackTraceScoreTests(TestCase):
             response = self._rate(f'{self.conversation.pk}:1', 1)
 
         self.assertEqual(response.status_code, 204)
+
+    def test_a_thumb_down_is_sent_as_minus_one_rather_than_zero(self):
+        """A BOOLEAN 0 is indistinguishable from no rating in the scored table.
+
+        The first version sent `dataType: BOOLEAN` with 1/0, so a negative rating
+        arrived as zero and the reader could not tell it apart from an unrated
+        trace — which defeats the purpose of scoring at all. Reported from the
+        Langfuse UI on 2026-10-17.
+        """
+        from demo import langfuse_scores
+
+        env = {'LANGFUSE_HOST': 'https://lf.example.invalid',
+               'LANGFUSE_PUBLIC_KEY': 'pk', 'LANGFUSE_SECRET_KEY': 'sk'}
+        with patch.dict(os.environ, env), \
+                patch('demo.langfuse_scores.requests.post') as post:
+            post.return_value.status_code = 200
+            self.assertTrue(langfuse_scores.score('trace-abc', -1))
+            self.assertTrue(langfuse_scores.score('trace-abc', 1))
+
+        first, second = (call.kwargs['json'] for call in post.call_args_list)
+        self.assertEqual(first['value'], -1)
+        self.assertEqual(first['dataType'], 'NUMERIC')
+        self.assertEqual(first['comment'], 'not helpful')
+        self.assertEqual(second['value'], 1)
+        self.assertEqual(second['comment'], 'helpful')
+        # One id per trace, so rating twice replaces rather than appends.
+        self.assertEqual(first['id'], 'user-feedback-trace-abc')
+        self.assertEqual(second['id'], first['id'])
 
 
 class ConversationStoreTests(TestCase):
