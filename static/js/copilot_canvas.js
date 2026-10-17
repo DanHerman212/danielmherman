@@ -472,6 +472,14 @@
        the model made about itself. Absent for a redirect, which rested on nothing. */
     var scopeEl = el('span', 'cp-scope');
     scopeEl.hidden = true;
+    /* Which command answered a question the reader did not type as one.
+       Free text is routed deterministically before the model is consulted, so the
+       command that answered is not a choice the reader made — and an answer that
+       arrives in a shape they did not ask for has to say why. It borrows the scope
+       pill's class because it is the same kind of statement: a fact about the turn
+       rather than about the answer. */
+    var routedEl = el('span', 'cp-scope cp-routed');
+    routedEl.hidden = true;
 
     var evidence = el('span', 'cp-evidence');
     evidence.setAttribute('role', 'status');
@@ -535,7 +543,7 @@
     var title = document.createElement('h2');
     title.className = 'cp-turn-title';
     title.textContent = asked || '';
-    head.append(title, scopeEl, evidence, toolbar);
+    head.append(title, scopeEl, routedEl, evidence, toolbar);
 
     var body = el('div', 'cp-turn-body');
     var answerSection = el('section', 'cp-answer');
@@ -621,10 +629,14 @@
        says where it is; each stage replaces the label as it arrives, so what the
        reader sees is the run's latest news rather than a log of it.
 
-       There is no control here and no list behind one. The list that used to open
-       from this row was only reachable once the run had finished, and a finished turn
-       now carries no row at all — so a disclosure would have had nothing to reveal
-       and nothing to open it. A live region is what this actually is. */
+       The labels are also kept, because a replaced label is not a forgotten one: once
+       the turn settles they become a collapsed disclosure under the answer. That is
+       the one thing this row can offer after it stops being a status — the order in
+       which the run actually did its work — and it is what a reader reaches for when
+       an answer looks thin or stopped early. While the run is live the row is a plain
+       live region with no control on it, so nothing is hidden behind a chevron at the
+       moment the reader most wants to see the run move. */
+    var stages = [];  // every label this run passed through, in order
     var status = el('div', 'cp-status');
     status.setAttribute('role', 'status');
     var dots = el('span', 'typing-dots');
@@ -643,8 +655,22 @@
     /* The row is only there while there is something to say. A finished turn says
        nothing about itself — "Answered" is the absence of news dressed as a status,
        and the hairline that closes the turn already separates it from the next one. */
+    var retired = false;
     function retire() {
-      if (foot.parentNode) foot.remove();
+      // Idempotent, and it has to be: a failed run calls `finish` and then the error
+      // path calls it again, and the second call found `status` already replaced by
+      // the stage history — `replaceChild` then threw, which left a correct answer on
+      // screen beside a red banner (seen 2026-10-17).
+      if (retired) return;
+      retired = true;
+      if (foot.parentNode) {
+        // The run's own history takes the live row's place. Kept, the labels are the
+        // account of what the run did; a restored turn has none, because the progress
+        // it passed through was never stored, and its foot goes away as it always did.
+        var history = stageHistory();
+        if (history) foot.replaceChild(history, status);
+        else foot.remove();
+      }
       // The run is over and the turn is settled. Both paths land here — `finish` for a
       // live run, `restore` for a turn read back from the store — so this is the one
       // place that means "the answer is final", which is the moment a rating becomes a
@@ -659,12 +685,39 @@
 
     function stage(label) {
       if (label === statusText.textContent) return;
+      // The opening label is a stage too: the run began there, and a history that starts
+      // at the second label would be missing the only one the reader already watched.
+      if (!stages.length) stages.push(statusText.textContent);
+      // A label that repeats is the run coming back to a stage — the loop, not a new
+      // step — so it is recorded again rather than deduplicated.
+      stages.push(label);
       statusText.textContent = label;
       // Restart the fade, so a replaced stage reads as replaced even when the two
       // arrive a moment apart.
       statusText.style.animation = 'none';
       void statusText.offsetWidth;
       statusText.style.animation = '';
+    }
+
+    /* The stages this run passed through, as a collapsed disclosure, or null when there
+       were none to keep. Closed on arrival: the answer is what the reader came for, and
+       the run's route is the footnote under it, not a second thing to read. */
+    function stageHistory() {
+      if (!stages.length) return null;
+      var details = el('details', 'cp-stages');
+      var summary = el('summary', 'cp-stages-summary');
+      // Named, not just counted. "8 steps" says how much there is to open and nothing
+      // about what opens, which is the one thing a reader needs before deciding to.
+      summary.textContent = 'Agent workflow - ' + stages.length
+        + (stages.length === 1 ? ' step' : ' steps');
+      var list = el('ol', 'cp-stages-list');
+      stages.forEach(function (label) {
+        var item = el('li', 'cp-stages-item');
+        item.textContent = label;
+        list.appendChild(item);
+      });
+      details.append(summary, list);
+      return details;
     }
 
     function finish() {
@@ -679,6 +732,14 @@
     }
 
     function say(message, isError) {
+      // A run that failed after it had already put words on screen did not fail to
+      // answer: it answered part of the way and then stopped. Replacing that text
+      // takes back work the reader has already done, so the failure is stated beneath
+      // it instead. The prose stays; the reader is told the run did not finish.
+      if (isError && hasProse()) {
+        interrupt(message);
+        return;
+      }
       // The settled answer is the authority on this turn's text, so it is written over
       // the draft and the draft's remainder is dropped rather than drained. A character
       // released after this line would append to the settled answer and corrupt it.
@@ -688,6 +749,30 @@
       // No correction to the status row here: every path that reports a failure also
       // finishes the turn, and finishing retires the row. Writing "Not answered" into
       // a detached node would be a line that runs and does nothing.
+    }
+
+    /* A run that stopped midway, with the reader already reading it.
+
+       Two things are true at once and the draft handling has to honour both: what is
+       on screen arrived correctly and is kept, and what is still queued arrived before
+       the failure and belongs to the same answer, so it is drawn rather than dropped.
+       Only then is the queue stopped. The notice is a pill under the prose, not a
+       banner over the turn — it qualifies the text above it and does not replace it. */
+    var notice = null;
+    function interrupt(message) {
+      if (pending) {
+        // Flushed through the same filter the pacing used, so a held marker is not
+        // the one thing the reader sees raw at the moment the run ends.
+        var whole = drawn(pending);
+        draw(whole.text + whole.hold);
+      }
+      stopPacing();
+      if (!notice) {
+        notice = el('div', 'cp-answer-interrupted');
+        notice.setAttribute('role', 'status');
+        prose.parentNode.insertBefore(notice, prose.nextSibling);
+      }
+      notice.textContent = '\u26a0\ufe0f Copilot run incomplete. ' + message;
     }
 
     /* The answer as it is written, held to a reading cadence.
@@ -733,7 +818,16 @@
         text = text.slice(0, open.index);
       }
       return {
-        text: text.replace(/\*/g, '').replace(/\^\[[^\]]*\]/g, ''),
+        text: text
+          .replace(/\*/g, '')
+          .replace(/\^\[[^\]]*\]/g, '')
+          // A heading marker is markup too. `## Hospital course` reached the reader as
+          // two hashes and only became an `<h2>` when the answer settled — the one piece
+          // of syntax the emphasis and citation filters did not cover, so it survived
+          // every draft and was the most visible of the three. Anchored to a line start,
+          // and a space is required after the hashes, so "#1 discharge note" in the body
+          // of a sentence is left exactly as written.
+          .replace(/^[ \t]*#{1,6}[ \t]+/gm, ''),
         hold: hold,
       };
     }
@@ -991,6 +1085,12 @@
           ? 'Patient Chart Synthesis'
           : 'General Medical Evidence';
         scopeEl.hidden = false;
+      }
+      if (payload.routed_to) {
+        // The server sends the wire name; the reader is owed the command they would
+        // have typed. The two coincide for every routed command today (meds, labs).
+        routedEl.textContent = '⚡ Routed to /' + payload.routed_to;
+        routedEl.hidden = false;
       }
       // A note passage has no surface of its own — the canvas shows the answer, not the
       // notes it was drawn from — so on a chart turn the drawer is the only place the

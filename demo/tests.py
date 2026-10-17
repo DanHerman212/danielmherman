@@ -381,6 +381,73 @@ class FeedbackEndpointTests(TestCase):
         self.assertEqual(response.status_code, 302)
 
 
+class FeedbackTraceScoreTests(TestCase):
+    """A rating reaches the trace it is about.
+
+    The endpoint answers 204 whatever happens, so these tests hold the wiring rather
+    than the response: which stored turn a rating is matched to, and that a turn with
+    nothing behind it is skipped rather than scored against its neighbour.
+    """
+
+    def setUp(self):
+        self.user = User.objects.create_user('scorer', password='x')
+        self.client.force_login(self.user)
+        self.patient = DemoPatient.objects.create(
+            hadm_id=90000077, display_name='Score Patient', age=60,
+            sex='F', summary='60F', split_name='test',
+        )
+        self.conversation = Conversation.objects.create(
+            user=self.user, patient=self.patient)
+        self.url = reverse('demo:feedback')
+
+    def _answered(self, ordinal, trace):
+        """One stored turn: the user row and the agent row `record_answer` writes."""
+        Turn.objects.create(conversation=self.conversation, ordinal=ordinal,
+                            role=Turn.Role.USER, question='q')
+        return Turn.objects.create(
+            conversation=self.conversation, ordinal=ordinal + 1,
+            role=Turn.Role.AGENT, answer='a', langfuse_trace_id=trace,
+        )
+
+    def _rate(self, turn_id, score):
+        return self.client.post(self.url,
+                                data=json.dumps({'turn_id': turn_id, 'score': score}),
+                                content_type='application/json')
+
+    def test_a_rating_lands_on_the_trace_of_the_turn_it_names(self):
+        self._answered(1, 'trace-first')
+        self._answered(3, 'trace-second')
+
+        with patch('demo.langfuse_scores.score', return_value=True) as scored:
+            response = self._rate(f'{self.conversation.pk}:2', -1)
+
+        self.assertEqual(response.status_code, 204)
+        scored.assert_called_once_with('trace-second', -1)
+
+    def test_a_turn_that_was_not_traced_is_not_scored(self):
+        self._answered(1, '')
+
+        with patch('demo.langfuse_scores.score', return_value=True) as scored:
+            self._rate(f'{self.conversation.pk}:1', 1)
+
+        scored.assert_not_called()
+
+    def test_a_rating_for_a_turn_that_was_never_stored_is_skipped(self):
+        """The client sends `unsaved:1` when the conversation id had not arrived."""
+        with patch('demo.langfuse_scores.score', return_value=True) as scored:
+            self._rate('unsaved:1', 1)
+
+        scored.assert_not_called()
+
+    def test_a_score_that_could_not_be_recorded_still_answers_204(self):
+        self._answered(1, 'trace-first')
+
+        with patch('demo.langfuse_scores.score', return_value=False):
+            response = self._rate(f'{self.conversation.pk}:1', 1)
+
+        self.assertEqual(response.status_code, 204)
+
+
 class ConversationStoreTests(TestCase):
     """The conversation store enforces the policy, not just the schema."""
 
@@ -1103,6 +1170,31 @@ class A2uiAskLiveTests(TestCase):
         self.assertTrue(_tools_errored({'tool_calls': [
             {'name': 'search_literature', 'response': failure},
             {'name': 'rag_search', 'response': failure},
+        ]}))
+
+    def test_the_agents_own_refusals_are_not_an_outage(self):
+        """A budget refusal is bookkeeping, not a broken dependency.
+
+        Found live on 2026-10-17: the agent answered an administrative question
+        from the pre-flight manifest, then spent its remaining tool budget on
+        searches it did not need. Those calls came back as `tool_call_limit` and
+        `repeated_tool_call`, and this function — which cannot tell a refusal from
+        an outage by shape alone — announced "the clinical copilot is unavailable"
+        over the top of a correct answer.
+        """
+        from demo.views import _tools_errored
+
+        for code in ('tool_call_limit', 'repeated_tool_call'):
+            with self.subTest(code=code):
+                refused = {'tool_calls': [
+                    {'name': 'rag_search', 'response': {'error': code, 'message': 'no'}},
+                ]}
+                self.assertFalse(_tools_errored(refused))
+
+        # A genuine core-tool failure in the same turn is still an outage.
+        self.assertTrue(_tools_errored({'tool_calls': [
+            {'name': 'rag_search', 'response': {'error': 'tool_call_limit'}},
+            {'name': 'rag_search', 'response': {'error': 'feature_fetch_failed'}},
         ]}))
 
     @patch('demo.views.ask_agent', return_value=dict(A2UI_AGENT_REPLY))

@@ -17,6 +17,7 @@ from django.shortcuts import render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
+from . import langfuse_scores
 from .agent_client import (
     AgentError,
     AgentRefused,
@@ -422,6 +423,17 @@ def patient_autocomplete(request):
 # answer.
 CORE_TOOLS = frozenset({"predict_readmission", "rag_search", "rag_search_sections"})
 
+#: Refusals the AGENT manufactures before a tool ever runs: the turn's tool budget is
+#: spent, or the same call was already made with the same arguments. They arrive in the
+#: same `{"error": ...}` shape a broken tool uses, and the difference matters — a
+#: refusal means the tool was never called, so nothing about the downstream is broken.
+#:
+#: Treating them as outages deleted a correct answer on 2026-10-17: the agent answered an
+#: administrative question from the pre-flight manifest, then spent its remaining budget
+#: on searches it did not need, and the BFF answered "the clinical copilot is
+#: unavailable" over the top of a right answer.
+POLICY_REFUSALS = frozenset({"tool_call_limit", "repeated_tool_call"})
+
 
 def _tools_errored(result) -> bool:
     """True if any CORE tool the agent called returned an error payload.
@@ -436,12 +448,15 @@ def _tools_errored(result) -> bool:
     the mechanism — but a rule kept in step with every new tool by hand is one that
     drifts, and the failure it would cause is an unnecessary outage page shown to
     somebody asking about a patient.
+
+    `POLICY_REFUSALS` are excluded for the same reason: they are the agent's own
+    bookkeeping, not a dependency failing.
     """
-    return any(
-        (tc.get("response") or {}).get("error")
-        and tc.get("name") in CORE_TOOLS
-        for tc in (result.get("tool_calls") or [])
-    )
+    for call in (result.get("tool_calls") or []):
+        code = (call.get("response") or {}).get("error")
+        if code and code not in POLICY_REFUSALS and call.get("name") in CORE_TOOLS:
+            return True
+    return False
 
 
 def _sse(event, data):
@@ -993,7 +1008,7 @@ def _streaming_ask(request, intent, trace, period, conversation=None, asked='',
                        asked),
         content_type='text/event-stream',
     )
-    response['Cache-Control'] = 'no-cache'
+    response['Cache-Control'] = 'no-cache, no-transform'
     # An explicit "do not buffer this" for any proxy in front. Without it the
     # whole stream can arrive at once when the response ends, which looks
     # exactly like no streaming at all.
@@ -1007,9 +1022,10 @@ def feedback(request):
     """How the reader rated one turn. Telemetry, and deliberately nothing more.
 
     There is no table behind this and no migration with it: the event is written to the
-    log stream where the rest of a request's trace already goes, and a later evals pass
-    joins it to a stored turn by `turn_id`. A table here would mean a schema this phase
-    does not need and a second home for one event.
+    log stream where the rest of a request's trace already goes, and the rating is
+    attached to the Langfuse trace behind the answer, which is where a review of
+    "answers a clinician rated badly" actually happens. A table here would mean a schema
+    this phase does not need and a second home for one event.
 
     It never fails the reader. A malformed rating is logged and accepted, because the
     reader has already moved on and there is nothing they could do about a 400 on a
@@ -1032,4 +1048,44 @@ def feedback(request):
 
     logger.info('a2ui feedback turn=%s score=%+d at=%s', turn_id or '-', score,
                 body.get('timestamp'))
+    _attach_score(turn_id, score)
     return HttpResponse(status=204)
+
+
+def _attach_score(turn_id: str, value: int) -> None:
+    """Record the rating against the trace behind the turn, when there is one.
+
+    `turn_id` is `"<conversation id>:<n>"`, where `n` counts the turns the console has
+    drawn for that conversation. It is deliberately NOT a row id: the console composes
+    it and a turn is two rows. So the nth drawn turn is the nth stored AGENT row, in
+    ordinal order — matched that way rather than by arithmetic, because `2 * n` would
+    encode an implementation detail (a turn being a user row and an agent row) into a
+    lookup that only needs to agree with what the reader saw.
+
+    Everything here is best-effort. A rating for a turn that was never stored (the
+    client sends `unsaved:1` when the conversation id had not arrived) has no trace to
+    point at, and neither has one whose run was not traced at all.
+    """
+    conversation_ref, _, index = (turn_id or '').partition(':')
+    if not (conversation_ref.isdigit() and index.isdigit()):
+        return
+    ordinal = int(index)
+    if ordinal < 1:
+        return
+
+    conversation = Conversation.objects.filter(pk=int(conversation_ref)).first()
+    if conversation is None:
+        return
+    answered = list(
+        conversation.turns.filter(role=Turn.Role.AGENT).order_by('ordinal')
+    )
+    if ordinal > len(answered):
+        logger.info('a2ui feedback turn=%s has no stored answer to score', turn_id)
+        return
+    turn = answered[ordinal - 1]
+    if not turn.langfuse_trace_id:
+        logger.info('a2ui feedback turn=%s was not traced', turn_id)
+        return
+    if langfuse_scores.score(turn.langfuse_trace_id, value):
+        logger.info('a2ui feedback turn=%s attached to trace %s', turn_id,
+                    turn.langfuse_trace_id)

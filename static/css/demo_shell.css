@@ -128,9 +128,9 @@ button.cp-menu-item {
 /* The run, while it runs. The dots say it is still going and the label says where
    it is; each stage replaces the label as it arrives.
 
-   There is nothing else here. The caret and the list it opened belonged to a
-   finished run, and a finished turn now removes this row outright — so both were
-   left with no way to be reached. */
+   Once the run settles the live row is replaced by `.cp-stages` below — the same
+   labels, kept, behind a chevron. Nothing is hidden while the run is moving: the
+   disclosure only exists after there is nothing left to watch. */
 .cp-status { width: 100%; display: flex; align-items: center; gap: 10px; }
 .cp-status[hidden] { display: none; }
 /* Takes its natural width and no more, so the label sits beside the dots rather
@@ -156,6 +156,36 @@ button.cp-menu-item {
 @keyframes status-fade { from { opacity: 0; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
   .typing-dots span, .cp-status-text { animation: none !important; }
+}
+
+/* What the run did, after it stopped being news.
+
+   Deliberately quiet: a chevron the width of its own words, not a panel. The answer
+   above it is what the reader came for, and this is the footnote that says how it got
+   there — read on demand, out of the way when it is not. The arrow is the browser's
+   own marker, rotated by `[open]` rather than replaced by a glyph, so the control is
+   still a `details` element to a screen reader and to the keyboard. */
+.cp-stages { font-size: 0.78rem; color: #64748b; }
+.cp-stages-summary {
+  cursor: pointer; list-style: none; display: inline-flex; align-items: center; gap: 5px;
+  padding: 2px 0; border-radius: 6px;
+}
+.cp-stages-summary::-webkit-details-marker { display: none; }
+.cp-stages-summary::before {
+  content: '\203a'; font-size: 0.9rem; line-height: 1;
+  transition: transform 140ms ease-out;
+}
+.cp-stages[open] .cp-stages-summary::before { transform: rotate(90deg); }
+.cp-stages-summary:hover { color: #475569; }
+.cp-stages-list {
+  margin: 6px 0 0; padding: 0 0 0 16px; list-style: none;
+  display: flex; flex-direction: column; gap: 3px;
+}
+.cp-stages-item { position: relative; }
+/* The rail, drawn per item so the last label does not trail a line into nothing. */
+.cp-stages-item::before {
+  content: ''; position: absolute; left: -10px; top: 0.55em;
+  width: 4px; height: 4px; border-radius: 50%; background: #cbd5e1;
 }
 
 .cp-ask {
@@ -398,6 +428,17 @@ button.cp-menu-item {
 .cp-answer-error {
   margin: 0; padding: 10px 14px; font-size: 0.88rem; color: #991b1b;
   background: #fef2f2; border: 1px solid #fecaca; border-radius: 10px;
+}
+/* A run that stopped after it had already put words on screen. The prose above it is
+   kept — it arrived correctly, and replacing it with an apology takes back work the
+   reader has already done — so this qualifies the text rather than standing in for it.
+   A pill, not a banner: it says the answer is unfinished, which is one fact, and a
+   full-width red box for one fact reads as a hazard alarm. */
+.cp-answer-interrupted {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin: 4px 0 0; padding: 4px 11px; border-radius: 999px;
+  font-size: 0.78rem; font-weight: 500; color: #92400e;
+  background: #fffbeb; border: 1px solid #fde68a;
 }
 
 /* The verification notice: a quiet pill beside the question rather than a banner over

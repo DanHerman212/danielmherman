@@ -72,6 +72,19 @@ const BAND_HUE = {
   below: { hue: '#276a58', wash: 'rgba(47, 125, 106, 0.12)' },
 };
 
+/**
+ * Air between the blocks a canvas stacks.
+ *
+ * The layout component spaces its children by 8px, which is right between two short
+ * paragraphs and too tight between a paragraph and a widget that already carries its
+ * own padding — the two read as one crowded block. The extra space is declared at the
+ * host and only for a block that follows something, so a widget that opens a surface
+ * does not grow a leading gap above itself.
+ */
+const BLOCK_SPACING = css`
+  :host(:not(:first-child)) { margin-top: 16px; }
+`;
+
 /** A stacked group's heading, and the row that carries one factor. */
 const INFLUENCER_STYLES = css`
   :host { display: block; }
@@ -83,7 +96,10 @@ const INFLUENCER_STYLES = css`
     background: #ffffff;
     border: 1px solid #e5e7eb;
     border-radius: 8px;
-    padding: 16px;
+    /* 16px -> 12px (Phase 4C §1.2). This widget sits directly above the comparative
+       matrix and the pair read as two cards stacked with a gap between them; the
+       vertical rhythm inside is now ~30% tighter so they read as one panel. */
+    padding: 12px;
   }
   /* Three slots on one baseline: score, badge, threshold. The score sets the row's
      height and the badge sits on its baseline rather than centred against it, which
@@ -91,7 +107,7 @@ const INFLUENCER_STYLES = css`
   .headline {
     display: flex;
     align-items: baseline;
-    gap: 10px;
+    gap: 8px;
     white-space: nowrap;
   }
   .score { font-size: 1.9rem; font-weight: 700; line-height: 1; color: var(--band-hue); }
@@ -103,24 +119,27 @@ const INFLUENCER_STYLES = css`
     color: var(--band-hue);
     background: var(--band-wash);
     border-radius: 9999px;
-    padding: 4px 8px;
+    padding: 3px 7px;
   }
   .threshold { margin-left: auto; font-size: 0.75rem; opacity: 0.7; }
-  .group { margin-top: 18px; }
+  /* 18px -> 12px: the group headings are tucked up under the headline rather than
+     starting a new block. They label the two halves of one reading, not two
+     sections. */
+  .group { margin-top: 12px; }
   .group-title { font-size: 0.75rem; font-weight: 700; text-transform: uppercase;
-                 letter-spacing: 0.04em; margin-bottom: 10px; opacity: 0.75; }
-  /* 16px between factors, 6px between a label and its bar. The label used to sit
-     directly on the bar and the rows touched each other, so the list read as a
-     block of ink instead of a set of separate readings. */
-  .factor { margin-bottom: 16px; }
+                 letter-spacing: 0.04em; margin-bottom: 5px; opacity: 0.75; }
+  /* 16px between factors -> 10px, and 6px between a label and its bar -> 4px. The
+     rows still read as separate readings rather than a block of ink, which is what
+     the wider spacing was for, at about 30% less height. */
+  .factor { margin-bottom: 10px; }
   .factor:last-child { margin-bottom: 0; }
-  .factor-label { font-size: 0.85rem; margin-bottom: 6px; }
-  .bar-track { height: 8px; border-radius: 999px; background: rgba(100, 116, 139, 0.14); }
+  .factor-label { font-size: 0.85rem; margin-bottom: 4px; }
+  .bar-track { height: 5px; border-radius: 999px; background: rgba(100, 116, 139, 0.14); }
   /* Slate, not ink. A near-black fill at this width is the heaviest mark on the
      screen and pulls the eye off the score it is meant to explain. Still neutral:
      the bar carries magnitude only, so it must not borrow the band's colour and
      imply it is asserting direction or threshold state (see the UX rulings). */
-  .bar-fill { height: 8px; border-radius: 999px; background: #64748b; }
+  .bar-fill { height: 5px; border-radius: 999px; background: #64748b; }
   /* A driver is a control now. It stays a div carrying a button role rather than
      becoming a <button>, because the row's children are blocks and a button may hold
      only phrasing content — which would mean re-declaring the label and the bar as
@@ -128,7 +147,7 @@ const INFLUENCER_STYLES = css`
   .factor { cursor: pointer; border-radius: 6px; transition: background 120ms ease; }
   .factor:hover { background: rgba(100, 116, 139, 0.07); }
   .factor:focus-visible { outline: 2px solid #1f2937; outline-offset: 2px; }
-  .mismatch { font-size: 0.75rem; font-style: italic; margin-top: 10px; opacity: 0.8; }
+  .mismatch { font-size: 0.75rem; font-style: italic; margin-top: 8px; opacity: 0.8; }
   /* An empty group is a state, not a fault. Italic and muted so it recedes instead
      of reading as a factor whose value failed to arrive. */
   .empty { font-size: 0.85rem; font-style: italic; color: #94a3b8; }
@@ -163,7 +182,7 @@ function driverQuestion(label) {
 }
 
 class RiskInfluencersElement extends A2uiLitElement {
-  static styles = INFLUENCER_STYLES;
+  static styles = [INFLUENCER_STYLES, BLOCK_SPACING];
 
   createController() {
     return new A2uiController(this, RiskInfluencersApi);
@@ -853,7 +872,7 @@ const LiteratureListApi = {
 };
 
 class LiteratureListElement extends A2uiLitElement {
-  static styles = _LITERATURE_STYLES;
+  static styles = [_LITERATURE_STYLES, BLOCK_SPACING];
 
   createController() {
     return new A2uiController(this, LiteratureListApi);
@@ -981,7 +1000,6 @@ const ComparativeRiskMatrixApi = {
       threshold: z.number(),
       decision: z.number(),
       cohort: z.string(),
-      drivers: z.array(z.string()).default([]),
       provenance: z.string(),
     }).optional(),
     baseline_note: z.string().default(''),
@@ -990,7 +1008,6 @@ const ComparativeRiskMatrixApi = {
       source: z.string(),
       reported_rate: z.string(),
       cohort_summary: z.string(),
-      matched_features: z.array(z.string()).default([]),
       evidence_tier: z.string(),
       horizon_days: z.number(),
       url: z.string(),
@@ -999,17 +1016,8 @@ const ComparativeRiskMatrixApi = {
   }).strict(),
 };
 
-/** The shared factors, or an em dash saying the record names none of them. */
-function factorPills(labels) {
-  if (!labels || !labels.length) {
-    return html`<span class="none">—</span>`;
-  }
-  return html`<div class="pills">${labels.map(
-    (label) => html`<span class="pill">${label}</span>`)}</div>`;
-}
-
 class ComparativeRiskMatrixElement extends A2uiLitElement {
-  static styles = _MATRIX_STYLES;
+  static styles = [_MATRIX_STYLES, BLOCK_SPACING];
 
   createController() {
     return new A2uiController(this, ComparativeRiskMatrixApi);
@@ -1025,18 +1033,14 @@ class ComparativeRiskMatrixElement extends A2uiLitElement {
     return html`
       ${baseline ? nothing : html`<div class="note">${props.baseline_note}</div>`}
       <div class="wrap">
-        <table>
-          <caption>
-            ${baseline
-              ? `This patient against published ${horizon} readmission rates`
-              : `Published ${horizon} readmission rates`}
-          </caption>
+        <table aria-label=${baseline
+          ? `This patient and published ${horizon} readmission rates`
+          : `Published ${horizon} readmission rates`}>
           <thead>
             <tr>
               <th scope="col">Source</th>
               <th scope="col">Readmission rate</th>
               <th scope="col">Cohort</th>
-              <th scope="col">Shared risk factors</th>
             </tr>
           </thead>
           <tbody>
@@ -1052,7 +1056,6 @@ class ComparativeRiskMatrixElement extends A2uiLitElement {
                     ${percent(baseline.threshold)}</span>
                 </td>
                 <td>${baseline.cohort}</td>
-                <td>${factorPills(baseline.drivers)}</td>
               </tr>
             ` : nothing}
             ${rows.map((row) => html`
@@ -1069,7 +1072,6 @@ class ComparativeRiskMatrixElement extends A2uiLitElement {
                   <div class="tier">${row.evidence_tier}</div>
                   <div class="excerpt">${row.excerpt}</div>
                 </td>
-                <td>${factorPills(row.matched_features)}</td>
               </tr>
             `)}
           </tbody>
@@ -1097,15 +1099,19 @@ customElements.define('a2ui-comparative-risk-matrix', ComparativeRiskMatrixEleme
 // carries the shape plus anything abnormal — because ten analytes times six timepoints is
 // sixty numbers, and a card that printed all of them is one nobody reads.
 //
-// Two things it must never do. It must not imply the model scored a measure it did not —
-// which is what the scored/generated marker on each row is for, driven by the payload's own
-// `anchored` list. And it must not present a generated value as a measured one: the note
-// under the title says where the numbers came from, and it is the agent's sentence rather
-// than a second wording written here.
+// Provenance is stated once, by the turn rather than by the card. The reader sees
+// the answer's own label — "Patient Chart Synthesis" — above this table, and the
+// caveat that used to sit under it said the same thing a second time, while the
+// per-row "scored"/"generated" markers asked the reader to decode two words that
+// meant nothing to them. Provenance repeated three ways is not three guarantees; it
+// is one guarantee and two distractions.
+//
+// The payload keeps `note` and `anchored`: the export and the eval read them, and
+// which measures the model actually scored is a fact about the run. The card no
+// longer draws either.
 
 const _LAB_STYLES = css`
   :host { display: block; }
-  .note { color: #475569; font-size: 0.78rem; margin-bottom: 8px; }
   table { border-collapse: collapse; width: 100%; font-size: 0.82rem; }
   th, td { text-align: left; vertical-align: middle; padding: 6px 10px;
            border-bottom: 1px solid rgba(17, 24, 39, 0.12); }
@@ -1114,9 +1120,6 @@ const _LAB_STYLES = css`
   .measure { font-weight: 600; white-space: nowrap; }
   .unit { display: block; font-weight: 400; font-size: 0.72rem; color: #64748b;
           margin-top: 2px; }
-  .origin { display: block; font-size: 0.68rem; margin-top: 3px; }
-  .origin.scored { color: #2563eb; }
-  .origin.drawn { color: #94a3b8; }
   .reference { white-space: nowrap; color: #475569; }
   .course { min-width: 12rem; }
   .spark { display: block; }
@@ -1205,7 +1208,7 @@ function sparkline(series, low, high, decimals, label) {
 }
 
 class LabTrendCardElement extends A2uiLitElement {
-  static styles = _LAB_STYLES;
+  static styles = [_LAB_STYLES, BLOCK_SPACING];
 
   createController() {
     return new A2uiController(this, LabTrendCardApi);
@@ -1218,7 +1221,6 @@ class LabTrendCardElement extends A2uiLitElement {
     if (!trends.length) return nothing;
 
     return html`
-      ${props.note ? html`<div class="note">${props.note}</div>` : nothing}
       <table>
         <thead>
           <tr>
@@ -1246,14 +1248,6 @@ class LabTrendCardElement extends A2uiLitElement {
                 <td class="measure">
                   ${trend.label}
                   <span class="unit">${trend.unit}</span>
-                  ${trend.anchored.length
-                    ? html`<span class="origin scored"
-                             title=${'Reproduces the value the model was scored on: '
-                                    + trend.anchored.join(', ')}
-                           >scored</span>`
-                    : html`<span class="origin drawn"
-                             title="Generated for this admission; the model was not scored on it"
-                           >generated</span>`}
                 </td>
                 <td class="reference">${trend.reference_low}–${trend.reference_high}</td>
                 <td class="course">
@@ -1322,7 +1316,7 @@ const SourceCardApi = {
 };
 
 class SourceCardElement extends A2uiLitElement {
-  static styles = _SOURCE_STYLES;
+  static styles = [_SOURCE_STYLES, BLOCK_SPACING];
 
   createController() {
     return new A2uiController(this, SourceCardApi);
@@ -1391,7 +1385,7 @@ const MedicationGridApi = {
 };
 
 class MedicationGridElement extends A2uiLitElement {
-  static styles = _MEDS_STYLES;
+  static styles = [_MEDS_STYLES, BLOCK_SPACING];
 
   createController() {
     return new A2uiController(this, MedicationGridApi);
