@@ -432,7 +432,16 @@ CORE_TOOLS = frozenset({"predict_readmission", "rag_search", "rag_search_section
 #: administrative question from the pre-flight manifest, then spent its remaining budget
 #: on searches it did not need, and the BFF answered "the clinical copilot is
 #: unavailable" over the top of a right answer.
-POLICY_REFUSALS = frozenset({"tool_call_limit", "repeated_tool_call"})
+POLICY_REFUSALS = frozenset({
+    "tool_call_limit",
+    "repeated_tool_call",
+    # The agent refusing its own tool call because the model reached for an
+    # admission this turn is not about, or put an identifier into a literature
+    # search. Both are the boundary working, and both look like a `rag_search`
+    # error to anything reading the payload alone.
+    "patient_scope_refused",
+    "patient_identifier_refused",
+})
 
 
 def _tools_errored(result) -> bool:
