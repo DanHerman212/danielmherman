@@ -64,18 +64,12 @@
   var rendererUrl = feed.getAttribute('data-renderer-url');
   var conversationBase = feed.getAttribute('data-conversation-url');
   var historyUrl = feed.getAttribute('data-history-url');
-  var feedbackUrl = feed.getAttribute('data-feedback-url');
   var retentionDays = feed.getAttribute('data-retention-days');
   if (!askUrl) return;
 
   var renderer = null;          // resolved on the first answer, then reused
   var rendererPromise = null;   // one import, however many turns ask for it
   var inFlight = false;
-
-  /* Turns carry no server id in the browser, so one is minted here: the conversation it
-     belongs to and its ordinal within that conversation. Stable for as long as the
-     thread is on screen, which is as long as a rating can be given. */
-  var turnOrdinal = 0;
 
   /* The thread on screen, and the patient it belongs to. Both are kept because a
      request sends the id and the admission, and the two have to agree: the server
@@ -174,12 +168,7 @@
     return parts.join(' ');
   }
 
-  /* The command vocabulary the server owns, for naming the command a turn used.
-
-     The whole list, not the menu's subset. This labels a turn that has already run, and a
-     command hidden from the menu (`/risk`) is still one a reader can type and the agent
-     still accepts — so dropping it here would only lose the heading above such a turn.
-     Filtering for the menu happens where the menu is drawn. */
+  /* The commands the `/` menu offers, from the one list the server owns. */
   function offeredCommands() {
     var node = document.getElementById('cp-command-data');
     if (!node) return [];
@@ -238,223 +227,6 @@
      two turns cannot reach into each other, and nothing in here is addressed by a
      page-wide id — a conversation holds several canvases and several status rows at
      once. */
-  /* A rating is a telemetry event, not a stored record. It is sent with the turn it
-     belongs to so a later evals pass can join it to a trace, and nothing waits on the
-     answer: a reader who rates and closes the tab is the normal case, and `keepalive` is
-     what lets the request outlive the page. */
-  function postFeedback(turnId, score) {
-    if (!feedbackUrl) return;
-    fetch(feedbackUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRFToken': csrfToken(),
-      },
-      body: JSON.stringify({
-        turn_id: turnId, score: score, timestamp: Date.now(),
-      }),
-      keepalive: true,
-    }).catch(function () {
-      // A rating that could not be sent is not worth an error in the reader's face.
-    });
-  }
-
-  function markChosen(chosen) {
-    [].forEach.call(chosen.parentNode.children, function (sibling) {
-      sibling.classList.remove('is-chosen');
-    });
-    chosen.classList.add('is-chosen');
-  }
-
-  /* One control in the turn's action strip: an outline glyph and a tooltip.
-
-     Outline rather than filled, and the same muted grey as the rest of the turn's
-     chrome, so the row reads as an affordance beside the answer rather than as a
-     reaction to it. The label lives on `title` and `aria-label` both — the glyph is
-     the whole visible control, so the accessible name cannot be the glyph. */
-  function iconButton(glyph, label, style) {
-    var button = el('button', 'cp-turn-action');
-    button.type = 'button';
-    var icon = document.createElement('i');
-    // The family is the caller's, defaulting to the outline set the rest of the turn's
-    // chrome uses. It cannot be hardcoded: FontAwesome Free ships a limited REGULAR
-    // subset, and an icon outside it draws nothing — which is not an empty control but
-    // the browser's missing-glyph box, a rectangle with a cross in it. `fa-download` is
-    // in that group, which is how this parameter came to exist (found in a screenshot,
-    // 2026-10-16). Solid is the complete set, and `flash` already swaps to a solid check
-    // in this same slot, so the element was never regular-only.
-    icon.className = (style || 'fa-regular') + ' ' + glyph;
-    icon.setAttribute('aria-hidden', 'true');
-    button.appendChild(icon);
-    button.title = label;
-    button.setAttribute('aria-label', label);
-    return button;
-  }
-
-  function ratingButton(glyph, label, score, turnIdOf) {
-    var button = iconButton(glyph, label);
-    button.addEventListener('click', function () {
-      postFeedback(turnIdOf(), score);
-      markChosen(button);
-    });
-    return button;
-  }
-
-  /* Confirmation on the control itself, so the strip does not gain a second element:
-     the glyph becomes a check for a moment and returns, which also leaves the button
-     ready to be used again. */
-  function flash(button, className) {
-    if (button.dataset.busy) return;
-    button.dataset.busy = '1';
-    var icon = button.querySelector('i');
-    var was = icon ? icon.className : '';
-    if (icon) icon.className = className;
-    window.setTimeout(function () {
-      if (icon) icon.className = was;
-      delete button.dataset.busy;
-    }, 1400);
-  }
-
-  function copyButton(source) {
-    var button = iconButton('fa-copy', 'Copy this answer');
-    button.addEventListener('click', function () {
-      var text = source ? source.textContent : '';
-      if (!text) return;
-      // Clipboard access can be refused — an insecure origin, a denied permission — and
-      // a copy that silently did nothing is worse than one that admits it.
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(text).then(function () {
-          flash(button, 'fa-solid fa-check');
-        }, function () {
-          flash(button, 'fa-solid fa-triangle-exclamation');
-        });
-      } else {
-        flash(button, 'fa-solid fa-triangle-exclamation');
-      }
-    });
-    return button;
-  }
-
-  /* Put text on the clipboard, and say on the control whether it worked.
-
-     Clipboard access can be refused — an insecure origin, a denied permission — and a
-     copy that silently did nothing is worse than one that admits it. An empty string
-     gets its own refusal: it means the turn carried nothing to copy, which is a
-     different failure from the browser saying no, and it must not look like success. */
-  function copyText(text, button) {
-    if (!text) {
-      flash(button, 'fa-solid fa-ban');
-      return;
-    }
-    if (!navigator.clipboard || !navigator.clipboard.writeText) {
-      flash(button, 'fa-solid fa-triangle-exclamation');
-      return;
-    }
-    navigator.clipboard.writeText(text).then(function () {
-      flash(button, 'fa-solid fa-check');
-    }, function () {
-      flash(button, 'fa-solid fa-triangle-exclamation');
-    });
-  }
-
-  /* The display precision for a probability, matching the widget's own formatter.
-
-     A second copy of one line, and it is deliberate: this file is served as a plain
-     script while the component bundle that draws the widget is a separate entry, so the
-     two cannot import from each other. The alternative was to export a raw 0.090459 under
-     a column headed by a rate, which is the disagreement worth avoiding — an export that
-     does not say what the screen says is worse than two one-line formatters. */
-  function percent(value) {
-    return (Number(value) * 100).toFixed(1) + '%';
-  }
-
-  /* The turn's structured rows as tab-separated text, or '' when it drew none.
-
-     Tab rather than comma: a clinical value may contain a comma and may not contain a
-     tab, so the delimiter cannot collide with a field. Read from the surface the agent
-     composed rather than from the DOM, because the DOM is where these rows are drawn,
-     not where they are defined — a reader who exports a grid should get the rows the
-     tool returned, not what the widget happened to paint.
-
-     One block per structured component, blank line between, so a turn carrying more
-     than one table exports as more than one table rather than as one run-on sheet. */
-  function structuredRows(surface) {
-    var messages = (surface || {}).messages;
-    var components = messages && messages[1] && messages[1].updateComponents
-      && messages[1].updateComponents.components;
-    if (!Array.isArray(components)) return '';
-
-    var key = function (value) { return String(value == null ? '' : value); };
-    var blocks = [];
-
-    components.forEach(function (component) {
-      var rows = null;
-      if (component.component === 'RiskInfluencers') {
-        rows = [['driver', 'contribution', 'direction']];
-        (component.factors || []).forEach(function (factor) {
-          var value = Number(factor.contribution) || 0;
-          rows.push([factor.label, value.toFixed(4),
-                     value >= 0 ? 'increases' : 'decreases']);
-        });
-      } else if (component.component === 'MedicationGrid') {
-        rows = [['medication', 'dosage', 'frequency']];
-        (component.medications || []).forEach(function (row) {
-          rows.push([row.medication, row.dosage, row.frequency]);
-        });
-      } else if (component.component === 'LiteratureList') {
-        rows = [['pmid', 'title', 'journal', 'pub_date', 'url']];
-        (component.articles || []).forEach(function (article) {
-          rows.push([article.pmid, article.title, article.journal,
-                     article.pub_date, article.url]);
-        });
-      } else if (component.component === 'LabTrendCard') {
-        /* One row per measurement, with the points joined rather than summarised.
-
-           A lab course IS a series, and an export that gave one number per analyte would
-           throw away the thing the card was drawn to show. Days, values and flags are three
-           parallel lists in one row, because the shape of a lab table is a series per
-           measurement and flattening it into repeated rows would lose which reading belongs
-           to which day. */
-        rows = [['measurement', 'unit', 'reference', 'days', 'values', 'flags']];
-        (component.trends || []).forEach(function (trend) {
-          var series = trend.series || [];
-          rows.push([
-            trend.label,
-            trend.unit,
-            trend.reference_low + '-' + trend.reference_high,
-            series.map(function (point) { return point.day; }).join('; '),
-            series.map(function (point) { return point.value; }).join('; '),
-            series.map(function (point) { return point.flag; }).join('; '),
-          ]);
-        });
-      } else if (component.component === 'ComparativeRiskMatrix') {
-        /* The patient's row, then the cohorts — in one sheet, because that is what the
-           reader is looking at. The provenance column carries the record's PMID for a
-           cohort row: an export that omits the identifier omits the only thing in the row
-           anyone can check. */
-        rows = [['cohort', 'readmission_rate', 'cohort_definition',
-                 'shared_risk_factors', 'provenance_or_pmid']];
-        var baseline = component.baseline;
-        if (baseline) {
-          rows.push([baseline.source, percent(baseline.probability),
-                     baseline.cohort, (baseline.drivers || []).join('; '),
-                     baseline.provenance]);
-        }
-        (component.rows || []).forEach(function (row) {
-          rows.push([row.source, row.reported_rate, row.cohort_summary,
-                     (row.matched_features || []).join('; '), row.pmid]);
-        });
-      }
-      if (rows && rows.length > 1) {
-        blocks.push(rows.map(function (row) {
-          return row.map(key).join('\t');
-        }).join('\n'));
-      }
-    });
-
-    return blocks.join('\n\n');
-  }
-
   function createTurn(asked) {
     var root = el('article', 'cp-turn');
 
@@ -472,14 +244,6 @@
        the model made about itself. Absent for a redirect, which rested on nothing. */
     var scopeEl = el('span', 'cp-scope');
     scopeEl.hidden = true;
-    /* Which command answered a question the reader did not type as one.
-       Free text is routed deterministically before the model is consulted, so the
-       command that answered is not a choice the reader made — and an answer that
-       arrives in a shape they did not ask for has to say why. It borrows the scope
-       pill's class because it is the same kind of statement: a fact about the turn
-       rather than about the answer. */
-    var routedEl = el('span', 'cp-scope cp-routed');
-    routedEl.hidden = true;
 
     var evidence = el('span', 'cp-evidence');
     evidence.setAttribute('role', 'status');
@@ -489,52 +253,6 @@
         + 'was checked against the record. The answer below is the verified version.');
     evidence.hidden = true;
 
-    /* The turn's utility toolbar, opposite the title in the header.
-
-       One toolbar per TURN rather than one per surface, because a unified `/ehr` turn
-       carries two surfaces in one answer and two toolbars would be two places to look for
-       the same two actions. It sits in the header rather than under the answer because
-       these are actions on the answer as a whole, and the header is the part of a turn
-       that outlives the run — the same reason the Evidence-Check notice lives here and
-       the status row does not.
-
-       Revealed by `retire`, like the rating strip: copying or exporting an answer that is
-       still being written would either be empty or export a half-composed surface. */
-    var toolbar = el('div', 'cp-turn-toolbar');
-    toolbar.hidden = true;
-    var copyAll = iconButton('fa-copy', 'Copy the answer');
-    copyAll.addEventListener('click', function () { copyText(answerText(), copyAll); });
-
-    /* Export, offered only when the turn drew a table.
-
-       The rows come from `structuredRows` — the same function and the same source the rest
-       of this file reads — so what a reader downloads is what the tool returned rather than
-       what the widget painted. The file is tab-separated and named `.tsv` rather than
-       `.csv`: a clinical value may contain a comma and may not contain a tab, so the
-       delimiter cannot collide with a field and no quoting rule has to be invented here and
-       kept in step with another one somewhere else. */
-    var exportAll = iconButton('fa-download', 'Export this table', 'fa-solid');
-    exportAll.hidden = true;
-    exportAll.addEventListener('click', function () {
-      var rows = structuredRows(latest && latest.a2ui);
-      if (!rows) { flash(exportAll, 'fa-solid fa-ban'); return; }
-      var blob = new Blob([rows + '\n'],
-                          { type: 'text/tab-separated-values;charset=utf-8' });
-      var url = URL.createObjectURL(blob);
-      var link = document.createElement('a');
-      link.href = url;
-      // Named for the turn, so two exports from one thread do not overwrite each other.
-      link.download = 'ecc-turn-'
-        + String(thisTurnId()).replace(/[^a-zA-Z0-9]+/g, '-') + '.tsv';
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
-      flash(exportAll, 'fa-solid fa-check');
-    });
-
-    toolbar.append(copyAll, exportAll);
-
     // A heading, not a toggle. A clinician must never have to click to read an
     // earlier turn, so there is nothing here to click: the question is text, and the
     // stylesheet pins it to the top of the scroll area while its answer passes
@@ -543,7 +261,7 @@
     var title = document.createElement('h2');
     title.className = 'cp-turn-title';
     title.textContent = asked || '';
-    head.append(title, scopeEl, routedEl, evidence, toolbar);
+    head.append(title, scopeEl, evidence);
 
     var body = el('div', 'cp-turn-body');
     var answerSection = el('section', 'cp-answer');
@@ -551,65 +269,14 @@
     var prose = el('div', 'cp-answer-text');
     answerSection.append(canvas, prose);
 
-    /* The last presentation this turn was given.
-
-       Held because the answer text is not always in this turn's DOM: when the agent
-       composes a surface that renders the prose, the console is told not to draw the
-       answer again (`renders_prose`), so `.cp-answer-text` is empty by design and both
-       the text to copy and the rows to export live in the payload. */
-    var latest = null;
-
-    /* The records the markers resolve to, the next questions, and what the reader
-       thought of the answer. All three are chrome under the answer rather than part of
-       it, and all three are absent on most turns. */
+    /* The records the markers resolve to, and the next questions. Both are chrome under
+       the answer rather than part of it, and both are absent on most turns. */
     var trail = el('div', 'cp-turn-trail');
     var references = el('details', 'cp-references');
     references.hidden = true;
     var followUps = el('div', 'cp-follow-ups');
     followUps.hidden = true;
-
-    /* What the reader thought of this answer, and a copy of it.
-
-       Held in the trail rather than in the status footer, because the footer does not
-       survive the run: `retire` removes it the moment the answer is settled, and a
-       rating control that vanishes as the answer lands is one nobody can use. The rule
-       is the same one the Evidence-Check notice follows, and for the same reason — the
-       parts of a turn that outlive the run are the heading and the trail. */
-    var actions = el('div', 'cp-turn-actions');
-    actions.hidden = true;
-    /* A turn's own id is composed when a rating is sent, not when the turn is built.
-
-       The conversation's id arrives with the first answer rather than before it, so a
-       turn that minted its id on creation logged `unsaved:1` — a rating that identifies
-       nothing and cannot be joined to a trace, which is the only thing it is for. */
-    var ordinal = ++turnOrdinal;
-    function thisTurnId() {
-      return (conversationId || 'unsaved') + ':' + ordinal;
-    }
-    actions.append(
-      ratingButton('fa-thumbs-up', 'Helpful answer', 1, thisTurnId),
-      ratingButton('fa-thumbs-down', 'Unhelpful answer', -1, thisTurnId)
-    );
-
-    /* The answer as text, for the toolbar's Copy.
-
-       The surface's own copy first: for a turn that draws its prose, this element is
-       empty and reading it would put nothing on the clipboard while the control said
-       "Copied". The element is still the answer for the turns where this file draws it. */
-    function answerText() {
-      return (latest && latest.answer) || prose.textContent || '';
-    }
-
-    trail.append(references, followUps, actions);
-
-    /* A clicked risk driver asks its own question, through the same door a clicked
-       follow-up row uses. The event is composed, so it leaves the renderer's shadow
-       root and arrives here; the alternative — reaching into that root for the click —
-       would couple this file to a component's internals. */
-    canvas.addEventListener('a2ui-follow-up', function (event) {
-      var question = event.detail && event.detail.question;
-      if (question) askFollowUp(question, []);
-    });
+    trail.append(references, followUps);
 
     body.append(answerSection, trail);
 
@@ -629,14 +296,10 @@
        says where it is; each stage replaces the label as it arrives, so what the
        reader sees is the run's latest news rather than a log of it.
 
-       The labels are also kept, because a replaced label is not a forgotten one: once
-       the turn settles they become a collapsed disclosure under the answer. That is
-       the one thing this row can offer after it stops being a status — the order in
-       which the run actually did its work — and it is what a reader reaches for when
-       an answer looks thin or stopped early. While the run is live the row is a plain
-       live region with no control on it, so nothing is hidden behind a chevron at the
-       moment the reader most wants to see the run move. */
-    var stages = [];  // every label this run passed through, in order
+       There is no control here and no list behind one. The list that used to open
+       from this row was only reachable once the run had finished, and a finished turn
+       now carries no row at all — so a disclosure would have had nothing to reveal
+       and nothing to open it. A live region is what this actually is. */
     var status = el('div', 'cp-status');
     status.setAttribute('role', 'status');
     var dots = el('span', 'typing-dots');
@@ -655,69 +318,18 @@
     /* The row is only there while there is something to say. A finished turn says
        nothing about itself — "Answered" is the absence of news dressed as a status,
        and the hairline that closes the turn already separates it from the next one. */
-    var retired = false;
     function retire() {
-      // Idempotent, and it has to be: a failed run calls `finish` and then the error
-      // path calls it again, and the second call found `status` already replaced by
-      // the stage history — `replaceChild` then threw, which left a correct answer on
-      // screen beside a red banner (seen 2026-10-17).
-      if (retired) return;
-      retired = true;
-      if (foot.parentNode) {
-        // The run's own history takes the live row's place. Kept, the labels are the
-        // account of what the run did; a restored turn has none, because the progress
-        // it passed through was never stored, and its foot goes away as it always did.
-        var history = stageHistory();
-        if (history) foot.replaceChild(history, status);
-        else foot.remove();
-      }
-      // The run is over and the turn is settled. Both paths land here — `finish` for a
-      // live run, `restore` for a turn read back from the store — so this is the one
-      // place that means "the answer is final", which is the moment a rating becomes a
-      // statement about an answer rather than about a question, and the moment there is
-      // something to copy or export at all.
-      actions.hidden = false;
-      // The export is offered only when there is a table to export, decided here rather
-      // than at click time so the control does not appear and then refuse.
-      exportAll.hidden = !structuredRows(latest && latest.a2ui);
-      toolbar.hidden = false;
+      if (foot.parentNode) foot.remove();
     }
 
     function stage(label) {
       if (label === statusText.textContent) return;
-      // The opening label is a stage too: the run began there, and a history that starts
-      // at the second label would be missing the only one the reader already watched.
-      if (!stages.length) stages.push(statusText.textContent);
-      // A label that repeats is the run coming back to a stage — the loop, not a new
-      // step — so it is recorded again rather than deduplicated.
-      stages.push(label);
       statusText.textContent = label;
       // Restart the fade, so a replaced stage reads as replaced even when the two
       // arrive a moment apart.
       statusText.style.animation = 'none';
       void statusText.offsetWidth;
       statusText.style.animation = '';
-    }
-
-    /* The stages this run passed through, as a collapsed disclosure, or null when there
-       were none to keep. Closed on arrival: the answer is what the reader came for, and
-       the run's route is the footnote under it, not a second thing to read. */
-    function stageHistory() {
-      if (!stages.length) return null;
-      var details = el('details', 'cp-stages');
-      var summary = el('summary', 'cp-stages-summary');
-      // Named, not just counted. "8 steps" says how much there is to open and nothing
-      // about what opens, which is the one thing a reader needs before deciding to.
-      summary.textContent = 'Agent workflow - ' + stages.length
-        + (stages.length === 1 ? ' step' : ' steps');
-      var list = el('ol', 'cp-stages-list');
-      stages.forEach(function (label) {
-        var item = el('li', 'cp-stages-item');
-        item.textContent = label;
-        list.appendChild(item);
-      });
-      details.append(summary, list);
-      return details;
     }
 
     function finish() {
@@ -732,14 +344,6 @@
     }
 
     function say(message, isError) {
-      // A run that failed after it had already put words on screen did not fail to
-      // answer: it answered part of the way and then stopped. Replacing that text
-      // takes back work the reader has already done, so the failure is stated beneath
-      // it instead. The prose stays; the reader is told the run did not finish.
-      if (isError && hasProse()) {
-        interrupt(message);
-        return;
-      }
       // The settled answer is the authority on this turn's text, so it is written over
       // the draft and the draft's remainder is dropped rather than drained. A character
       // released after this line would append to the settled answer and corrupt it.
@@ -749,30 +353,6 @@
       // No correction to the status row here: every path that reports a failure also
       // finishes the turn, and finishing retires the row. Writing "Not answered" into
       // a detached node would be a line that runs and does nothing.
-    }
-
-    /* A run that stopped midway, with the reader already reading it.
-
-       Two things are true at once and the draft handling has to honour both: what is
-       on screen arrived correctly and is kept, and what is still queued arrived before
-       the failure and belongs to the same answer, so it is drawn rather than dropped.
-       Only then is the queue stopped. The notice is a pill under the prose, not a
-       banner over the turn — it qualifies the text above it and does not replace it. */
-    var notice = null;
-    function interrupt(message) {
-      if (pending) {
-        // Flushed through the same filter the pacing used, so a held marker is not
-        // the one thing the reader sees raw at the moment the run ends.
-        var whole = drawn(pending);
-        draw(whole.text + whole.hold);
-      }
-      stopPacing();
-      if (!notice) {
-        notice = el('div', 'cp-answer-interrupted');
-        notice.setAttribute('role', 'status');
-        prose.parentNode.insertBefore(notice, prose.nextSibling);
-      }
-      notice.textContent = '\u26a0\ufe0f Copilot run incomplete. ' + message;
     }
 
     /* The answer as it is written, held to a reading cadence.
@@ -818,16 +398,7 @@
         text = text.slice(0, open.index);
       }
       return {
-        text: text
-          .replace(/\*/g, '')
-          .replace(/\^\[[^\]]*\]/g, '')
-          // A heading marker is markup too. `## Hospital course` reached the reader as
-          // two hashes and only became an `<h2>` when the answer settled — the one piece
-          // of syntax the emphasis and citation filters did not cover, so it survived
-          // every draft and was the most visible of the three. Anchored to a line start,
-          // and a space is required after the hashes, so "#1 discharge note" in the body
-          // of a sentence is left exactly as written.
-          .replace(/^[ \t]*#{1,6}[ \t]+/gm, ''),
+        text: text.replace(/\*/g, '').replace(/\^\[[^\]]*\]/g, ''),
         hold: hold,
       };
     }
@@ -1078,19 +649,12 @@
        evidence twice, and two renderings of one source read as two sources — which is
        exactly the misreading the citation contract exists to prevent. */
     function presentFacts(payload) {
-      latest = payload;
       var scope = payload.scope || null;
       if (scope) {
         scopeEl.textContent = scope === 'patient_chart'
           ? 'Patient Chart Synthesis'
           : 'General Medical Evidence';
         scopeEl.hidden = false;
-      }
-      if (payload.routed_to) {
-        // The server sends the wire name; the reader is owed the command they would
-        // have typed. The two coincide for every routed command today (meds, labs).
-        routedEl.textContent = '⚡ Routed to /' + payload.routed_to;
-        routedEl.hidden = false;
       }
       // A note passage has no surface of its own — the canvas shows the answer, not the
       // notes it was drawn from — so on a chart turn the drawer is the only place the
@@ -1845,15 +1409,6 @@
       } else if (!block.hasProse()) {
         block.finish();
         block.say('The clinical copilot is unavailable. Please try again.', true);
-      } else {
-        // Prose arrived and no settled answer followed: the stream closed early. Both
-        // branches above are skipped in that case — there is no answer payload, yet the
-        // block does have prose — so NOTHING finished the turn and the composer stayed
-        // pending with a half-written answer on screen and no error to explain it
-        // (reported 2026-10-16 from an unrecognised slash command). Finishing is the
-        // whole fix: the prose the reader already has is kept rather than replaced by a
-        // generic failure, because the failure was in the transport, not the answer.
-        block.finish();
       }
       scrollIntoView(block.root);
     } catch (error) {
