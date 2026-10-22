@@ -388,7 +388,13 @@ def fixture_ask(payload: dict) -> dict:
     question = CHIPS[chip]['question']
     answer = _compose_answer(chip, tool_calls)
     compose_presentation, _ = _agent_presentation()
-    presentation = compose_presentation(question, answer, tool_calls)
+    # The chip IS the command name the live path passes, and the composer needs it: the
+    # comparative matrix is drawn per command (`_draws_matrix`), so omitting it made the
+    # fixture compose a turn the live service would never produce — records with no
+    # comparison above them. Everything the surface draws is decided by that one
+    # argument here, which is the whole reason the fixture composes through the agent's
+    # own module instead of a copy of it.
+    presentation = compose_presentation(question, answer, tool_calls, command=chip)
 
     return {
         'question': question,
