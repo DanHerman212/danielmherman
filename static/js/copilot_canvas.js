@@ -72,6 +72,15 @@
   var rendererPromise = null;   // one import, however many turns ask for it
   var inFlight = false;
 
+  /* An intent an affordance declared, held for exactly one submit.
+
+     A clicked driver bar knows what kind of question it is asking and its wording
+     cannot say so, so it sends the declaration beside the question. It is consumed by
+     the submit it causes — the next thing asked is the reader's own and carries
+     nothing — and it is cleared before that submit awaits anything, so a second
+     submission cannot inherit it. */
+  var declaredIntent = '';
+
   /* Turns carry no server id in the browser, so one is minted here: the conversation it
      belongs to and its ordinal within that conversation. Stable for as long as the
      thread is on screen, which is as long as a rating can be given. */
@@ -604,12 +613,9 @@
 
     /* A clicked risk driver asks its own question, through the same door a clicked
        follow-up row uses. The event is composed, so it leaves the renderer's shadow
-       root and arrives here; the alternative — reaching into that root for the click —
-       would couple this file to a component's internals. */
-    canvas.addEventListener('a2ui-follow-up', function (event) {
-      var question = event.detail && event.detail.question;
-      if (question) askFollowUp(question, []);
-    });
+       root and arrives at the feed, which listens ONCE for the whole column: a listener
+       here would be one per turn, kept for as long as the thread is, and the click also
+       declares an intent that only the feed's listener carries. */
 
     body.append(answerSection, trail);
 
@@ -913,8 +919,29 @@
        told: the pill appears for this case and no other, and says on hover exactly what
        happened. */
     function settleProse(swap) {
+      // A guardrail removed something from what the reader has just read, so the pill
+      // says that whether or not the turn was also verified: the correction is the more
+      // specific fact, and two pills in one slot would be one fact hidden behind the
+      // other.
       if (swap !== 'visible') return;
       evidence.textContent = '🛡️ Reconciled with medical record';
+      evidence.title =
+        'Part of what was shown while this answer was being written was removed after it '
+          + 'was checked against the record. The answer below is the verified version.';
+      evidence.hidden = false;
+    }
+
+    /* That the answer was checked against — and grounded in — the patient record.
+
+       One pill in the header, drawn for every turn the envelope marks `verified`, live
+       or read back from the store. The title carries what was checked, because the
+       sentence on the pill says the reassuring half and the reader is owed the specific
+       one on hover. */
+    function showVerified() {
+      evidence.textContent = '🛡️ Verified against the chart';
+      evidence.title =
+        'This answer was checked against the patient record and rests on it: retrieved '
+          + 'note text, a structured chart result, or the admission summary.';
       evidence.hidden = false;
     }
 
@@ -922,13 +949,14 @@
        path of its own. A question built here would be a second way into the chain, with
        its own handling of intent, clearing and the in-flight guard — and the two would
        drift. Typed into the box, it is asked exactly as the reader would have asked it. */
-    function askFollowUp(question, buttons) {
+    function askFollowUp(question, buttons, intent) {
       // Every row goes at once, not just the one clicked: two clicks on different rows
       // would otherwise send both questions, and the second would be answered as a
       // follow-up to something the reader never read the answer to.
       buttons.forEach(function (button) { button.disabled = true; });
       if (!input || !form) return;
       input.value = question;
+      if (intent) declaredIntent = intent;
       form.requestSubmit();
     }
 
@@ -1092,6 +1120,15 @@
         routedEl.textContent = '⚡ Routed to /' + payload.routed_to;
         routedEl.hidden = false;
       }
+      /* That this answer was checked against, and grounded in, the patient record.
+
+         Read from the envelope rather than inferred here. Which turns qualify is a
+         clinical rule — a `/labs` answer rests on a trajectory, a `/meds` answer on an
+         extraction verified against the note — and a second derivation in this file
+         would be a second answer to the same question. An older payload has no field,
+         which is why this is `=== true` rather than truthiness: `undefined` is a turn
+         recorded before the field existed, not a turn that failed verification. */
+      if (payload.verified === true) showVerified();
       // A note passage has no surface of its own — the canvas shows the answer, not the
       // notes it was drawn from — so on a chart turn the drawer is the only place the
       // passage behind a marker can be read, and it is the row that carries it.
@@ -1723,12 +1760,22 @@
   // --- sending ------------------------------------------------------------------
 
   async function send(hadmId) {
+    // Taken before the first await: an affordance's declaration belongs to the submit
+    // it caused, and a submission that suspends before reading it is one another
+    // submission could take it from.
+    var declared = declaredIntent;
+    declaredIntent = '';
+
     // Before anything is sent: the thread on screen must be this patient's, and the
     // id sent must be that thread's.
     await syncToPatient(hadmId);
 
     var request = { hadm_id: Number(hadmId) };
     if (conversationId) request.conversation_id = conversationId;
+    // Sent as its own field rather than folded into the wording, because the agent is
+    // the one place that defines this vocabulary. This side does not decide what the
+    // value means, and does not keep a list of which values exist.
+    if (declared) request.intent = declared;
 
     // A `/` command names which question to ask, and the typed text is either that
     // command's own input or a separate question. Which one it is belongs to the
@@ -1889,6 +1936,20 @@
     if (event.key !== 'Escape') return;
     closeRowMenu();
     if (filterInput && filterInput.value) setSearchOpen(false);
+  });
+
+  /* An affordance inside a composed surface asking its own question: a clicked risk
+     driver, and nothing else today. Listened for on the feed rather than on each turn,
+     because the surfaces are created per turn and per answer and a listener attached
+     with each of them would be one per turn, kept for as long as the thread is.
+
+     It goes through the composer's submit rather than a request of its own — the
+     comment on `askFollowUp` says why — so the declaration travels with the question
+     in `declaredIntent` and leaves with the same submit. */
+  feed.addEventListener('a2ui-follow-up', function (event) {
+    var detail = event.detail || {};
+    if (!detail.question) return;
+    askFollowUp(detail.question, [], detail.intent);
   });
 
   form.addEventListener('submit', function (event) {
