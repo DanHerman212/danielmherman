@@ -220,12 +220,18 @@ class RiskInfluencersElement extends A2uiLitElement {
        The event is `composed` because it has to leave this shadow root. The composer
        is outside it, and the canvas listens for this rather than reaching in here for
        the click — the same direction of travel the citation markers use, for the same
-       reason. */
+       reason.
+
+       `intent` is the driver declaration, not a second copy of the question. The
+       wording above is written to be read on screen and cannot be asked to carry a
+       machine meaning; the agent's own vocabulary is the place for that, and the
+       declaration is what lets the turn be recognised as a drill-down on a score
+       already in the transcript rather than as a fresh question that must search. */
     const ask = (row) => {
       this.dispatchEvent(new CustomEvent('a2ui-follow-up', {
         bubbles: true,
         composed: true,
-        detail: { question: driverQuestion(row.label) },
+        detail: { question: driverQuestion(row.label), intent: 'risk_driver' },
       }));
     };
 

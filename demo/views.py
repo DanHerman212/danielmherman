@@ -64,7 +64,7 @@ PATIENT_LOOKUP_LIMIT = 5
 # turn, and a caller that does not draw the rows should not pay for them.
 APPROVED_REQUEST_FIELDS = frozenset(
     {'question', 'hadm_id', 'chip', 'conversation_id', 'asked', 'stream_prose',
-     'follow_ups'}
+     'follow_ups', 'intent'}
 )
 
 # Names a caller reaches for when it expects the copilot to remember the
@@ -258,6 +258,21 @@ def _asked_from(payload):
     return asked[:MAX_ASKED_CHARS]
 
 
+def _with_declaration(intent, declared):
+    """Attach the intent a control declared, unread.
+
+    A question's wording is for the reader; what kind of question it is has to be
+    said separately, and the vocabulary for saying it belongs to the agent (it is
+    the layer that acts on it). So this side carries the value across and nothing
+    more: it does not decide which values exist, and a value it has never heard of
+    is the agent's to refuse with its own message rather than a second opinion
+    from here.
+    """
+    if declared:
+        intent['intent'] = declared
+    return intent
+
+
 def _intent_for(payload):
     """Turn the request body into what the agent is asked, or (None, error).
 
@@ -275,7 +290,18 @@ def _intent_for(payload):
     and which refuse them as a second intention is the agent's decision, not
     this side's: the command vocabulary lives in one place, and this proxy is a
     pass-through for intent rather than a second interpreter of it.
+
+    `intent` is a third thing and travels beside the question rather than instead
+    of it: a rendered control that asks its own question (a clicked risk driver)
+    declares what kind of question it is, because the wording written for the
+    reader cannot carry a machine meaning.
     """
+    declared = payload.get('intent')
+    if declared is not None:
+        if not isinstance(declared, str) or not declared.strip():
+            return None, 'intent must be a non-empty string.'
+        declared = declared.strip()
+
     hadm_id = payload.get('hadm_id')
     if hadm_id is not None:
         try:
@@ -308,8 +334,10 @@ def _intent_for(payload):
                 q = question.strip()
                 if len(q) > MAX_QUESTION_CHARS:
                     return None, f'Question exceeds {MAX_QUESTION_CHARS} characters.'
-                return {'chip': chip, 'hadm_id': hadm_id, 'question': q}, None
-            return {'chip': chip, 'hadm_id': hadm_id}, None
+                return _with_declaration(
+                    {'chip': chip, 'hadm_id': hadm_id, 'question': q}, declared), None
+            return _with_declaration(
+                {'chip': chip, 'hadm_id': hadm_id}, declared), None
         # Free text sent alongside the selected patient: the agent embeds the
         # admission in the question so it can ground the answer.
         question = payload.get('question')
@@ -317,17 +345,17 @@ def _intent_for(payload):
             q = question.strip()
             if len(q) > MAX_QUESTION_CHARS:
                 return None, f'Question exceeds {MAX_QUESTION_CHARS} characters.'
-            return {'question': q, 'hadm_id': hadm_id}, None
+            return _with_declaration({'question': q, 'hadm_id': hadm_id}, declared), None
         # Patient selected, nothing asked: the agent has a default question for
         # exactly this case.
-        return {'hadm_id': hadm_id}, None
+        return _with_declaration({'hadm_id': hadm_id}, declared), None
 
     question = payload.get('question')
     if not isinstance(question, str) or not question.strip():
         return None, 'Provide either hadm_id or a non-empty question.'
     if len(question) > MAX_QUESTION_CHARS:
         return None, f'Question exceeds {MAX_QUESTION_CHARS} characters.'
-    return {'question': question.strip()}, None
+    return _with_declaration({'question': question.strip()}, declared), None
 
 
 # --------------------------------------------------------------------------- #

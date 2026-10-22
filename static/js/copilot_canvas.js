@@ -71,6 +71,15 @@
   var rendererPromise = null;   // one import, however many turns ask for it
   var inFlight = false;
 
+  /* An intent an affordance declared, held for exactly one submit.
+
+     A clicked driver bar knows what kind of question it is asking and its wording
+     cannot say so, so it sends the declaration beside the question. It is consumed by
+     the submit it causes — the next thing asked is the reader's own and carries
+     nothing — and it is cleared before that submit awaits anything, so a second
+     submission cannot inherit it. */
+  var declaredIntent = '';
+
   /* The thread on screen, and the patient it belongs to. Both are kept because a
      request sends the id and the admission, and the two have to agree: the server
      refuses a turn that would land in another patient's thread, which is the right
@@ -493,13 +502,14 @@
        path of its own. A question built here would be a second way into the chain, with
        its own handling of intent, clearing and the in-flight guard — and the two would
        drift. Typed into the box, it is asked exactly as the reader would have asked it. */
-    function askFollowUp(question, buttons) {
+    function askFollowUp(question, buttons, intent) {
       // Every row goes at once, not just the one clicked: two clicks on different rows
       // would otherwise send both questions, and the second would be answered as a
       // follow-up to something the reader never read the answer to.
       buttons.forEach(function (button) { button.disabled = true; });
       if (!input || !form) return;
       input.value = question;
+      if (intent) declaredIntent = intent;
       form.requestSubmit();
     }
 
@@ -1287,12 +1297,22 @@
   // --- sending ------------------------------------------------------------------
 
   async function send(hadmId) {
+    // Taken before the first await: an affordance's declaration belongs to the submit
+    // it caused, and a submission that suspends before reading it is one another
+    // submission could take it from.
+    var declared = declaredIntent;
+    declaredIntent = '';
+
     // Before anything is sent: the thread on screen must be this patient's, and the
     // id sent must be that thread's.
     await syncToPatient(hadmId);
 
     var request = { hadm_id: Number(hadmId) };
     if (conversationId) request.conversation_id = conversationId;
+    // Sent as its own field rather than folded into the wording, because the agent is
+    // the one place that defines this vocabulary. This side does not decide what the
+    // value means, and does not keep a list of which values exist.
+    if (declared) request.intent = declared;
 
     // A `/` command names which question to ask, and the typed text is either that
     // command's own input or a separate question. Which one it is belongs to the
@@ -1444,6 +1464,20 @@
     if (event.key !== 'Escape') return;
     closeRowMenu();
     if (filterInput && filterInput.value) setSearchOpen(false);
+  });
+
+  /* An affordance inside a composed surface asking its own question: a clicked risk
+     driver, and nothing else today. Listened for on the feed rather than on each turn,
+     because the surfaces are created per turn and per answer and a listener attached
+     with each of them would be one per turn, kept for as long as the thread is.
+
+     It goes through the composer's submit rather than a request of its own — the
+     comment on `askFollowUp` says why — so the declaration travels with the question
+     in `declaredIntent` and leaves with the same submit. */
+  feed.addEventListener('a2ui-follow-up', function (event) {
+    var detail = event.detail || {};
+    if (!detail.question) return;
+    askFollowUp(detail.question, [], detail.intent);
   });
 
   form.addEventListener('submit', function (event) {
