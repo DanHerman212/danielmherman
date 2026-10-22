@@ -153,6 +153,11 @@ def _stored_presentation(result):
         'scope': scope if isinstance(scope, str) and scope else None,
         'references': _records(result.get('references')),
         'follow_ups': _strings(result.get('follow_ups')),
+        # Whether the agent checked this answer against the record. Stored with the rest
+        # of what the turn presented, because a restored thread has to show the badge the
+        # live turn showed: the judgement belongs to the moment the answer was composed,
+        # and re-deriving it later would be a second opinion about the same answer.
+        'verified': result.get('verified') is True,
     }
 
 
@@ -181,7 +186,6 @@ def _presentation_parts(stored):
         _records(stored.get('references')),
         _strings(stored.get('follow_ups')),
     )
-
 
 def turn_payloads(conversation):
     """The conversation as the list of turns the console renders, oldest first.
@@ -231,6 +235,12 @@ def turn_payloads(conversation):
             'scope': scope,
             'references': references,
             'follow_ups': follow_ups,
+            # The badge a restored turn shows. `presentation` is read through
+            # `_presentation_parts` for the older shapes above, so this is asked of the
+            # stored dict directly and defaults to False for every turn written before
+            # the field existed — an unbadged turn, never a rejected one.
+            'verified': bool(row.presentation.get('verified'))
+            if isinstance(row.presentation, dict) else False,
         })
         asked = ''
     return payloads

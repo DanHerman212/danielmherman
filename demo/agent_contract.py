@@ -31,6 +31,12 @@ class AgentSuccess(TypedDict, total=False):
     # ("no search ran") and an empty article list ("searched, found nothing") must not
     # render identically — and neither must `degraded` ("could not search at all").
     literature: dict[str, Any] | None
+    #: Whether the agent checked this answer against, and grounded it in, the patient's
+    #: own record. Optional because the two services deploy from separate triggers: a
+    #: site revision that lands before an agent revision still answers, and a turn
+    #: recorded before the field existed must read as "not verified" rather than as a
+    #: rejected response.
+    verified: bool
     model: str
     code_revision: str
     # The pointer to the run behind this answer. Optional here rather than
@@ -104,5 +110,10 @@ def validate_agent_response(result: Any) -> AgentSuccess:
             raise AgentResponseError("Agent returned malformed literature.")
         if not isinstance(literature.get("degraded", False), bool):
             raise AgentResponseError("Agent returned malformed literature.")
+
+    # A boolean, not a truthy value. The badge says a clinical claim was checked against
+    # the record, so `"false"` and `1` are both wrong in a way the reader cannot see.
+    if "verified" in result and not isinstance(result["verified"], bool):
+        raise AgentResponseError("Agent returned an invalid verified field.")
 
     return result
