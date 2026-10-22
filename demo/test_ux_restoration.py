@@ -130,10 +130,18 @@ class TurnChromeTests(TestCase):
 
         Two listeners — one per turn and one on the feed — would send the question
         twice; a listener with no intent cannot tell the agent it is a drill-down.
+
+        The listener also has to be able to CALL the function it names. It is at module
+        scope, so `askFollowUp` must be too: nested inside `createTurn` the name was
+        unresolved and every click threw before anything was sent. Indentation is the
+        only scope signal available without a DOM, and this file indents module scope by
+        two spaces — which is exactly the invariant that broke.
         """
         assert self.canvas.count("addEventListener('a2ui-follow-up'") == 1
         assert 'askFollowUp(detail.question, [], detail.intent)' in self.canvas
         assert 'declaredIntent' in self.canvas
+        assert '\n  function askFollowUp(' in self.canvas
+        assert self.canvas.count('function askFollowUp') == 1
 
     def test_the_verified_badge_is_drawn_from_the_envelope(self):
         assert "payload.verified === true" in self.canvas

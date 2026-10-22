@@ -464,6 +464,28 @@
     return blocks.join('\n\n');
   }
 
+  /* Ask a follow-up by putting it in the composer and submitting, rather than by a
+     path of its own. A question built here would be a second way into the chain, with
+     its own handling of intent, clearing and the in-flight guard — and the two would
+     drift. Typed into the box, it is asked exactly as the reader would have asked it.
+
+     Module scope, not per turn. It closes over `input`, `form` and `declaredIntent`,
+     which live here, and TWO callers need it: a follow-up row inside a turn, and the
+     feed's `a2ui-follow-up` listener, which hears a clicked risk driver for the whole
+     column. Nested inside `createTurn` it was invisible to that listener, and every
+     click threw `ReferenceError` before anything was sent — no turn, no request, no
+     server-side trace of the failure (2026-10-22). */
+  function askFollowUp(question, buttons, intent) {
+    // Every row goes at once, not just the one clicked: two clicks on different rows
+    // would otherwise send both questions, and the second would be answered as a
+    // follow-up to something the reader never read the answer to.
+    buttons.forEach(function (button) { button.disabled = true; });
+    if (!input || !form) return;
+    input.value = question;
+    if (intent) declaredIntent = intent;
+    form.requestSubmit();
+  }
+
   function createTurn(asked) {
     var root = el('article', 'cp-turn');
 
@@ -943,21 +965,6 @@
         'This answer was checked against the patient record and rests on it: retrieved '
           + 'note text, a structured chart result, or the admission summary.';
       evidence.hidden = false;
-    }
-
-    /* Ask a follow-up by putting it in the composer and submitting, rather than by a
-       path of its own. A question built here would be a second way into the chain, with
-       its own handling of intent, clearing and the in-flight guard — and the two would
-       drift. Typed into the box, it is asked exactly as the reader would have asked it. */
-    function askFollowUp(question, buttons, intent) {
-      // Every row goes at once, not just the one clicked: two clicks on different rows
-      // would otherwise send both questions, and the second would be answered as a
-      // follow-up to something the reader never read the answer to.
-      buttons.forEach(function (button) { button.disabled = true; });
-      if (!input || !form) return;
-      input.value = question;
-      if (intent) declaredIntent = intent;
-      form.requestSubmit();
     }
 
     /* The inline marker a drawer row answers to. The prose lives inside the renderer's
