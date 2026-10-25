@@ -55,10 +55,11 @@ def _agent_presentation():
 # repository derives from it — the live allowlist, fixture mode's wording, and the
 # buttons the console renders (passed to the page by `views.a2ui_console`).
 #
-# It was two lists here until 2026-10-08: this one and another in
-# `static/js/demo_flow.js`. Two declarations of one concept in one repository is a
-# drift hazard with no upside: a chip added to the console and forgotten here is
-# refused with a 400 the moment somebody clicks it, and the page gives no hint why.
+# It was two lists here until 2026-10-08: this one and another in the split-pane
+# console script, retired in the 2026-10-25 cleanup. Two declarations of one concept
+# in one repository is a drift hazard with no upside: a chip added to the console and
+# forgotten here is refused with a 400 the moment somebody clicks it, and the page
+# gives no hint why.
 #
 # `question` is the wording the model is asked, and it is kept here ONLY for fixture
 # mode, which has to write a `question` into its response to match the live contract.

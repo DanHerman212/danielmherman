@@ -1020,6 +1020,25 @@ class A2uiAskLiveTests(TestCase):
             with self.assertRaises(ModuleNotFoundError):
                 importlib.import_module(module)
 
+    def test_retired_frontend_scripts_stay_gone(self):
+        """Phase 1 removed the split-pane console and the Q3 spike.
+
+        None of these are loaded by a template: the console renders
+        `bundled/a2ui_clinical.js` alone. A script that comes back without a
+        template to load it is dead weight that looks maintained, and a
+        `SourceCard` that comes back is a catalog entry the agent never emits —
+        `services/agent/a2ui.py` mentions it only in prose.
+        """
+        from pathlib import Path
+
+        static_js = Path(settings.BASE_DIR) / 'static' / 'js'
+        for name in ('demo_flow.js', 'demo_a2ui.js', 'a2ui_renderer.js',
+                     'a2ui_risk_components.js'):
+            self.assertFalse((static_js / name).exists(), f'{name} was retired')
+
+        components = (static_js / 'a2ui_clinical_components.js').read_text()
+        self.assertNotIn("'SourceCard'", components)
+
     def _post(self, payload):
         return self.client.post(
             reverse('demo:a2ui_ask'),

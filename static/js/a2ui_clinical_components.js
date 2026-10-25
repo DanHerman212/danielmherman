@@ -1286,70 +1286,6 @@ export const LabTrendCard = {
 customElements.define('a2ui-lab-trend', LabTrendCardElement);
 
 // ---------------------------------------------------------------------------
-// Source card
-//
-// The cited note passage. It is here because switching the console to this
-// catalog would otherwise have taken the evidence card off /meds, /ehr and every
-// free-text answer that cites a note: the agent still composes a `SourceCard`, and
-// a component the catalog does not register draws nothing at all — no error, no
-// warning, just a missing card. Phase 2 replaces it with citations in the
-// narrative itself; until that lands, the card has to keep working.
-
-const _SOURCE_STYLES = css`
-  :host { display: block; }
-  .source { border: 1px solid rgba(17, 24, 39, 0.15);
-            border-left: 3px solid rgba(17, 24, 39, 0.35);
-            border-radius: 8px; padding: 12px 14px;
-            background: rgba(127, 127, 127, 0.04); }
-  .head { font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
-          letter-spacing: 0.05em; opacity: 0.65; }
-  /* pre-wrap: a note passage is a block of clinical text whose line structure
-     carries meaning (drug lists, vitals rows). Reflowing it would make the
-     evidence harder to check than the summary it supports. */
-  .passage { font-size: 0.85rem; line-height: 1.5; margin-top: 8px;
-             white-space: pre-wrap; }
-  .query { font-size: 0.72rem; opacity: 0.6; margin-top: 8px; }
-`;
-
-const SourceCardApi = {
-  name: 'SourceCard',
-  schema: z.object({
-    cite: z.number(),
-    section: z.string(),
-    text: z.string(),
-    query: z.string().default(''),
-  }).strict(),
-};
-
-class SourceCardElement extends A2uiLitElement {
-  static styles = [_SOURCE_STYLES, BLOCK_SPACING];
-
-  createController() {
-    return new A2uiController(this, SourceCardApi);
-  }
-
-  render() {
-    const props = this.controller?.props;
-    if (!props) return nothing;
-
-    return html`
-      <div class="source">
-        <div class="head">
-          Cite ${props.cite} · ${props.section.replace(/_/g, ' ')}
-        </div>
-        <div class="passage">${props.text}</div>
-        ${props.query ? html`<div class="query">retrieved for: ${props.query}</div>` : nothing}
-      </div>
-    `;
-  }
-}
-
-export const SourceCard = {
-  ...SourceCardApi, tagName: 'a2ui-source-card',
-};
-customElements.define('a2ui-source-card', SourceCardElement);
-
-// ---------------------------------------------------------------------------
 // Medications
 //
 // The grid, for `/meds`. A list of drugs in prose is what it replaces: a clinician
@@ -1464,7 +1400,6 @@ export function buildClinicalCatalog(basicCatalog) {
       ['LiteratureList', LiteratureList],
       ['ComparativeRiskMatrix', ComparativeRiskMatrix],
       ['LabTrendCard', LabTrendCard],
-      ['SourceCard', SourceCard],
       ['MedicationGrid', MedicationGrid],
     ]),
     functions: basicCatalog.functions,

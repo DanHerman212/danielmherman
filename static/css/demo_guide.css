@@ -1,7 +1,10 @@
 /* demo_guide.css — Demo User Guide styling.
- * Matches the ECC console theme (see demo_splitpane.css tokens) so the guide
+ * Matches the ECC console theme (the tokens below are the console's) so the guide
  * reads as part of the product: Inter for UI, Source Serif 4 for lede text,
  * the same accent/muted/line/surface palette and risk band colors.
+ *
+ * The console header rules live at the foot of this file: the split-pane stylesheet
+ * they came from was retired on 2026-10-25 and this page was its last loader.
  */
 
 /* Re-declare the console's theme tokens (console.html scopes them under
@@ -210,3 +213,44 @@
 .guide-muted {
   color: var(--guide-muted) !important;
 }
+
+/* ---------- console header ----------
+ * Copied from the retired split-pane stylesheet, which this page was the last
+ * loader of: the guide reuses the console's header classes and nothing else.
+ * Only the classes guide.html actually renders are here — .demo-user and the
+ * avatar belonged to the split-pane rail that no longer exists.
+ */
+.demo-header {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; padding: 0 20px;
+  height: var(--header-h);
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+.demo-header-left { min-width: 0; }
+.demo-brand { display: flex; align-items: center; gap: 12px; }
+.ecc-logo { width: 40px; height: 40px; flex: none; }
+.demo-brand-name {
+  font-size: 0.82rem; font-weight: 600; line-height: 1.2; color: #1f2937;
+  letter-spacing: 0.01em; white-space: nowrap;
+}
+.demo-header-right { display: flex; align-items: center; gap: 10px; white-space: nowrap; }
+.demo-guide-link {
+  display: inline-flex; align-items: center; gap: 7px;
+  height: 38px; padding: 0 14px; border-radius: 9px;
+  border: 1px solid var(--line); background: var(--surface); color: var(--text);
+  font-size: 0.82rem; font-weight: 600; text-decoration: none;
+  cursor: pointer; white-space: nowrap;
+}
+.demo-guide-link:hover { background: var(--surface-2); color: var(--accent); }
+.demo-guide-link i { font-size: 0.95rem; color: var(--accent); }
+.demo-logout { display: inline-flex; align-items: center; }
+.demo-logout button {
+  display: inline-flex; align-items: center; gap: 7px;
+  height: 38px; padding: 0 14px; border-radius: 9px;
+  border: 1px solid var(--line); background: var(--surface); color: var(--text);
+  font: inherit; font-size: 0.82rem; font-weight: 600;
+  cursor: pointer; white-space: nowrap;
+}
+.demo-logout button:hover { background: var(--surface-2); color: var(--accent); }
+.demo-logout button i { font-size: 0.95rem; color: var(--accent); }
