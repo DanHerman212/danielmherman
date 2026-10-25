@@ -295,6 +295,15 @@ def _stored_calls(calls):
     put note text in this database, and the cost of guessing this way is one
     re-run of a tool whose corpus is written offline and never mutated by a
     request.
+
+    That cost was mispriced for one tool. A re-derivable call is not stored, so
+    `graph.replay_messages` re-runs it to rebuild the transcript — which means a thread
+    that had ever answered `/labs` paid for `get_lab_trends` again on every subsequent
+    turn, before the model was asked anything, and the reader saw it only as latency.
+    The agent now classifies the lab series as a result a caller keeps (phases 5C,
+    2026-10-25): values, intervals and flags generated from the admission's own feature
+    row, with no note prose in it. Nothing here changed — the flag is the agent's to set
+    — and this note records why the set moved.
     """
     stored = []
     for call in calls or []:

@@ -234,6 +234,22 @@
       release();
     }
 
+    /* Drop what has not been painted, and keep the reveal open.
+
+       For the one caller that is not finished: a run that spoke, went back for evidence
+       and is about to speak again. What it queued belongs to the pass that was abandoned
+       — left in the queue it would be painted under the *next* pass's opening sentence —
+       and the turn goes on using this same reveal. `cancel` is the terminal version of
+       this and stays terminal, because everything that calls it is about to replace the
+       text outright. */
+    function discard() {
+      stopTimer();
+      queue = '';
+      budget = 0;
+      flushing = false;
+      release();
+    }
+
     function close() {
       closed = true;
       stopTimer();
@@ -246,6 +262,7 @@
     return Object.freeze({
       push: push,
       flush: flush,
+      discard: discard,
       drainNow: drainNow,
       cancel: close,
       get pending() { return queue.length; },

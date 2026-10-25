@@ -808,6 +808,23 @@
       });
     }
 
+    /* Take the draft away without ending the turn.
+
+       For the run that went back for evidence: the model spoke, was sent to a tool or
+       told to retrieve, and will answer again. The prose on screen belongs to the first
+       pass and is not the answer — the answer is the last pass's — so it goes at the
+       frame that says the run moved on, rather than being replaced by the settled answer
+       a moment later. The reveal stays open: the next pass pours into this same turn,
+       and its opening characters must not be painted underneath the tail of the abandoned
+       one. */
+    function abandonDraft() {
+      reveal.discard();
+      prose.textContent = '';
+      streamed = '';
+      committed = 0;
+      tail = null;
+    }
+
     /* Take the draft away, and stop the cadence feeding it.
 
        Called once the surface has crossed over, and by `say` — the one path that replaces
@@ -1091,6 +1108,7 @@
       say: say,
       appendProse: appendProse,
       hasProse: hasProse,
+      abandonDraft: abandonDraft,
       flushProse: flushProse,
       settle: settle,
       settleProse: settleProse,
@@ -1269,6 +1287,13 @@
         return;
       }
       // A stage frame's own wording, whatever the agent chose to call it.
+      //
+      // A stage that arrives after this turn has already drawn prose is the run going
+      // back for evidence: the model spoke, was sent to a tool or told to retrieve, and
+      // will answer again. What is on screen belongs to the first pass and is not the
+      // answer, so it is dropped here, at the frame that says so — the reader watches the
+      // run move on rather than watching a sentence arrive and be taken away.
+      if (block.hasProse()) block.abandonDraft();
       var label = payload.label || payload.stage || name;
       if (label) block.stage(label);
     }

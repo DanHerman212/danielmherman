@@ -196,3 +196,35 @@ test('cancel stops the pour and paints nothing further', () => {
   assert.equal(turn.reveal.pending, 0);
   assert.equal(turn.hands.timers, 0);
 });
+
+test('discard empties the queue and leaves the reveal open for the next pass', () => {
+  // A run that spoke, went back for evidence and is about to speak again: the queued
+  // characters belong to a pass that was abandoned, and the turn keeps using this
+  // reveal. `cancel` would end it, and the second pass would be dropped entire.
+  const turn = subject();
+  turn.reveal.push('u'.repeat(400));
+  turn.hands.advance(2000);
+  const abandoned = turn.text();
+
+  turn.reveal.discard();
+  assert.equal(turn.reveal.pending, 0);
+  assert.equal(turn.hands.timers, 0);
+
+  turn.reveal.push('second pass');
+  turn.hands.advance(1000);
+
+  assert.equal(turn.text(), abandoned + 'second pass');
+  assert.equal(turn.text().includes('u'), true);
+});
+
+test('cancel is terminal, unlike discard', () => {
+  const turn = subject();
+  turn.reveal.push('v'.repeat(50));
+  turn.reveal.cancel();
+  const after = turn.text().length;
+
+  turn.reveal.push('nothing more');
+  turn.hands.advance(2000);
+
+  assert.equal(turn.text().length, after);
+});
