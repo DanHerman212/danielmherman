@@ -66,7 +66,6 @@ A2UI_AGENT_REPLY = {
                      'text': ('Estimated 30-day unplanned readmission risk is '
                               '0.1540 (15.4%), above the 0.12 operating '
                               'threshold.^[1]'),
-                     'streaming': False,
                      'citations': [
                          {'index': 1, 'source': 'Discharge note',
                           'title': 'Discharge medications',

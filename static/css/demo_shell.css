@@ -423,8 +423,78 @@ button.cp-menu-item {
 .cp-answer-text:empty { display: none; }
 .cp-canvas:empty { display: none; }
 
-.cp-answer-text { font-size: 0.95rem; line-height: 1.65; color: #0f172a; }
-.cp-answer-text p { margin: 0 0 0.75rem; }
+/* The draft, before the surface replaces it.
+
+   Every metric here is the narrative's own (`NARRATIVE_STYLES` in
+   a2ui_clinical_components.js), and the reason is that the draft and the settled answer
+   are the same words. Laid out at the same size and the same leading, the handover
+   between them changes a marker's border and nothing else. This element used to be 1.65
+   leading against the narrative's 1.6, and unformatted, so the swap reflowed the whole
+   answer at the moment the reader finished reading it.
+
+   A shadow root cannot be styled from here and this cannot be styled from there, so the
+   numbers are duplicated rather than shared — and `demo/test_frontend_stream.py` asserts
+   that the two sets agree, which is the only thing that keeps a duplicate honest. */
+.cp-answer-text { font-size: 0.95rem; line-height: 1.6; color: #0f172a; }
+.cp-answer-text > h1, .cp-answer-text > h2,
+.cp-answer-text > h3, .cp-answer-text > h4 {
+  font-size: 0.95rem; font-weight: 600; line-height: 1.45; color: #0f172a;
+  margin: 1.25rem 0 0.25rem;
+}
+.cp-answer-text > :first-child { margin-top: 0; }
+.cp-answer-text > p, .cp-answer-text > ul, .cp-answer-text > ol {
+  margin: 0 0 0.75rem;
+}
+
+/* A block that has just finished arriving, settling into the place it will keep. It is
+   appended once and never re-rendered, so this runs once per block and later text does
+   not disturb the ones already read. */
+.cp-draft-block { animation: cp-settle 200ms ease-out both; }
+
+/* The block that has not finished arriving. `pre-wrap` because this is one block of
+   markdown source: a list whose blank line has not arrived yet would otherwise run its
+   items together on a single line. */
+.cp-draft-tail { white-space: pre-wrap; }
+
+/* A citation marker during the draft. Shaped like the component's own pill so the reader
+   is not shown one thing and then another, and dashed because it is not yet a control:
+   there is nothing to open until the answer settles. */
+.cp-cite {
+  font-size: 0.72em; line-height: 1; vertical-align: super;
+  margin-left: 1px; padding: 1px 5px;
+  border: 1px dashed rgba(17, 24, 39, 0.4); border-radius: 999px;
+  background: #ffffff; color: #1f2937; opacity: 0.6; white-space: nowrap;
+}
+
+@keyframes cp-settle {
+  from { opacity: 0; transform: translateY(3px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* The handover between the draft and the surface.
+
+   One grid cell for both children, so they occupy the same place instead of stacking:
+   the draft underneath at full opacity, the surface over it at zero, and then the two
+   cross over in place. In normal flow the reader would be shown two copies of the answer
+   one above the other for the length of the fade, which is the failure this replaces.
+
+   The cell is the taller of the two — the surface, which carries the cards as well as
+   the prose — and that is also the height the column takes once the draft is emptied and
+   the grid is dropped, so the collapse at the end moves nothing. */
+.cp-canvas > a2ui-surface {
+  display: block;
+  transition: opacity 180ms ease-out;
+}
+.cp-canvas > a2ui-surface.cp-entering { opacity: 0; }
+.cp-answer.is-settling { display: grid; grid-template-columns: minmax(0, 1fr); }
+.cp-answer.is-settling > * { grid-area: 1 / 1; align-self: start; }
+.cp-answer.is-settling > .cp-answer-text { pointer-events: none; }
+.cp-answer-text.cp-leaving { opacity: 0; transition: opacity 180ms ease-out; }
+
+@media (prefers-reduced-motion: reduce) {
+  .cp-draft-block, .cp-canvas > a2ui-surface { animation: none; }
+  .cp-canvas > a2ui-surface, .cp-answer-text.cp-leaving { transition: none; }
+}
 .cp-answer-error {
   margin: 0; padding: 10px 14px; font-size: 0.88rem; color: #991b1b;
   background: #fef2f2; border: 1px solid #fecaca; border-radius: 10px;
@@ -452,6 +522,10 @@ button.cp-menu-item {
   font-size: 0.75rem; font-weight: 500; color: #475569;
   background: #f1f5f9; border: 1px solid #e2e8f0;
   cursor: help;
+  /* It arrives after the answer does, when the guardrails have finished with the text.
+     Fading in says it is new; appearing whole under a line the reader has already
+     started makes them look twice at what moved. */
+  animation: cp-settle 180ms ease-out both;
 }
 .cp-evidence[hidden] { display: none; }
 
@@ -463,6 +537,7 @@ button.cp-menu-item {
   padding: 3px 10px; border-radius: 999px;
   font-size: 0.72rem; font-weight: 600; letter-spacing: 0.01em;
   color: #1e40af; background: #eff6ff; border: 1px solid #bfdbfe;
+  animation: cp-settle 180ms ease-out both;
 }
 .cp-scope[hidden] { display: none; }
 
@@ -471,7 +546,7 @@ button.cp-menu-item {
 
 /* The references drawer, closed by default. It exists to be opened by a reader who wants
    to check a marker, not to be read through on the way past the answer. */
-.cp-references { font-size: 0.85rem; }
+.cp-references { font-size: 0.85rem; animation: cp-settle 200ms ease-out both; }
 .cp-references[hidden] { display: none; }
 .cp-references > summary {
   width: fit-content; padding: 4px 0; cursor: pointer;
@@ -505,7 +580,8 @@ button.cp-menu-item {
 
 /* The follow-up rows: one control per row, full width, hairline-separated, with the
    chevron saying what a click does. Disabled once one is taken — see `askFollowUp`. */
-.cp-follow-ups { display: flex; flex-direction: column; border-top: 1px solid #e2e8f0; }
+.cp-follow-ups { display: flex; flex-direction: column; border-top: 1px solid #e2e8f0;
+  animation: cp-settle 220ms ease-out both; }
 .cp-follow-ups[hidden] { display: none; }
 .cp-follow-up {
   display: flex; align-items: center; gap: 12px; width: 100%;

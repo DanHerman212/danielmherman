@@ -260,7 +260,7 @@ of the scroll area while its own answer passes beneath it.
     first paint needs it.
     {% endcomment %}
     <section class="cp-feed" id="cp-feed" aria-live="polite" aria-label="Conversation"
-             data-renderer-url="{% static 'js/bundled/a2ui_clinical.js' %}?v=15"
+             data-renderer-url="{% static 'js/bundled/a2ui_clinical.js' %}?v=16"
              data-conversation-url="{% url 'demo:conversation_detail' 0 %}"
              data-history-url="{% url 'demo:conversation_history' %}"
              data-feedback-url="{% url 'demo:feedback' %}"
@@ -318,9 +318,12 @@ of the scroll area while its own answer passes beneath it.
 <script src="{% static 'js/copilot_shell.js' %}?v=2"></script>
 <script src="{% static 'js/copilot_app.js' %}?v=4"></script>
 <script src="{% static 'js/copilot_composer.js' %}?v=4"></script>
-{# The thread list and the TSV exporter go before the canvas, which is what boots and #}
-{# the only script that calls into either of them. Each exposes one frozen namespace. #}
+{# The thread list, the cadence and the draft renderer go before the canvas, which is #}
+{# what boots and the only script that calls into any of them. Each exposes one frozen #}
+{# namespace. #}
 <script src="{% static 'js/copilot_threads.js' %}?v=1"></script>
 <script src="{% static 'js/copilot_tsv.js' %}?v=1"></script>
-<script src="{% static 'js/copilot_canvas.js' %}?v=36"></script>
+<script src="{% static 'js/copilot_reveal.js' %}?v=1"></script>
+<script src="{% static 'js/copilot_draft.js' %}?v=1"></script>
+<script src="{% static 'js/copilot_canvas.js' %}?v=37"></script>
 {% endblock %}

@@ -175,26 +175,26 @@
     return found;
   }
 
-  // --- streaming cadence (Phase 4 §1.4) ------------------------------------------
+  // --- streaming cadence (Phase 4 §1.4, revised Phase 5B) ------------------------
 
-  /* The cadence the draft is drawn at, once it is here.
+  /* The cadence lives in `copilot_reveal.js`, and the reason is that the old one was
+     wrong in a way nothing could see.
 
-     The baseline is a reading speed rather than a wire speed: 45 characters a second
-     is conversational prose read aloud. It is deliberately slower than the model
-     writes, and that is the point — a paced draft is one the reader actually reads,
-     which is also why the swap protocol now has a reader who has read the span that
-     may be withdrawn.
+     It released 45 characters a second against a model that writes two or three
+     hundred, so the queue could only grow: an answer longer than 45 x (stream
+     duration) was guaranteed to still be behind when the settled answer landed, and
+     the swap then discarded whatever was left. That piece now tracks the inflow with
+     a bounded lag instead of a fixed speed, and finishes pouring on a deadline before
+     anything replaces it.
 
-     Two things follow. A long synthesis would leave the reader hundreds of characters
-     behind the model, so a backlog past `catchUpQueue` drains at
-     `catchUpMultiplier`; and when the settled answer lands it replaces the draft
-     outright, so the tail is never something the reader has to wait out. */
-  var PACING = {
-    charsPerSecond: 45,
-    catchUpQueue: 350,
-    catchUpMultiplier: 3,
-    tickMs: 40,
-  };
+     This file keeps the half that draws. `PACING` and the state machine moved because
+     a cadence that can only be exercised in a browser is a cadence that only ever gets
+     redesigned by argument. */
+
+  /* How long the settled surface and the draft cross-fade over. Short enough to read as
+     one state becoming another rather than as an animation, and matched to
+     `.cp-answer.is-settling` in the stylesheet. */
+  var SETTLE_MS = 180;
 
   /* Reduced motion skips the pacing rather than shortening it — the request is for no
      animated text, not for faster animated text. Read on each use rather than once,
@@ -202,6 +202,22 @@
   var reduceMotion = window.matchMedia
     ? window.matchMedia('(prefers-reduced-motion: reduce)')
     : { matches: false };
+
+  /* One painted frame later. Two of these is the shortest reliable "the browser has
+     laid this out" available to a page that does not control its own stylesheet. */
+  function nextFrame() {
+    return new Promise(function (resolve) {
+      if (window.requestAnimationFrame) {
+        window.requestAnimationFrame(function () { resolve(); });
+        return;
+      }
+      window.setTimeout(resolve, 16);
+    });
+  }
+
+  function wait(ms) {
+    return new Promise(function (resolve) { window.setTimeout(resolve, ms); });
+  }
 
   // --- one turn -----------------------------------------------------------------
 
@@ -635,7 +651,7 @@
       // The settled answer is the authority on this turn's text, so it is written over
       // the draft and the draft's remainder is dropped rather than drained. A character
       // released after this line would append to the settled answer and corrupt it.
-      stopPacing();
+      resetDraft();
       prose.textContent = message;
       if (isError) prose.classList.add('cp-answer-error');
       // No correction to the status row here: every path that reports a failure also
@@ -652,13 +668,12 @@
        banner over the turn — it qualifies the text above it and does not replace it. */
     var notice = null;
     function interrupt(message) {
-      if (pending) {
-        // Flushed through the same filter the pacing used, so a held marker is not
-        // the one thing the reader sees raw at the moment the run ends.
-        var whole = drawn(pending);
-        draw(whole.text + whole.hold);
-      }
-      stopPacing();
+      // What is still queued arrived before the failure and belongs to the same answer,
+      // so it is drawn rather than dropped. Only then does the cadence stop — and the
+      // draft is emphatically not reset, because the text already on screen is the
+      // part of the answer the reader has done the work of reading.
+      if (reveal.pending) reveal.drainNow();
+      reveal.cancel();
       if (!notice) {
         notice = el('div', 'cp-answer-interrupted');
         notice.setAttribute('role', 'status');
@@ -670,121 +685,144 @@
     /* The answer as it is written, held to a reading cadence.
 
        `say` replaces, which is what a settled answer needs; a delta appends, which is
-       what a stream of them needs. Both write the same node, so the reader watches one
-       body of text grow rather than a second one appear beside it — and the settled
-       answer overwrites the lot, so a delta that arrived after the answer cannot
-       survive it.
+       what a stream of them needs. The cadence itself lives in `copilot_reveal.js`; this
+       is the half that draws, and what it receives is a slice of the answer, in order,
+       exactly once.
 
-       The queue exists because the two speeds do not match: the model emits in a few
-       seconds what takes half a minute to read. Draining it on a timer is what turns
-       the arrival into a cadence. */
-    var pending = '';         // received, not yet drawn
-    var ticker = null;        // the drain timer, alive only while there is a backlog
-    var budget = 0;           // fractional characters carried between ticks
-    var releasePrefix = true; // the agent's held lookahead, drawn on the first tick
+       Two things the draft keeps that the old one did not. A finished block is rendered
+       as markdown the moment it finishes, so headings and paragraphs arrive in the
+       typography the settled answer will use — the old draft was a text node, and a text
+       node turns every blank line into a space, which is why it arrived as one paragraph.
+       And the unfinished block keeps its citation markers, drawn as inert pills: a marker
+       is the thing a clinical reader scans for, and the answer used to lose every one of
+       them while it was being written and give them back when it stopped.
 
-    function draw(text) {
-      prose.appendChild(document.createTextNode(text));
+       None of this sanitises anything the reader typed. A block goes through the
+       renderer's own provider, which is the same one the surface uses, and a block is only
+       ever text that arrived from the agent. */
+    var streamed = '';   // every character released, for the block renderer
+    var committed = 0;   // how many blocks have been rendered, so each is rendered once
+    var tail = null;     // the element holding the unfinished block
+
+    var reveal = window.CopilotReveal.create(function (slice) {
+      streamed += slice;
+      renderDraft();
+    }, { reducedMotion: reduceMotion.matches });
+
+    function renderDraft() {
+      var parts = window.CopilotDraft.partition(streamed);
+      for (var index = committed; index < parts.blocks.length; index += 1) {
+        renderBlock(parts.blocks[index]);
+      }
+      committed = parts.blocks.length;
+      renderTail(parts.tail);
     }
 
-    /* Markdown emphasis and citation markers are both markup, and the draft is a draft of
-       the text rather than of its markup. `**Hospital course.**` reaches the reader as
-       literal asterisks and `^[1]` as three literal characters, and both become bold and
-       a citation pill a moment later when the answer settles. The words are drawn now and
-       the markup is applied at settle, which is the smaller of the two visible changes.
+    /* One finished block, in its final form.
 
-       A marker that has not closed is held rather than drawn: `^[1` is not a citation
-       until its bracket arrives, and drawing it would put raw syntax in front of the
-       reader only to delete it on the next tick — the flash this exists to prevent. The
-       held fragment goes back on the queue and is drawn, or stripped, when the rest of
-       it lands.
-
-       Only the draft is affected. What the guardrails compared, and what the settled
-       answer is rendered from, is the server's own text and never this. */
-    var OPEN_MARKER = /\^(\[[^\]]*)?$/;
-    function drawn(text) {
-      var open = OPEN_MARKER.exec(text);
-      var hold = '';
-      if (open) {
-        hold = open[0];
-        text = text.slice(0, open.index);
-      }
-      return {
-        text: text
-          .replace(/\*/g, '')
-          .replace(/\^\[[^\]]*\]/g, '')
-          // A heading marker is markup too. `## Hospital course` reached the reader as
-          // two hashes and only became an `<h2>` when the answer settled — the one piece
-          // of syntax the emphasis and citation filters did not cover, so it survived
-          // every draft and was the most visible of the three. Anchored to a line start,
-          // and a space is required after the hashes, so "#1 discharge note" in the body
-          // of a sentence is left exactly as written.
-          .replace(/^[ \t]*#{1,6}[ \t]+/gm, ''),
-        hold: hold,
-      };
+       Appended empty and filled when the provider resolves, so what the reader sees is
+       in the order the blocks arrived even though rendering is asynchronous: every block
+       of a turn awaits the same promise, and its callbacks run in the order they were
+       registered. */
+    function renderBlock(markdown) {
+      var host = el('div', 'cp-draft-block');
+      host.setAttribute('aria-busy', 'true');
+      prose.insertBefore(host, tail);
+      scene().then(function () { return proseMarkdown(markdown); }).then(function (html) {
+        host.innerHTML = html;
+        host.removeAttribute('aria-busy');
+        decorateInert(host);
+      }, function () {
+        // No renderer yet, or it refused. The block is still true; it arrives as words
+        // rather than as markup, and the settled answer replaces it a moment later.
+        host.textContent = plain(markdown);
+        host.removeAttribute('aria-busy');
+      });
     }
 
-    function stopPacing() {
-      if (ticker !== null) {
-        window.clearInterval(ticker);
-        ticker = null;
-      }
-      pending = '';
-      budget = 0;
+    /* A block as words, for the fallback above and for nothing else. */
+    function plain(markdown) {
+      return window.CopilotDraft.segments(markdown).map(function (piece) {
+        return piece.cite === undefined ? piece.text : piece.cite;
+      }).join('');
     }
 
-    function drain() {
-      if (!pending) {
-        if (ticker !== null) {
-          window.clearInterval(ticker);
-          ticker = null;
-        }
-        budget = 0;
-        return;
+    /* The block that has not finished arriving.
+
+       Its markup is still on the way — `##` may yet become `## Diagnosis`, a `**` may yet
+       close — so it is drawn as text with the syntax removed, which is what
+       `CopilotDraft.segments` decides. It is one element, replaced in place, so the
+       reader watches a sentence finish rather than a node appear. */
+    function renderTail(text) {
+      if (!tail) {
+        tail = el('span', 'cp-draft-tail');
+        prose.appendChild(tail);
       }
-      // The lookahead the agent holds is released in one burst, and holding it a
-      // second time here would spend on the first paint exactly the latency that hold
-      // was paid to avoid. Everything that arrived with it is drawn now; the cadence
-      // governs what comes after. Once per turn, not once per drain: after a pause in
-      // the stream the queue refills a delta at a time, and those are paces apart.
-      if (releasePrefix) {
-        releasePrefix = false;
-        var burst = drawn(pending);
-        draw(burst.text);
-        pending = burst.hold;
-        budget = 0;
-        return;
+      tail.textContent = '';
+      window.CopilotDraft.segments(text).forEach(function (piece) {
+        tail.appendChild(piece.cite === undefined
+          ? document.createTextNode(piece.text)
+          : markerPill(piece.cite));
+      });
+    }
+
+    /* A citation marker during the draft. Not a control: there is nothing to open until
+       the answer settles, and a button that opens nothing is worse than a marker that
+       plainly is not one. */
+    function markerPill(label) {
+      var pill = el('span', 'cp-cite');
+      pill.setAttribute('aria-hidden', 'true');
+      pill.textContent = label;
+      return pill;
+    }
+
+    /* Citation markers inside a finished block, as inert pills.
+
+       The substitution the component makes once the answer settles, minus the
+       interaction. Done on the rendered DOM rather than on the markdown source, because a
+       marker sits mid-sentence: splitting the source would hand the renderer two
+       half-paragraphs and it would close each of them. */
+    function decorateInert(host) {
+      var pattern = new RegExp(window.CopilotDraft.marker, 'gi');
+      var walker = document.createTreeWalker(host, NodeFilter.SHOW_TEXT);
+      var targets = [];
+      while (walker.nextNode()) {
+        if (walker.currentNode.data.indexOf('^[') !== -1) targets.push(walker.currentNode);
       }
-      var rate = PACING.charsPerSecond;
-      if (pending.length > PACING.catchUpQueue) {
-        rate *= PACING.catchUpMultiplier;
-      }
-      budget += rate * (PACING.tickMs / 1000);
-      var take = Math.floor(budget);
-      if (take < 1) return;
-      if (take > pending.length) take = pending.length;
-      var paced = drawn(pending.slice(0, take));
-      // Only what was actually drawn is consumed. A held fragment stays at the front of
-      // the queue, so the next tick draws it together with whatever follows it.
-      var consumed = take - paced.hold.length;
-      if (consumed < 1) return;
-      draw(paced.text);
-      pending = pending.slice(consumed);
-      budget -= consumed;
+      targets.forEach(function (node) {
+        var found = [];
+        var match;
+        pattern.lastIndex = 0;
+        while ((match = pattern.exec(node.data)) !== null) found.push(match);
+        if (!found.length) return;
+        var fragment = document.createDocumentFragment();
+        var cursor = 0;
+        found.forEach(function (marker) {
+          fragment.appendChild(
+            document.createTextNode(node.data.slice(cursor, marker.index)));
+          fragment.appendChild(markerPill(marker[1]));
+          cursor = marker.index + marker[0].length;
+        });
+        fragment.appendChild(document.createTextNode(node.data.slice(cursor)));
+        node.parentNode.replaceChild(fragment, node);
+      });
+    }
+
+    /* Take the draft away, and stop the cadence feeding it.
+
+       Called once the surface has crossed over, and by `say` — the one path that replaces
+       the text outright. A character released after either of those would append to an
+       answer that is no longer the draft. */
+    function resetDraft() {
+      reveal.cancel();
+      prose.textContent = '';
+      streamed = '';
+      committed = 0;
+      tail = null;
     }
 
     function appendProse(piece) {
-      if (reduceMotion.matches) {
-        // No cadence, but the same filtering: everything that is not the fragment of an
-        // unclosed marker is drawn at once, and that fragment waits for its bracket.
-        pending += piece;
-        var whole = drawn(pending);
-        draw(whole.text);
-        pending = whole.hold;
-        return;
-      }
-      pending += piece;
-      if (ticker === null) ticker = window.setInterval(drain, PACING.tickMs);
+      reveal.push(piece);
     }
 
     /* Whether this turn holds any prose at all, drawn or still queued. The caller needs
@@ -792,7 +830,53 @@
        but a turn with characters still waiting to be drawn is a draft, and treating it
        as a failure would replace a partial answer with an apology. */
     function hasProse() {
-      return prose.textContent.length > 0 || pending.length > 0;
+      return reveal.released > 0 || reveal.pending > 0;
+    }
+
+    /* Finish the pour, and resolve when the last character is on screen.
+
+       Awaiting this before anything replaces the draft is the whole of the first defect:
+       the settled answer used to overwrite a queue that was still a third full, so the
+       reader was shown the beginning of a draft and then the whole answer. A turn read
+       back from the store has nothing queued and this resolves without doing anything. */
+    function flushProse() {
+      return reveal.flush();
+    }
+
+    /* Lay the settled surface over the draft, and take the draft away.
+
+       The two ways this goes wrong are both visible. Two copies of the answer stacked
+       vertically, because both elements are in normal flow and both have height; or the
+       answer briefly blank, because the draft was removed before the surface was drawn. So
+       during the handover `.cp-answer` stacks its children in ONE grid cell — the draft
+       underneath, the surface over it at opacity 0 — and the two cross-fade in place. When
+       the fade ends the draft is emptied and the cell collapses back into normal flow, at
+       a moment when nothing on screen is changing.
+
+       The two frames before the fade are not ceremony. The surface has to be laid out
+       before its opacity can animate against a cell of the right height, and a transition
+       started in the same task as the append would start from a height that is still
+       being computed. */
+    function settle(surface) {
+      if (!surface) {
+        resetDraft();
+        return Promise.resolve();
+      }
+      answerSection.classList.add('is-settling');
+      return nextFrame()
+        .then(nextFrame)
+        .then(function () {
+          // The same frame for both, which is the point: the surface begins to appear as
+          // the draft begins to leave, never after it has gone.
+          surface.classList.remove('cp-entering');
+          prose.classList.add('cp-leaving');
+          return reduceMotion.matches ? null : wait(SETTLE_MS);
+        })
+        .then(function () {
+          resetDraft();
+          prose.classList.remove('cp-leaving');
+          answerSection.classList.remove('is-settling');
+        });
     }
 
     /* What the server said about the prose it announced, once it settled. `visible`
@@ -1007,6 +1091,8 @@
       say: say,
       appendProse: appendProse,
       hasProse: hasProse,
+      flushProse: flushProse,
+      settle: settle,
       settleProse: settleProse,
       presentFacts: presentFacts,
       answer: function (message) { say(message || ''); },
@@ -1070,46 +1156,60 @@
     // A fresh processor per turn: reusing one would carry the previous surface into
     // the new one and draw both.
     var processor = new sceneRenderer.MessageProcessor([sceneRenderer.catalog]);
+    var created = null;
     processor.onSurfaceCreated(function (surface) {
       var element = document.createElement('a2ui-surface');
       element.surface = surface;
+      // Invisible until the draft has been handed over, and laid out anyway: the two
+      // are cross-faded in one grid cell, so the surface's height has to count before
+      // it can be seen. `createTurn`'s `settle` removes this class.
+      element.classList.add('cp-entering');
       host.appendChild(element);
+      created = element;
     });
     processor.processMessages(envelope.messages);
+    return created;
   }
 
   /* Fill a turn from the canonical payload — the same shape a stored turn is
      restored with, which is what keeps one renderer for both.
 
+     The order of the three steps is the second defect. The draft finishes pouring
+     before anything replaces it; the surface is mounted invisible over it; and only
+     then does the handover happen. What used to happen was a wipe on the first
+     statement and a dump on the third.
+
      The surface draws the prose itself when it carries the cited narrative, and the
      envelope says so with `renders_prose`; writing the answer here as well would
-     print it twice, once with nothing clickable. The prose element stays because it
-     is where an error, a refusal, or a turn with no canvas is written. */
+     print it twice, once with nothing clickable. The prose element stays because it is
+     where an error, a refusal, or a turn with no canvas is written — and because it is
+     where the draft lived. */
   async function fillTurn(block, payload) {
     var envelope = payload.a2ui || null;
     var drawsProse = !!(envelope && envelope.renders_prose);
     // Before the answer is drawn, so the turn's chrome and its text arrive together
     // rather than the chrome appearing under text that is already being read.
     block.presentFacts(payload);
-    if (!drawsProse) {
+
+    await block.flushProse();
+
+    if (!drawsProse || !envelope.messages) {
+      // Nothing draws this prose but this element, so the answer is written here. For a
+      // turn that streamed it is the same text the reader has just finished reading.
       block.answer(payload.answer || '');
-    } else {
-      // The surface is drawing the prose, so the streamed draft has to go. The guard
-      // above only stops a SECOND write to this element; it cannot remove text the
-      // deltas already put there, and a turn that streamed would otherwise show the
-      // answer twice — once cited and clickable, once as raw prose with bare `^[1]`
-      // markers beside it. Emptying it is enough: `:empty` hides the element.
-      block.answer('');
+      return;
     }
-    if (envelope && envelope.messages) {
+
+    var surface = null;
+    try {
+      surface = await mountSurface(block.canvas, envelope);
+    } catch (error) {
       // A composed surface is a bonus on top of the prose: if the renderer cannot
-      // mount, the answer the clinician needs is already on screen.
-      try {
-        await mountSurface(block.canvas, envelope);
-      } catch (error) {
-        console.error('a2ui: the composed surface could not be drawn', error);
-      }
+      // mount, the answer the clinician needs is already on screen and stays there.
+      console.error('a2ui: the composed surface could not be drawn', error);
+      return;
     }
+    await block.settle(surface);
   }
 
   /* The frames of one run, read against that run's turn: a stage goes to the turn

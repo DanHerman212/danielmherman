@@ -73,16 +73,39 @@ const BAND_HUE = {
 };
 
 /**
- * Air between the blocks a canvas stacks.
+ * How a block arrives on a canvas: the air around it, and the settle it animates in with.
  *
  * The layout component spaces its children by 8px, which is right between two short
  * paragraphs and too tight between a paragraph and a widget that already carries its
  * own padding — the two read as one crowded block. The extra space is declared at the
  * host and only for a block that follows something, so a widget that opens a surface
  * does not grow a leading gap above itself.
+ *
+ * The animation lives here because this is the only place that can reach these elements:
+ * a card is a child of the surface's shadow root, so no rule in `demo_shell.css` and no
+ * `querySelectorAll` from the page can select one. `:host(...)` matches the host against
+ * its own position among its siblings, which is enough to stagger them, and the stagger
+ * is what makes a canvas read as being laid out rather than pasted.
+ *
+ * The cited narrative is deliberately not on this list. It IS the prose, and it is
+ * cross-faded with the draft the page has been reading (`copilot_canvas.js`, `settle`),
+ * so animating it here as well would fade the same text twice.
  */
-const BLOCK_SPACING = css`
+const BLOCK_SETTLE = css`
   :host(:not(:first-child)) { margin-top: 16px; }
+  :host { animation: a2ui-settle 260ms ease-out both; }
+  :host(:nth-child(2)) { animation-delay: 60ms; }
+  :host(:nth-child(3)) { animation-delay: 120ms; }
+  :host(:nth-child(4)) { animation-delay: 180ms; }
+  :host(:nth-child(5)) { animation-delay: 240ms; }
+  :host(:nth-child(6)) { animation-delay: 300ms; }
+  @keyframes a2ui-settle {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    :host { animation: none; }
+  }
 `;
 
 /** A stacked group's heading, and the row that carries one factor. */
@@ -182,7 +205,7 @@ function driverQuestion(label) {
 }
 
 class RiskInfluencersElement extends A2uiLitElement {
-  static styles = [INFLUENCER_STYLES, BLOCK_SPACING];
+  static styles = [INFLUENCER_STYLES, BLOCK_SETTLE];
 
   createController() {
     return new A2uiController(this, RiskInfluencersApi);
@@ -292,12 +315,13 @@ customElements.define('a2ui-risk-influencers', RiskInfluencersElement);
 //
 // Glance, then verify: the prose carries superscript markers, a marker is a
 // control, and the control opens the evidence behind that sentence. Two rules
-// hold the safety line. Markers are inert until the answer is complete, because
-// a control that goes live while the text around it is still arriving invites a
-// reader to open a citation for a sentence that is not finished being written.
-// And a marker with no citation behind it is drawn disabled rather than dropped,
-// because a model can emit a marker the retrieval did not support, and a bare
-// number reads as evidence the reader simply has not opened yet.
+// hold the safety line. A marker is a control from the first frame — the surface is
+// only ever mounted on a settled answer, and the draft that precedes it draws inert
+// markers of its own in the page (`copilot_draft.js`), so a control never goes live
+// while the sentence around it is still being written. And a marker with no citation
+// behind it is drawn disabled rather than dropped, because a model can emit a marker
+// the retrieval did not support, and a bare number reads as evidence the reader simply
+// has not opened yet.
 
 // `^[2]` is the instructed form; `^[PMID: 35186616]` is the form the model reaches for
 // anyway, because on a literature turn the marker it displays IS the identifier. Both are
@@ -382,9 +406,7 @@ const NARRATIVE_STYLES = css`
   /* A literature marker is an identifier rather than a control that opens a panel,
      so it keeps the badge's shape and loses the underline. */
   .cite-pmid { text-decoration: none; }
-  .cite.inert { border-style: dashed; opacity: 0.6; cursor: default; }
   .cite.missing { border-style: dotted; opacity: 0.6; cursor: not-allowed; }
-  .streaming-note { font-size: 0.75rem; opacity: 0.7; font-style: italic; margin-top: 8px; }
 `;
 
 const POPOVER_STYLES = css`
@@ -634,8 +656,6 @@ const CitedNarrativeApi = {
       excerpt: z.string().optional(),
       url: z.string().optional(),
     })).default([]),
-    // True while the answer is still arriving.
-    streaming: z.boolean().default(false),
   }).strict(),
 };
 
@@ -701,16 +721,9 @@ class CitedNarrativeElement extends A2uiLitElement {
     const props = this.controller?.props;
     if (!props) return nothing;
 
-    const streaming = props.streaming === true;
-
     return html`
       <div class="narrative">
         <div class="prose">${this._body ? unsafeHTML(this._body) : this._source}</div>
-        ${streaming
-          ? html`<div class="streaming-note">
-              Markers are inert until the answer is complete.
-            </div>`
-          : nothing}
       </div>
       <citation-popover></citation-popover>
     `;
@@ -755,7 +768,6 @@ class CitedNarrativeElement extends A2uiLitElement {
 
     const props = this.controller?.props || {};
     const citations = props.citations || [];
-    const streaming = props.streaming === true;
 
     const walker = document.createTreeWalker(prose, NodeFilter.SHOW_TEXT);
     const targets = [];
@@ -772,7 +784,7 @@ class CitedNarrativeElement extends A2uiLitElement {
       let cursor = 0;
       for (const match of matches) {
         fragment.appendChild(document.createTextNode(node.data.slice(cursor, match.index)));
-        fragment.appendChild(this._marker(match[1], citations, streaming));
+        fragment.appendChild(this._marker(match[1], citations));
         cursor = match.index + match[0].length;
       }
       fragment.appendChild(document.createTextNode(node.data.slice(cursor)));
@@ -782,7 +794,7 @@ class CitedNarrativeElement extends A2uiLitElement {
     this._popover?.closeIfDetached();
   }
 
-  _marker(digits, citations, streaming) {
+  _marker(digits, citations) {
     // A marker names its citation by position, or — when the model writes the identifier
     // instead — by PMID. Position is tried first: it is the instructed form, and an index
     // is far too small to be mistaken for an eight-digit identifier.
@@ -794,15 +806,6 @@ class CitedNarrativeElement extends A2uiLitElement {
     // fallbacks are for a payload from an agent that predates the label — a bare number
     // still answers its popover, so nothing breaks, it just reads the way it used to.
     const label = citation?.label || citation?.pmid || digits;
-
-    if (streaming) {
-      const inert = document.createElement('span');
-      inert.className = 'cite inert';
-      // Labelled with what it will become, not with the index: the text does not change
-      // when the answer completes, so the sentence never reflows under the reader.
-      inert.textContent = label;
-      return inert;
-    }
 
     if (citation?.pmid) {
       // Straight to the source. The record is the primary evidence, and a copy of its
@@ -858,8 +861,9 @@ class CitedNarrativeElement extends A2uiLitElement {
    * rather than to a `setTimeout` racing a node it cannot see replaced.
    *
    * Returns false when there is nothing to show — a turn whose prose the surface did
-   * not draw, or markers still inert because the answer is streaming — so the caller
-   * can tell "revealed" from "nothing to reveal" without inspecting this element.
+   * not draw, or a marker that is not a control because no citation resolved behind it
+   * — so the caller can tell "revealed" from "nothing to reveal" without inspecting
+   * this element.
    */
   revealCitation(index) {
     const marker = this.renderRoot.querySelector(
@@ -927,7 +931,7 @@ const LiteratureListApi = {
 };
 
 class LiteratureListElement extends A2uiLitElement {
-  static styles = [_LITERATURE_STYLES, BLOCK_SPACING];
+  static styles = [_LITERATURE_STYLES, BLOCK_SETTLE];
 
   createController() {
     return new A2uiController(this, LiteratureListApi);
@@ -1072,7 +1076,7 @@ const ComparativeRiskMatrixApi = {
 };
 
 class ComparativeRiskMatrixElement extends A2uiLitElement {
-  static styles = [_MATRIX_STYLES, BLOCK_SPACING];
+  static styles = [_MATRIX_STYLES, BLOCK_SETTLE];
 
   createController() {
     return new A2uiController(this, ComparativeRiskMatrixApi);
@@ -1263,7 +1267,7 @@ function sparkline(series, low, high, decimals, label) {
 }
 
 class LabTrendCardElement extends A2uiLitElement {
-  static styles = [_LAB_STYLES, BLOCK_SPACING];
+  static styles = [_LAB_STYLES, BLOCK_SETTLE];
 
   createController() {
     return new A2uiController(this, LabTrendCardApi);
@@ -1376,7 +1380,7 @@ const MedicationGridApi = {
 };
 
 class MedicationGridElement extends A2uiLitElement {
-  static styles = [_MEDS_STYLES, BLOCK_SPACING];
+  static styles = [_MEDS_STYLES, BLOCK_SETTLE];
 
   createController() {
     return new A2uiController(this, MedicationGridApi);
