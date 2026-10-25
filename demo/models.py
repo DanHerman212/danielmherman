@@ -321,6 +321,13 @@ class Turn(models.Model):
     langfuse_trace_id = models.CharField(max_length=64, blank=True, default='')
     # Identities only: [{'cite': 1, 'section': 'hospital_course', 'query': '…'}].
     # The passage behind each is re-derived from the note on demand.
+    #
+    # Provenance, not a published field. It is kept because it records what the
+    # agent resolved this turn against, at the revision that answered it, and that
+    # is not recoverable once the index moves on. It is not republished in
+    # `turn_payloads`: the console's references drawer lists `presentation`
+    # references, which carry the label a reader clicks, and a second list of the
+    # same facts with no reader is a second thing to keep correct.
     citations = models.JSONField(default=list, blank=True)
     # The composed A2UI payload for this turn — what the canvas drew, stored rather
     # than recomposed (Phase 3, 2026-10-14).

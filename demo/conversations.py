@@ -198,11 +198,16 @@ def turn_payloads(conversation):
         answer      the prose, for a turn the surface does not draw
         a2ui        the composed presentation for the turn, or {} when it had none
         flags       the guardrails that fired, which is why this answer differs
-        citations   identities, for the click-through list beside the thread
+        references  the records the answer's markers resolve to, for the drawer
 
     Nothing here re-composes. `a2ui` is the payload the agent composed at the time
     and this store kept, so a restored thread shows what the turn showed rather than
     a recomposition from evidence that has since moved.
+
+    The stored `citations` identities are provenance and are deliberately not
+    published here: the drawer lists `references`, which carry the label a reader
+    sees, and a second list of the same facts with no reader is a second thing to
+    keep correct.
     """
     if conversation is None:
         return []
@@ -226,7 +231,6 @@ def turn_payloads(conversation):
             'answer': row.answer,
             'a2ui': envelope,
             'flags': list(row.guardrail_flags or []),
-            'citations': list(row.citations or []),
             'ordinal': row.ordinal,
             # Phase 4A-2. Defaulted for every turn stored before these existed, so a
             # thread spanning the change needs no special case anywhere downstream: a

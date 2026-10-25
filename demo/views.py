@@ -68,8 +68,11 @@ APPROVED_REQUEST_FIELDS = frozenset(
 )
 
 # Names a caller reaches for when it expects the copilot to remember the
-# conversation. None of them do anything, and the refusal says so rather than
-# leaving the caller to infer it from an answer that quietly lost its context.
+# conversation. Only `turns` does anything — it is the site's own replay of the
+# thread, and it is the one name the agent accepts. The rest are refused with that
+# reason rather than left to be inferred from an answer that quietly lost its
+# context. `conversation_id` is deliberately absent: it is the browser's handle on
+# the stored thread, resolved here, and never forwarded.
 CONVERSATION_FIELDS = frozenset(
     {'history', 'messages', 'session_id', 'context', 'turns'}
 )
@@ -441,15 +444,24 @@ def patient_autocomplete(request):
 #
 # These read the patient's own record. If one of them fails, the answer that arrives
 # is not the answer that was asked for, and spending a credit on it would be charging
-# for nothing.
+# for nothing. `discharge_medications` and `get_lab_trends` are here for that reason:
+# a medication or lab question is answered from them and nothing else, so their failure
+# is the question going unanswered.
 #
 # The literature tool is deliberately NOT here. It is the only one that reaches
 # outside the project, and no clinical question depends on it: an outside agency
 # rate-limiting its own server must not deny a clinician the risk score and note
 # summary they came for. It degrades instead — the agent is instructed to report the
 # search as unavailable rather than as an absence, and the canvas says so beside the
-# answer.
-CORE_TOOLS = frozenset({"predict_readmission", "rag_search", "rag_search_sections"})
+# answer. `get_admission_profile` is not here either: it is a pre-flight read folded
+# into the prompt, so its failure degrades the context rather than the answer.
+CORE_TOOLS = frozenset({
+    "predict_readmission",
+    "rag_search",
+    "rag_search_sections",
+    "discharge_medications",
+    "get_lab_trends",
+})
 
 #: Refusals the AGENT manufactures before a tool ever runs: the turn's tool budget is
 #: spent, or the same call was already made with the same arguments. They arrive in the
@@ -469,6 +481,10 @@ POLICY_REFUSALS = frozenset({
     # error to anything reading the payload alone.
     "patient_scope_refused",
     "patient_identifier_refused",
+    # The agent refusing a call the model declared arguments for that the tool
+    # does not accept. Nothing downstream was contacted, so nothing can be broken:
+    # the agent caught a malformed call at its own boundary and said so.
+    "undeclared_argument_refused",
 })
 
 

@@ -403,11 +403,41 @@ def fixture_ask(payload: dict) -> dict:
         'tool_calls': tool_calls,
         'a2ui': presentation['a2ui'],
         'sources': presentation['sources'],
-        # Carried so the fixture response matches the live one exactly. Absent keys
-        # here would be a difference the browser could see even though it is not
-        # supposed to be able to tell the two apart — which is the whole point of
-        # composing the fixture response with the agent's own modules.
+        # Carried so the fixture response matches the live one key for key. Absent
+        # keys here would be a difference the browser could see even though it is
+        # not supposed to be able to tell the two apart — which is the whole point
+        # of composing the fixture response with the agent's own modules.
         'literature': presentation.get('literature'),
+        # What the composer decided about this turn, published rather than left to
+        # the reader: whether the answer was checked against the record, what it
+        # rested on, and the rows the references drawer lists. All three come from
+        # `compose_presentation`, so the fixture cannot disagree with the live path
+        # about them.
+        'verified': bool(presentation.get('verified')),
+        'scope': presentation.get('scope'),
+        'references': presentation.get('references') or [],
+        # Routing state. The chip IS the command, and no free-text routing chose
+        # it, which is exactly what the live path sends for a typed command.
+        'command': chip,
+        'routed_to': None,
+        # The guardrails did not run: this path never calls a model, so there is no
+        # prose for one to have rewritten. Empty is the honest value and the same
+        # one a clean live turn sends.
+        'guardrail_flags': [],
+        # The three follow-up questions are proposed by the model, and this path has
+        # no model. Empty is a supported value on the live path — the console draws
+        # no follow-up row rather than an empty one — so the fixture says what a
+        # live turn with no proposals says.
+        'follow_ups': [],
+        # No deploy produced this answer, so there is no revision to name. The live
+        # service uses the empty string for the same reason on a local run.
+        'code_revision': '',
+        # No run was traced, so there is no run to point at.
+        'langfuse_trace_id': '',
+        # Which transport carried the tool calls. The live field names the MCP
+        # transport; these calls came from captured payloads, so it says so rather
+        # than naming a server that was never contacted.
+        'mcp_transport': 'fixture',
         'source': 'fixture',
         'model': 'fixture-mode (real captured payloads)',
         'fixture_note': (

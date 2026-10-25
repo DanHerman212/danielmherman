@@ -148,6 +148,38 @@ class TurnStoreTests(_AskTestCase):
         self.assertEqual(stored, [{'cite': 1, 'section': 'hospital_course',
                                    'query': 'diagnosis'}])
 
+    @patch('demo.views.ask_agent')
+    def test_the_stored_citations_are_provenance_and_are_not_published(
+        self, _mocked
+    ):
+        """One name for the facts a reader clicks.
+
+        The identities above are what the agent resolved this turn against, and
+        they are kept for that reason alone. The console's references drawer
+        lists `references`, which carry the label a reader sees, so publishing a
+        second list of the same facts would be a second thing to keep correct
+        with no reader.
+        """
+        _mocked.return_value = {
+            **AGENT_REPLY,
+            'a2ui': dict(A2UI_ENVELOPE),
+            'references': [{'index': 1, 'source': 'Discharge note',
+                            'title': 'Hospital course',
+                            'excerpt': 'admitted with pneumonia'}],
+        }
+
+        self._post({'hadm_id': 90000009, 'chip': 'risk'})
+
+        turn = turn_payloads(self._conversation())[0]
+        self.assertEqual(len(turn['references']), 1)
+        self.assertEqual(turn['references'][0]['title'], 'Hospital course')
+        self.assertNotIn('citations', turn)
+        # The stored column survives the change: it is provenance, not a
+        # rendering input.
+        stored = Turn.objects.get(conversation=self._conversation(),
+                                  role=Turn.Role.AGENT)
+        self.assertEqual(len(stored.citations), 1)
+
     @patch('demo.views.ask_agent', return_value=dict(AGENT_REPLY))
     def test_a_tool_result_is_kept_only_when_it_cannot_be_derived_again(
         self, _mocked
