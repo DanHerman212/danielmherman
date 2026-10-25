@@ -373,6 +373,11 @@ const NARRATIVE_STYLES = css`
   }
   .cite:hover { background: #eef1f5; }
   .cite:focus-visible { outline: 2px solid #1f2937; outline-offset: 1px; }
+  /* The marker a drawer row has just opened, set by revealCitation. It lives here
+     because this stylesheet already owns the marker's outline colour — the page used
+     to write the same colour inline into a shadow node, at a different offset, which
+     is two definitions of one highlight and only one of them could be adjusted. */
+  .cite.is-target { outline: 2px solid #1f2937; outline-offset: 1px; }
   .cite[aria-expanded='true'] { background: #1f2937; color: #ffffff; border-color: #1f2937; }
   /* A literature marker is an identifier rather than a control that opens a panel,
      so it keeps the badge's shape and loses the underline. */
@@ -652,6 +657,8 @@ class CitedNarrativeElement extends A2uiLitElement {
     this._source = null;   // the text `_body` was rendered from
     this._body = null;     // rendered html, or null while the provider is working
     this._failed = false;
+    this._revealTimer = null;   // the highlight `revealCitation` is holding
+    this._announced = false;    // the ready event is dispatched once
   }
 
   /**
@@ -720,6 +727,19 @@ class CitedNarrativeElement extends A2uiLitElement {
     }
     this._syncProse();
     this._decorate();
+
+    // Announced once, after the first render, so the page can hold a handle on this
+    // element without selecting through two shadow roots it does not own — the A2UI
+    // surface's and this one's. `composed` is what carries it across the surface's
+    // boundary; `bubbles` is what carries it up to the turn.
+    if (!this._announced) {
+      this._announced = true;
+      this.dispatchEvent(new CustomEvent('a2ui-cited-narrative-ready', {
+        bubbles: true,
+        composed: true,
+        detail: { element: this },
+      }));
+    }
   }
 
   /**
@@ -826,6 +846,35 @@ class CitedNarrativeElement extends A2uiLitElement {
     if (!citation) return;
 
     this._popover.toggle(citation, button);
+  }
+
+  /**
+   * Highlight the citation marker for `index` and bring it into view.
+   *
+   * The page's references drawer opens a row and then wants the reader shown which
+   * sentence that passage supports. The marker is this component's own node inside
+   * its own shadow root, so the drawing is done here: the outline is a class this
+   * stylesheet defines, and the 1,400 ms belongs to the element that owns the timer
+   * rather than to a `setTimeout` racing a node it cannot see replaced.
+   *
+   * Returns false when there is nothing to show — a turn whose prose the surface did
+   * not draw, or markers still inert because the answer is streaming — so the caller
+   * can tell "revealed" from "nothing to reveal" without inspecting this element.
+   */
+  revealCitation(index) {
+    const marker = this.renderRoot.querySelector(
+      `button.cite[data-cite="${String(index)}"]`);
+    if (!marker) return false;
+
+    const reduce = window.matchMedia
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    marker.scrollIntoView({ block: 'center', behavior: reduce ? 'auto' : 'smooth' });
+    marker.classList.add('is-target');
+
+    clearTimeout(this._revealTimer);
+    this._revealTimer = setTimeout(
+      () => marker.classList.remove('is-target'), 1400);
+    return true;
   }
 }
 

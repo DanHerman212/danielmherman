@@ -108,7 +108,13 @@ class TurnChromeTests(TestCase):
     """
 
     def setUp(self):
-        self.canvas = (STATIC / 'copilot_canvas.js').read_text(encoding='utf-8')
+        # The console's scripts, read as one source set. These assertions are about
+        # behaviour the page provides, and a marker is where the reader can find it
+        # rather than in whichever file happened to hold it this month — pinning them
+        # to one filename made every split a test rewrite, and the file had already
+        # grown to twice the size the comments in it describe.
+        scripts = sorted(STATIC.glob('copilot_*.js'))
+        self.canvas = ''.join(p.read_text(encoding='utf-8') for p in scripts)
         self.console = (TEMPLATES / 'a2ui_console.html').read_text(encoding='utf-8')
 
     def test_the_turn_toolbar_and_its_actions_are_drawn(self):

@@ -886,6 +886,12 @@ class A2uiConsolePageTests(TestCase):
         # the version here would mean every bump edits this file too, and a test that
         # fails on a correct bump is one people learn to update without reading.
         self.assertContains(response, 'copilot_canvas.js')
+        # The two islands split out of it, each with one frozen namespace. Asserted
+        # because a script the canvas calls into and the template forgot to load is a
+        # `TypeError` in a browser and nothing at all in here — the page would render,
+        # the feed would work, and the sidebar would be silently absent.
+        self.assertContains(response, 'copilot_threads.js')
+        self.assertContains(response, 'copilot_tsv.js')
         # The per-turn singletons are gone, and their absence is the fix: with the
         # canvas host addressed by id, a second turn mounted into the first turn's
         # host. Asserted as absent so that putting one back is a deliberate act with a

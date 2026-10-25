@@ -86,46 +86,10 @@
      thread is on screen, which is as long as a rating can be given. */
   var turnOrdinal = 0;
 
-  /* The thread on screen, and the patient it belongs to. Both are kept because a
-     request sends the id and the admission, and the two have to agree: the server
-     refuses a turn that would land in another patient's thread, which is the right
-     refusal and a bad one to earn by accident. */
-  var conversationId = null;
-  var loadedHadm = null;
-
-  /* The sidebar's list as last read from the store. Held so filtering is a re-render
-     rather than a request per keystroke: the list is bounded by the retention window
-     and a few dozen rows long, so the whole of it is already here. */
-  var threadEntries = [];
-
-  /* The thread this tab is in, and where it is kept.
-
-     `sessionStorage` rather than `localStorage`: a conversation is one patient's
-     record and the site is a clinical tool, so two tabs are two threads and closing
-     the tab should not leave an admission pinned to the next visit. A reload keeps
-     its place, which is the thing that was missing. */
-  var CONVERSATION_KEY = 'cp.conversation';
-
-  function rememberConversation(pk) {
-    conversationId = pk;
-    try {
-      if (pk) window.sessionStorage.setItem(CONVERSATION_KEY, String(pk));
-      else window.sessionStorage.removeItem(CONVERSATION_KEY);
-    } catch (error) {
-      // A browser with storage disabled still gets a working page; it just does not
-      // survive a reload, and saying so would be a worse interruption than the
-      // limitation.
-    }
-  }
-
-  function storedConversation() {
-    try {
-      var raw = window.sessionStorage.getItem(CONVERSATION_KEY);
-      return raw ? Number(raw) : null;
-    } catch (error) {
-      return null;
-    }
-  }
+  /* The thread on screen and the patient it belongs to live in
+     `copilot_threads.js`, along with the sidebar that renders them: they are facts
+     about the thread rather than about the feed, and the feed asks for them at the
+     moment it needs one. */
 
   /* The route for one thread. The template has no id to substitute at render time,
      so the server's own path is the template and the trailing `0` is the
@@ -373,108 +337,6 @@
      two cannot import from each other. The alternative was to export a raw 0.090459 under
      a column headed by a rate, which is the disagreement worth avoiding — an export that
      does not say what the screen says is worse than two one-line formatters. */
-  function percent(value) {
-    return (Number(value) * 100).toFixed(1) + '%';
-  }
-
-  /* The turn's structured rows as tab-separated text, or '' when it drew none.
-
-     Tab rather than comma: a clinical value may contain a comma and may not contain a
-     tab, so the delimiter cannot collide with a field. Read from the surface the agent
-     composed rather than from the DOM, because the DOM is where these rows are drawn,
-     not where they are defined — a reader who exports a grid should get the rows the
-     tool returned, not what the widget happened to paint.
-
-     One block per structured component, blank line between, so a turn carrying more
-     than one table exports as more than one table rather than as one run-on sheet. */
-  function structuredRows(surface) {
-    var messages = (surface || {}).messages;
-    var components = messages && messages[1] && messages[1].updateComponents
-      && messages[1].updateComponents.components;
-    if (!Array.isArray(components)) return '';
-
-    var key = function (value) { return String(value == null ? '' : value); };
-    var blocks = [];
-
-    components.forEach(function (component) {
-      var rows = null;
-      if (component.component === 'RiskInfluencers') {
-        rows = [['driver', 'contribution', 'direction']];
-        (component.factors || []).forEach(function (factor) {
-          var value = Number(factor.contribution) || 0;
-          rows.push([factor.label, value.toFixed(4),
-                     value >= 0 ? 'increases' : 'decreases']);
-        });
-      } else if (component.component === 'MedicationGrid') {
-        rows = [['medication', 'dosage', 'frequency']];
-        (component.medications || []).forEach(function (row) {
-          rows.push([row.medication, row.dosage, row.frequency]);
-        });
-      } else if (component.component === 'LiteratureList') {
-        rows = [['pmid', 'title', 'journal', 'pub_date', 'url']];
-        (component.articles || []).forEach(function (article) {
-          rows.push([article.pmid, article.title, article.journal,
-                     article.pub_date, article.url]);
-        });
-      } else if (component.component === 'LabTrendCard') {
-        /* One row per measurement, with the points joined rather than summarised.
-
-           A lab course IS a series, and an export that gave one number per analyte would
-           throw away the thing the card was drawn to show. Days, values and flags are three
-           parallel lists in one row, because the shape of a lab table is a series per
-           measurement and flattening it into repeated rows would lose which reading belongs
-           to which day. */
-        rows = [['measurement', 'unit', 'reference', 'days', 'values', 'flags']];
-        (component.trends || []).forEach(function (trend) {
-          var series = trend.series || [];
-          rows.push([
-            trend.label,
-            trend.unit,
-            trend.reference_low + '-' + trend.reference_high,
-            series.map(function (point) { return point.day; }).join('; '),
-            series.map(function (point) { return point.value; }).join('; '),
-            series.map(function (point) { return point.flag; }).join('; '),
-          ]);
-        });
-      } else if (component.component === 'ComparativeRiskMatrix') {
-        /* The patient's row, then the cohorts — in one sheet, because that is what the
-           reader is looking at. The provenance column carries the record's PMID for a
-           cohort row: an export that omits the identifier omits the only thing in the row
-           anyone can check. */
-        rows = [['cohort', 'readmission_rate', 'cohort_definition',
-                 'shared_risk_factors', 'provenance_or_pmid']];
-        var baseline = component.baseline;
-        if (baseline) {
-          rows.push([baseline.source, percent(baseline.probability),
-                     baseline.cohort, (baseline.drivers || []).join('; '),
-                     baseline.provenance]);
-        }
-        (component.rows || []).forEach(function (row) {
-          rows.push([row.source, row.reported_rate, row.cohort_summary,
-                     (row.matched_features || []).join('; '), row.pmid]);
-        });
-      }
-      if (rows && rows.length > 1) {
-        blocks.push(rows.map(function (row) {
-          return row.map(key).join('\t');
-        }).join('\n'));
-      }
-    });
-
-    return blocks.join('\n\n');
-  }
-
-  /* Ask a follow-up by putting it in the composer and submitting, rather than by a
-     path of its own. A question built here would be a second way into the chain, with
-     its own handling of intent, clearing and the in-flight guard — and the two would
-     drift. Typed into the box, it is asked exactly as the reader would have asked it.
-
-     Module scope, not per turn. It closes over `input`, `form` and `declaredIntent`,
-     which live here, and TWO callers need it: a follow-up row inside a turn, and the
-     feed's `a2ui-follow-up` listener, which hears a clicked risk driver for the whole
-     column. Nested inside `createTurn` it was invisible to that listener, and every
-     click threw `ReferenceError` before anything was sent — no turn, no request, no
-     server-side trace of the failure (2026-10-22). */
   function askFollowUp(question, buttons, intent) {
     // Every row goes at once, not just the one clicked: two clicks on different rows
     // would otherwise send both questions, and the second would be answered as a
@@ -538,8 +400,8 @@
 
     /* Export, offered only when the turn drew a table.
 
-       The rows come from `structuredRows` — the same function and the same source the rest
-       of this file reads — so what a reader downloads is what the tool returned rather than
+       The rows come from `CopilotTSV.structuredRows` — the same function and the same
+       source the rest of this file reads — so what a reader downloads is what the tool returned rather than
        what the widget painted. The file is tab-separated and named `.tsv` rather than
        `.csv`: a clinical value may contain a comma and may not contain a tab, so the
        delimiter cannot collide with a field and no quoting rule has to be invented here and
@@ -547,7 +409,7 @@
     var exportAll = iconButton('fa-download', 'Export this table', 'fa-solid');
     exportAll.hidden = true;
     exportAll.addEventListener('click', function () {
-      var rows = structuredRows(latest && latest.a2ui);
+      var rows = window.CopilotTSV.structuredRows(latest && latest.a2ui);
       if (!rows) { flash(exportAll, 'fa-solid fa-ban'); return; }
       var blob = new Blob([rows + '\n'],
                           { type: 'text/tab-separated-values;charset=utf-8' });
@@ -615,7 +477,9 @@
        nothing and cannot be joined to a trace, which is the only thing it is for. */
     var ordinal = ++turnOrdinal;
     function thisTurnId() {
-      return (conversationId || 'unsaved') + ':' + ordinal;
+      // Read at click time, from the module that owns it: a turn is rated after the
+      // turn that minted its ordinal, and by then the thread may have moved on.
+      return (window.CopilotThreads.conversationId() || 'unsaved') + ':' + ordinal;
     }
     actions.append(
       ratingButton('fa-thumbs-up', 'Helpful answer', 1, thisTurnId),
@@ -707,7 +571,7 @@
       actions.hidden = false;
       // The export is offered only when there is a table to export, decided here rather
       // than at click time so the control does not appear and then refuse.
-      exportAll.hidden = !structuredRows(latest && latest.a2ui);
+      exportAll.hidden = !window.CopilotTSV.structuredRows(latest && latest.a2ui);
       toolbar.hidden = false;
     }
 
@@ -967,41 +831,31 @@
       evidence.hidden = false;
     }
 
-    /* The inline marker a drawer row answers to. The prose lives inside the renderer's
-       shadow root, so this reaches through it by hand: no selector crosses a shadow
-       boundary, and the marker the reader clicked and the row they opened have to be the
-       same record — which is the whole reason the row is built from the marker's own
-       citation rather than from a second list. */
-    function inlineMarker(node, index) {
-      var markers = node.querySelectorAll
-        ? node.querySelectorAll('button.cite[data-cite]') : [];
-      for (var i = 0; i < markers.length; i++) {
-        if (markers[i].getAttribute('data-cite') === String(index)) return markers[i];
-      }
-      var hosts = node.querySelectorAll ? node.querySelectorAll('*') : [];
-      for (var j = 0; j < hosts.length; j++) {
-        if (!hosts[j].shadowRoot) continue;
-        var found = inlineMarker(hosts[j].shadowRoot, index);
-        if (found) return found;
-      }
-      return null;
-    }
+    /* Which composed narrative this turn is drawing, once it exists.
 
-    /* Show which sentence the passage just opened belongs to. The outline is set inline
-       because the marker is a shadow-DOM node and this stylesheet cannot reach it. */
+       The prose and its markers live inside two shadow roots — the A2UI surface's and
+       the narrative's own — so this page cannot select into them and must not try. The
+       component announces itself with a composed event when it first updates; that
+       event crosses upward out of both boundaries and is the only thing this side
+       learns about the renderer's internals. See `CitedNarrativeElement`'s
+       `a2ui-cited-narrative-ready`.
+
+       Null for a turn with no canvas: an answer that is prose only, a refusal, a
+       failed request. Every caller tolerates it, because a drawer row exists on turns
+       whose canvas drew nothing. */
+    var narrative = null;
+    root.addEventListener('a2ui-cited-narrative-ready', function (event) {
+      narrative = (event.detail && event.detail.element) || null;
+    });
+
+    /* Show which sentence the passage just opened belongs to.
+
+       The component does the showing — it owns the marker, the stylesheet and the
+       1,400 ms — and returns false when there is nothing to reveal: a prose-only turn,
+       or markers still inert because the answer is streaming. */
     function revealMarker(index) {
-      var marker = inlineMarker(root, index);
-      if (!marker) return;
-      marker.scrollIntoView({
-        block: 'center',
-        behavior: reduceMotion.matches ? 'auto' : 'smooth',
-      });
-      marker.style.outline = '2px solid #1f2937';
-      marker.style.outlineOffset = '2px';
-      setTimeout(function () {
-        marker.style.outline = '';
-        marker.style.outlineOffset = '';
-      }, 1400);
+      if (!narrative) return;
+      narrative.revealCitation(index);
     }
 
     /* One row of the drawer, and the two kinds of evidence a reference record can carry.
@@ -1388,384 +1242,6 @@
 
   // --- the thread list ----------------------------------------------------------
 
-  function entryForHadm(hadmId) {
-    var wanted = Number(hadmId);
-    var found = null;
-    threadEntries.forEach(function (entry) {
-      if (!found && entry.hadm_id === wanted) found = entry;
-    });
-    return found;
-  }
-
-  async function loadThreads() {
-    if (!historyUrl || !threadList) return;
-    try {
-      var response = await fetch(historyUrl, {
-        headers: { 'Accept': 'application/json' },
-      });
-      if (!response.ok) throw new Error('threads ' + response.status);
-      var body = await response.json();
-      threadEntries = body.conversations || [];
-      renderThreads();
-    } catch (error) {
-      // The conversation itself is unaffected by the list failing to load, so this is
-      // logged rather than written into the feed: an error about the sidebar is not an
-      // error about the answer.
-      console.error('copilot: the thread list could not be loaded', error);
-    }
-  }
-
-  function renderThreads() {
-    if (!threadList) return;
-    // The open menu belongs to a row that is about to be replaced.
-    closeRowMenu();
-    var needle = ((filterInput && filterInput.value) || '').trim().toLowerCase();
-    var shown = needle
-      ? threadEntries.filter(function (entry) {
-          return entry.patient.toLowerCase().indexOf(needle) !== -1;
-        })
-      : threadEntries;
-
-    threadList.textContent = '';
-    shown.forEach(function (entry) {
-      threadList.appendChild(threadRow(entry));
-    });
-
-    if (threadsEmpty) {
-      // Only ever the "nothing matches" message. An empty list says nothing: a reader
-      // who has not asked anything yet is looking at a sidebar with a composer beside
-      // it, and a paragraph explaining what will appear there is the interface talking
-      // about itself.
-      threadsEmpty.hidden = !needle || shown.length > 0;
-      threadsEmpty.textContent = 'No patient matches \u201c' + needle + '\u201d.';
-    }
-    markActiveThread();
-  }
-
-  /* One row: the patient's name, and a menu.
-
-     The name is the patient's, always. A pin lifts a thread to the top of the list
-     and does not rename it: nothing a thread is given replaces the patient it is
-     about, because the patient is how the reader finds it again. */
-  function threadRow(entry) {
-    var item = document.createElement('li');
-    item.className = 'cp-thread';
-
-    var open = document.createElement('button');
-    open.type = 'button';
-    open.className = 'cp-thread-open';
-    open.setAttribute('data-thread', String(entry.conversation_id));
-    if (entry.pinned) {
-      // A pinned thread is ordered to the top, and this says why it is there. It is
-      // the only mark a row carries, because it is the only one that changes what the
-      // reader would otherwise have to work out from the order alone.
-      var pin = el('i', 'fa-solid fa-thumbtack cp-thread-pin');
-      pin.setAttribute('aria-hidden', 'true');
-      open.appendChild(pin);
-    }
-    var label = el('span', 'cp-thread-name');
-    label.textContent = entry.patient;
-    open.appendChild(label);
-    open.addEventListener('click', function () {
-      closeRowMenu();
-      openConversation(entry.conversation_id);
-    });
-    item.appendChild(open);
-
-    var toggle = document.createElement('button');
-    toggle.type = 'button';
-    toggle.className = 'cp-thread-menu-btn';
-    toggle.setAttribute('aria-expanded', 'false');
-    toggle.setAttribute('aria-label', 'Actions for ' + entry.patient);
-    toggle.title = 'More';
-    var glyph = el('i', 'fa-solid fa-ellipsis-vertical');
-    glyph.setAttribute('aria-hidden', 'true');
-    toggle.appendChild(glyph);
-    toggle.addEventListener('click', function (event) {
-      event.stopPropagation();
-      openRowMenu(entry, toggle);
-    });
-
-    var wrap = el('div', 'cp-thread-menu-wrap');
-    wrap.appendChild(toggle);
-    item.appendChild(wrap);
-    return item;
-  }
-
-  /* ---- the row menu ----------------------------------------------------------
-     One menu for the whole list, attached to the document rather than to the row it
-     was opened from.
-
-     It used to be built inside the row, which is why it came out half off the screen:
-     the thread list is a scroll container, and a scroll container clips its
-     absolutely positioned descendants. The menu opened downward into the rows below
-     and the list cut it off at its own edge. A menu that belongs to a row cannot
-     escape the row's containers, so this one does not belong to a row — it is fixed
-     to the viewport, placed beside the control that opened it, and no ancestor can
-     clip it or cover it. */
-  var rowMenu = null;
-  var rowMenuButton = null;
-
-  function rowMenuEl() {
-    if (rowMenu) return rowMenu;
-    rowMenu = el('div', 'cp-row-menu');
-    rowMenu.hidden = true;
-    rowMenu.setAttribute('role', 'menu');
-    document.body.appendChild(rowMenu);
-    return rowMenu;
-  }
-
-  function closeRowMenu() {
-    if (rowMenuButton) {
-      rowMenuButton.setAttribute('aria-expanded', 'false');
-      rowMenuButton = null;
-    }
-    if (rowMenu) rowMenu.hidden = true;
-  }
-
-  function menuChoice(text, className, run) {
-    var button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'cp-row-menu-item' + (className ? ' ' + className : '');
-    button.textContent = text;
-    button.setAttribute('role', 'menuitem');
-    button.addEventListener('click', function (event) {
-      event.stopPropagation();
-      run();
-    });
-    return button;
-  }
-
-  /* To the right of the dots, which is where the eye already is, and inside the
-     window. The menu is fixed, so these are viewport coordinates and there is no
-     ancestor to convert them against. */
-  function placeRowMenu(host, button) {
-    var at = button.getBoundingClientRect();
-    // Placed at the origin first: a box has to be laid out before it can be measured,
-    // and a hidden element has no size to measure.
-    host.style.left = '0px';
-    host.style.top = '0px';
-    var box = host.getBoundingClientRect();
-    var left = at.right + 6;
-    var top = at.top;
-    if (top + box.height > window.innerHeight - 8) {
-      top = Math.max(8, window.innerHeight - 8 - box.height);
-    }
-    if (left + box.width > window.innerWidth - 8) {
-      // No room on the right: the sidebar is against the edge of a narrow window.
-      // Back over the list rather than off the screen.
-      left = Math.max(8, at.left - box.width - 6);
-    }
-    host.style.left = left + 'px';
-    host.style.top = top + 'px';
-  }
-
-  function openRowMenu(entry, button) {
-    var host = rowMenuEl();
-    // Clicking the control that opened the menu closes it, rather than reopening it
-    // a pixel away from where it already was.
-    var wasOpen = rowMenuButton === button;
-    closeRowMenu();
-    if (wasOpen) return;
-
-    host.textContent = '';
-    host.appendChild(menuChoice(entry.pinned ? 'Unpin' : 'Pin', null, function () {
-      closeRowMenu();
-      setPinned(entry, !entry.pinned);
-    }));
-    host.appendChild(menuChoice('Delete', 'cp-row-menu-danger', function () {
-      confirmDelete(entry, button);
-    }));
-
-    host.hidden = false;
-    placeRowMenu(host, button);
-    button.setAttribute('aria-expanded', 'true');
-    rowMenuButton = button;
-  }
-
-  /* Two steps rather than a modal. A confirm dialog is a browser box over a clinical
-     tool, and the question it asks — "are you sure?" — is answered better by the row
-     itself disappearing than by a paragraph about it. */
-  function confirmDelete(entry, button) {
-    var host = rowMenuEl();
-    host.textContent = '';
-    var line = el('p', 'cp-row-menu-prompt');
-    line.textContent = 'Delete this thread?';
-    host.appendChild(line);
-    host.appendChild(menuChoice('Delete', 'cp-row-menu-danger', function () {
-      closeRowMenu();
-      deleteThread(entry);
-    }));
-    host.appendChild(menuChoice('Cancel', null, function () {
-      // Back to the menu rather than shut: cancelling the confirmation is not the
-      // same as dismissing the menu, and shutting it would make the reader reopen it
-      // to do the thing they came for.
-      closeRowMenu();
-      openRowMenu(entry, button);
-    }));
-    // The confirmation is a different size from the menu it replaced, so it is placed
-    // again rather than left where the other one ended.
-    placeRowMenu(host, button);
-  }
-
-  async function threadAction(entry, path, body) {
-    var base = conversationUrl(entry.conversation_id);
-    if (!base) return null;
-    try {
-      var response = await fetch(base + path, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRFToken': csrfToken(),
-        },
-        body: JSON.stringify(body),
-      });
-      if (!response.ok) throw new Error(path + ' ' + response.status);
-      return await response.json();
-    } catch (error) {
-      console.error('copilot: the thread could not be updated', error);
-      // The list is the thing that was guessed at, so it is re-read from the store
-      // rather than left showing the change that did not happen.
-      loadThreads();
-      return null;
-    }
-  }
-
-  async function setPinned(entry, pinned) {
-    if (await threadAction(entry, 'pin/', { pinned })) loadThreads();
-  }
-
-  async function deleteThread(entry) {
-    if (!(await threadAction(entry, 'delete/', {}))) return;
-    // A thread that was on screen and has just been deleted is not a thread, so the
-    // canvas goes back to empty rather than showing text the store will not answer
-    // for.
-    if (entry.conversation_id === conversationId) newConversation();
-    loadThreads();
-  }
-
-  /* Which row is the thread on screen. Marked after every render, because a render
-     and a change of thread can happen in either order. */
-  function markActiveThread() {
-    if (!threadList) return;
-    [].forEach.call(threadList.querySelectorAll('.cp-thread-open'), function (open) {
-      if (Number(open.getAttribute('data-thread')) === conversationId) {
-        open.setAttribute('aria-current', 'true');
-      } else {
-        open.removeAttribute('aria-current');
-      }
-    });
-  }
-
-  function setSearchOpen(open) {
-    if (!searchRow || !searchButton) return;
-    searchRow.hidden = !open;
-    searchButton.setAttribute('aria-expanded', open ? 'true' : 'false');
-    if (open) {
-      if (filterInput) filterInput.focus();
-    } else if (filterInput && filterInput.value) {
-      filterInput.value = '';
-      renderThreads();
-    }
-  }
-
-  // --- the stored thread --------------------------------------------------------
-
-  function clearFeed() {
-    feed.textContent = '';
-    closeRowMenu();
-  }
-
-  /* One stored turn, drawn by the same pair that draws a live one. The stage list
-     stays empty: the run is over, and replaying the stages it passed through would be
-     a re-enactment rather than a record. */
-  async function restoreConversation(payload) {
-    clearFeed();
-    var stored = payload.turns || [];
-    for (var index = 0; index < stored.length; index += 1) {
-      var block = createTurn(stored[index].asked);
-      await fillTurn(block, stored[index]);
-      block.restore();
-    }
-    rememberConversation(payload.conversation_id);
-    loadedHadm = payload.hadm_id;
-    setPatient(payload.patient, payload.hadm_id);
-    updateContext(payload.expires_at);
-    markActiveThread();
-    return stored.length;
-  }
-
-  /* Open a stored thread. Nothing is answered here and no credit is spent: this is
-     the store handing back what it already holds. */
-  async function openConversation(pk, options) {
-    var url = conversationUrl(pk);
-    if (!url) return;
-    var scroll = !options || options.scroll !== false;
-    try {
-      var response = await fetch(url, { headers: { 'Accept': 'application/json' } });
-      if (!response.ok) {
-        // A thread the store will no longer answer for — swept, deleted, or another
-        // account's. The id goes rather than being retried, because retrying a
-        // refusal is how a stale id becomes a loop.
-        rememberConversation(null);
-        loadedHadm = null;
-        loadThreads();
-        return;
-      }
-      await restoreConversation(await response.json());
-      var blocks = turns();
-      if (scroll && blocks.length) scrollIntoView(blocks[blocks.length - 1]);
-    } catch (error) {
-      console.error('copilot: that conversation could not be restored', error);
-    }
-  }
-
-  /* Put the canvas on the patient the composer is pinned to.
-
-     The store keeps one thread per patient, so the composer's pill and the thread on
-     screen have to agree before a question is sent: the server refuses a turn that
-     would land in another patient's thread, and earning that refusal by accident is a
-     bad way to learn it. Asking about a patient nobody has asked about yet leaves the
-     canvas empty rather than showing the previous patient's text under the new
-     patient's name. */
-  async function syncToPatient(hadmId) {
-    var wanted = Number(hadmId);
-    if (loadedHadm === wanted) return;
-    var entry = entryForHadm(wanted);
-    if (entry) {
-      await openConversation(entry.conversation_id, { scroll: false });
-      return;
-    }
-    clearFeed();
-    clearContext();
-    rememberConversation(null);
-    loadedHadm = wanted;
-    markActiveThread();
-  }
-
-  /* A new conversation is an empty canvas and no patient pinned: the feed, the id,
-     the pill and the context bar all go together, because an empty feed that still
-     carried the last admission would open the next turn against the wrong patient.
-
-     Note what this is not. The store holds one thread per patient, so this does not
-     create a thread — picking a patient is what does that, and picking a patient
-     already asked about continues theirs. What this clears is the composer and the
-     view, which is what a reader pressing it is asking for. */
-  function newConversation() {
-    rememberConversation(null);
-    loadedHadm = null;
-    clearFeed();
-    // Dropping the pin goes through the composer's own control rather than reaching
-    // into its state: the composer owns the pill and the hidden field, and a second
-    // writer to them is how the two come to disagree.
-    if (patientClear) patientClear.click();
-    clearContext();
-    markActiveThread();
-    if (input) input.focus();
-  }
-
-  // --- sending ------------------------------------------------------------------
-
   async function send(hadmId) {
     // Taken before the first await: an affordance's declaration belongs to the submit
     // it caused, and a submission that suspends before reading it is one another
@@ -1775,10 +1251,11 @@
 
     // Before anything is sent: the thread on screen must be this patient's, and the
     // id sent must be that thread's.
-    await syncToPatient(hadmId);
+    await window.CopilotThreads.syncToPatient(hadmId);
 
     var request = { hadm_id: Number(hadmId) };
-    if (conversationId) request.conversation_id = conversationId;
+    var threadId = window.CopilotThreads.conversationId();
+    if (threadId) request.conversation_id = threadId;
     // Sent as its own field rather than folded into the wording, because the agent is
     // the one place that defines this vocabulary. This side does not decide what the
     // value means, and does not keep a list of which values exist.
@@ -1865,9 +1342,8 @@
           // The thread this tab thought it was in has gone — swept, or deleted in
           // another tab. Re-reading the list is what puts the sidebar and the id back
           // in step with the store.
-          rememberConversation(null);
-          loadedHadm = null;
-          loadThreads();
+          window.CopilotThreads.forget();
+          window.CopilotThreads.load();
         }
         return;
       }
@@ -1883,8 +1359,8 @@
         // with the id it used or opened, and adopting it is what makes the next
         // question a follow-up instead of a new thread.
         if (answerPayload.conversation_id) {
-          rememberConversation(answerPayload.conversation_id);
-          loadedHadm = Number(hadmId);
+          window.CopilotThreads.remember(
+            answerPayload.conversation_id, hadmId);
         }
         block.finish();
         await fillTurn(block, answerPayload);
@@ -1895,7 +1371,7 @@
         updateContext(answerPayload.expires_at);
         // The list is re-read because asking about a new patient is what creates their
         // thread, so the sidebar is one patient out of date otherwise.
-        loadThreads();
+        window.CopilotThreads.load();
       } else if (!block.hasProse()) {
         block.finish();
         block.say('The clinical copilot is unavailable. Please try again.', true);
@@ -1916,34 +1392,11 @@
     }
   }
 
-  // --- wiring -------------------------------------------------------------------
-
-  if (newButton) newButton.addEventListener('click', newConversation);
-
-  if (searchButton) {
-    searchButton.addEventListener('click', function () {
-      setSearchOpen(searchButton.getAttribute('aria-expanded') !== 'true');
-    });
-  }
-
-  if (filterInput) {
-    // Filtered as it is typed, over the list already in hand. The alternative — a
-    // request per keystroke — would answer a question the browser can already answer,
-    // and answer it later.
-    filterInput.addEventListener('input', renderThreads);
-  }
-
-  // The menu is placed against the button, so anything that moves the button closes
-  // it: it would otherwise be left pointing at where the row used to be.
-  if (threadList) threadList.addEventListener('scroll', closeRowMenu, { passive: true });
-  window.addEventListener('resize', closeRowMenu);
-
-  document.addEventListener('click', closeRowMenu);
-  document.addEventListener('keydown', function (event) {
-    if (event.key !== 'Escape') return;
-    closeRowMenu();
-    if (filterInput && filterInput.value) setSearchOpen(false);
-  });
+  // --- wiring ------------------------------------------------------------
+  //
+  // The sidebar's own wiring — the new-thread button, the search toggle, the filter,
+  // and the row menu's dismissal listeners — lives in `copilot_threads.js`, beside
+  // the DOM it drives. What is left here is the feed and the submit.
 
   /* An affordance inside a composed surface asking its own question: a clicked risk
      driver, and nothing else today. Listened for on the feed rather than on each turn,
@@ -1978,12 +1431,35 @@
     send(hadmId).finally(function () { inFlight = false; });
   });
 
-  /* Where the tab left off, and the list it left off in. Both are read on load: the
-     thread so a reload continues it, and the list so the sidebar is populated
-     immediately rather than behind a control. */
-  updateContext(null);
-  loadThreads().then(function () {
-    var previous = storedConversation();
-    if (previous) openConversation(previous);
+  /* What `copilot_threads.js` is allowed to drive.
+
+     The feed and the thread list used to be one closure, so every call between them
+     was a free variable. This is that seam written down: the thread module restores a
+     stored thread into the feed, empties it, mirrors the patient and the context bar,
+     and asks which turns are on screen. Nothing here lets it reach the turn internals
+     — a thread row is not allowed to draw a turn, and the only way to put one on the
+     screen is `restore`, which uses the same pair a live answer uses.
+
+     Frozen, and read by the other module at call time rather than captured at load:
+     this file is the last script on the page, so the thread module exists first and
+     must not have cached a handle to a feed that had not been built yet. */
+  window.CopilotFeed = Object.freeze({
+    createTurn: createTurn,
+    fillTurn: fillTurn,
+    turns: turns,
+    scrollTo: scrollIntoView,
+    clear: function () { feed.textContent = ''; },
+    patient: setPatient,
+    context: updateContext,
+    clearContext: clearContext,
+    focusInput: function () { if (input) input.focus(); },
+    dropPin: function () { if (patientClear) patientClear.click(); },
+    csrfToken: csrfToken,
+    conversationUrl: conversationUrl,
   });
+
+  /* Where the tab left off, and the list it left off in. The thread module owns both:
+     it reads the sidebar and restores the thread this tab was in. */
+  updateContext(null);
+  window.CopilotThreads.start();
 })();
