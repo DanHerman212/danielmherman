@@ -36,3 +36,6 @@ static/spikes/
 # Terraform — provider plugins and state are machine-local, never committed.
 .terraform/
 *.tfstate*
+
+# Clean context archives (generated for review, never committed)
+*-clean.zip
