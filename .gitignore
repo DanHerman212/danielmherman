@@ -32,3 +32,7 @@ demo/data/demo_fixtures/rag_*.json
 
 # Dev spikes (A2UI proof-of-concept)
 static/spikes/
+
+# Terraform — provider plugins and state are machine-local, never committed.
+.terraform/
+*.tfstate*
