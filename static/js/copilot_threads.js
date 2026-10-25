@@ -54,6 +54,24 @@
     return window.CopilotFeed;
   }
 
+  /* One element, made.
+
+     A duplicate of the same four lines in `copilot_canvas.js`, and deliberately a
+     duplicate. It holds no state and decides nothing, so there is nothing for the two
+     copies to disagree about; and reaching through `window.CopilotFeed` for it would
+     widen the interface between the two modules to carry a helper. A seam that carries
+     helpers stops being a list of the things one module needs from the other, which is
+     the only reason the seam is worth having.
+
+     This function was not here on 2026-10-25 and nothing noticed. `threadRow` called
+     it on the first render, so the sidebar threw before it drew a single row and the
+     stored-thread restore threw on every open. See `eslint.config.mjs`. */
+  function el(tag, className) {
+    var node = document.createElement(tag);
+    node.className = className;
+    return node;
+  }
+
   function rememberConversation(pk) {
     conversationId = pk;
     try {
@@ -369,8 +387,12 @@
     canvas().clear(); closeRowMenu();
     var stored = payload.turns || [];
     for (var index = 0; index < stored.length; index += 1) {
-      var block = createTurn(stored[index].asked);
-      await fillTurn(block, stored[index]);
+      // Through the namespace, and awaited: `createTurn` and `fillTurn` are the feed's
+      // pair, and they lived in its closure until this file called one of them and
+      // threw. `fillTurn` is asynchronous because it mounts a surface, so a turn that
+      // is not awaited is a turn drawn after the one below it.
+      var block = canvas().createTurn(stored[index].asked);
+      await canvas().fillTurn(block, stored[index]);
       block.restore();
     }
     rememberConversation(payload.conversation_id);
