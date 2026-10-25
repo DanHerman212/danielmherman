@@ -39,3 +39,11 @@ static/spikes/
 
 # Clean context archives (generated for review, never committed)
 *-clean.zip
+
+# Personal media — kept locally, never published. front-door.png is referenced
+# by docs/copilot/README.md and stays tracked.
+/images/*
+!/images/front-door.png
+
+# Local scratch notes: session logs, rejected drafts, agendas.
+.notes/
