@@ -3,8 +3,15 @@
 The production ask path, exercised locally before anything is pushed:
 posts the meds chip (and a free-text instructions question) for a set of
 patients to the local Django `a2ui_ask` view with the real deployed agent
-behind it, then asserts the composed canvas SourceCard resolves to the
+behind it, then asserts the turn's published citations resolve to the
 section that actually supports the claim.
+
+The assertions read `sources` — the numbered discharge-note citation
+channel the agent composes — and the prose the canvas draws. They used to
+read the `SourceCard` component, which was retired on 2026-10-25: the
+canvas now carries `CitedNarrative`, whose citations are human labels
+("1 · Discharge medications"), so the raw section names live in `sources`
+and nowhere else.
 
 Usage (from the site repo root; live endpoints must be up):
     DEMO_FIXTURE_MODE=false .venv/bin/python demo/verify_live_citations.py
@@ -71,13 +78,25 @@ CASES = [
 MEDS_SECTIONS = ("discharge_medications", "discharge_instructions")
 
 
-def source_card(a2ui):
+def cited_narrative(a2ui):
+    """The prose component the canvas draws, or None when the turn drew none.
+
+    Its presence is the assertion that the answer reached the page at all; the
+    section it cites is read from `sources`, because the component's citations
+    are human labels rather than the raw section names this script compares.
+    """
     for msg in a2ui.get("messages", []):
         if msg.get("updateComponents"):
             for c in msg["updateComponents"].get("components", []):
-                if c.get("component") == "SourceCard":
+                if c.get("component") == "CitedNarrative":
                     return c
     return None
+
+
+def note_source(body):
+    """The first published citation: {cite, section, text}. None when the turn cited nothing."""
+    sources = body.get("sources") or []
+    return sources[0] if sources else None
 
 
 _MED_STOPWORDS = {
@@ -127,18 +146,22 @@ def main():
             continue
         body = resp.json()
         answer = body.get("answer") or ""
-        card = source_card(body.get("a2ui") or {})
+        narrative = cited_narrative(body.get("a2ui") or {})
+        source = note_source(body)
         meds = first_meds(answer)
-        section = card["section"] if card else None
+        section = source["section"] if source else None
 
         if expected == "unavailable":
-            ok = section == "not available"
+            # The honest no-meds answer states the absence and cites nothing. The
+            # old sentinel was the section name "not available", which only existed
+            # in the retired SourceCard envelope.
+            ok = source is None and "no discharge medication information" in answer.lower()
             if meds:
                 print(f"  WARN {name}: live agent still lists meds "
                       f"({meds[:3]}) — the harness prompt rule aligns the "
                       f"answer once the agent redeploys")
         elif expected == "empty_passages":
-            ok = section == "not found"
+            ok = source is None
         elif expected == "instructions_no_meds":
             ok = section == "discharge_instructions" and not meds
         else:
@@ -148,15 +171,17 @@ def main():
             }[expected]
             overlap = [
                 m for m in meds
-                if m.lower() in (card.get("text") or "").lower()
-            ]
+                if m.lower() in (source.get("text") or "").lower()
+            ] if source else []
             ok = section == want_section and bool(overlap)
+        # A turn that cited a passage has to have drawn the prose beside it.
+        ok = ok and (narrative is not None or source is None)
         detail = (f"expected={expected!r} section={section!r} "
                   f"first_answer_meds={meds[:3]}")
         print(f"{'PASS' if ok else 'FAIL'} {name} ({why})")
         print(f"     {detail}")
-        if card:
-            print(f"     card text head: {card.get('text', '')[:110]!r}")
+        if source:
+            print(f"     cited text head: {source.get('text', '')[:110]!r}")
         # The renumbered answer must not stack citations (^[1]^[2]^[3] on one
         # claim is a formatting bug the demo normalizes server-side).
         if re.search(r"\]\s*\^\[", answer):
@@ -177,12 +202,12 @@ def main():
         failures += 1
     else:
         body = resp.json()
-        card = source_card(body.get("a2ui") or {})
-        ok = card is not None and card["section"] == "discharge_instructions"
+        source = note_source(body)
+        ok = source is not None and source["section"] == "discharge_instructions"
         print(f"{'PASS' if ok else 'FAIL'} free-text 'discharge instructions' "
-              f"(Cynthia Petrov) section={card['section'] if card else None!r}")
-        if card:
-            print(f"     card text head: {card.get('text', '')[:110]!r}")
+              f"(Cynthia Petrov) section={source['section'] if source else None!r}")
+        if source:
+            print(f"     cited text head: {source.get('text', '')[:110]!r}")
         if not ok:
             failures += 1
 
