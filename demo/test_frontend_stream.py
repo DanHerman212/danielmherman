@@ -186,8 +186,18 @@ class IslandWiringTests(SimpleTestCase):
     def test_the_page_cache_busters_moved_with_the_code(self):
         # A rebuilt bundle behind an unchanged query string is a rebuild nobody sees.
         self.assertIn("a2ui_clinical.js' %}?v=16", CONSOLE)
-        self.assertIn("copilot_canvas.js' %}?v=39", CONSOLE)
+        self.assertIn("copilot_canvas.js' %}?v=40", CONSOLE)
         self.assertIn("copilot_threads.js' %}?v=2", CONSOLE)
+
+    def test_a_follow_up_chip_declares_what_it_is(self):
+        """The chip was generated from a tool result this conversation holds. The agent
+        cannot tell that from the wording — the wording is the record's own — so the
+        console says it. Two attempts to infer it from the words shipped wrong answers
+        on 2026-10-25."""
+        self.assertIn("askFollowUp(question, buttons, 'follow_up')", CANVAS)
+        # The declared value is one the agent's boundary accepts; the vocabulary is the
+        # agent's, and `demo/test_wire_contract.py` carries the forwarded value across.
+        self.assertIn("'follow_up'", CANVAS)
 
 
 class JavascriptGateTests(SimpleTestCase):

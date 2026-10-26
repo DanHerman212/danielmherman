@@ -165,3 +165,35 @@ test('a guardrail that did withdraw something still says so', async () => {
   assert.equal(pill.hidden, false, 'a withdrawal went unannounced');
   assert.match(pill.textContent, /Reconciled with medical record/);
 });
+
+test('a clicked chip declares itself, because the agent cannot tell by reading it', async () => {
+  // The chip's wording is the record's own. `routing.asks_about_a_lab_analyte` could not
+  // read "Red blood cells" and every attempt to infer provenance from the words shipped
+  // a wrong answer, so the console says what it is and the agent stops guessing.
+  const chip = 'How does the abnormal discharge Red blood cells (3.47 x10^6/uL) compare '
+    + 'to its reference range and trend?';
+
+  const { window, requests, errors } = await drive([
+    frame('answer', { answer: 'The red cell count was 3.47 x10^6/uL.',
+                      scope: 'patient_chart', verified: true, references: [],
+                      follow_ups: [chip] }),
+  ]);
+
+  const button = window.document.querySelector('#cp-feed .cp-follow-up');
+  assert.ok(button, 'the turn offered no chips');
+  assert.match(button.textContent, /Red blood cells/);
+
+  button.click();
+  for (let tick = 0; tick < 20; tick += 1) {
+    await settle();
+    if (requests.filter((entry) => entry.path === '/demo/a2ui/ask/').length > 1) break;
+  }
+
+  assert.deepEqual(errors, []);
+  const asked = requests.filter((entry) => entry.path === '/demo/a2ui/ask/');
+  assert.equal(asked.length, 2, 'the chip did not send a second question');
+
+  const body = JSON.parse(asked[1].options.body);
+  assert.equal(body.intent, 'follow_up');
+  assert.equal(body.question, chip);
+});

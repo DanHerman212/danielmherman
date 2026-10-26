@@ -140,6 +140,18 @@ class ForwardedRequestTests(TestCase):
         # it is this side's replay of the thread, not a capability on offer.
         self.assertLessEqual(set(replayed) - {'turns'}, APPROVED_REQUEST_FIELDS)
 
+    def test_a_declared_follow_up_travels_across_untouched(self):
+        """A chip generated from a tool result is answered from the transcript, and the
+        agent learns that from the declaration rather than from the wording. This side
+        carries the value and does not interpret it: the vocabulary belongs to the agent,
+        so a value it has never heard of is refused there with its own message."""
+        intent = self._forwarded(
+            {'question': 'How does the red cell count compare to its range?',
+             'hadm_id': 90000009, 'intent': 'follow_up'})
+
+        self.assertEqual(intent['intent'], 'follow_up')
+        self.assertLessEqual(set(intent), APPROVED_REQUEST_FIELDS)
+
     @override_settings(DEMO_FIXTURE_MODE=False)
     def test_the_stream_adds_its_two_flags_and_nothing_else(self):
         """`stream_prose` and `follow_ups` are capabilities the page asks for, not

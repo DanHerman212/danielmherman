@@ -1046,7 +1046,14 @@
         chevron.setAttribute('aria-hidden', 'true');
         chevron.textContent = '›';
         row.append(text, chevron);
-        row.addEventListener('click', function () { askFollowUp(question, buttons); });
+        // The chip says what it is. It was generated from a tool result this
+        // conversation holds, so the agent can answer it from the transcript and must
+        // not go back for evidence — and it cannot know that from the wording, because
+        // the wording is the record's own ("…the abnormal discharge Red blood cells…").
+        // Provenance is the one thing this side knows and the agent cannot infer.
+        row.addEventListener('click', function () {
+          askFollowUp(question, buttons, 'follow_up');
+        });
         followUps.appendChild(row);
         return row;
       });
