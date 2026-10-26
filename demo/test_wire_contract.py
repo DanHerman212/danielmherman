@@ -112,9 +112,8 @@ class ForwardedRequestTests(TestCase):
         `asked`, both consumed here, and the comment on the constant says so.
         """
         bodies = [
-            {'chip': 'risk', 'hadm_id': 90000009},
-            {'chip': 'risk', 'hadm_id': 90000009, 'question': 'and his meds?'},
-            {'hadm_id': 90000009},
+            {'chip': 'meds', 'hadm_id': 90000009},
+            {'chip': 'meds', 'hadm_id': 90000009, 'question': 'and his meds?'},
             {'question': 'What was her course?'},
             {'hadm_id': 90000009, 'question': 'Why does her RDW drive risk?',
              'intent': 'risk_driver'},
@@ -125,11 +124,20 @@ class ForwardedRequestTests(TestCase):
                 self.assertLessEqual(set(self._forwarded(body)),
                                      APPROVED_REQUEST_FIELDS)
 
+    def test_an_admission_with_no_question_is_refused_rather_than_forwarded(self):
+        """The proxy used to forward this and let the agent compose its default, and that
+        default was the retired `/risk` command's own question. There is nothing to ask,
+        so nothing is built."""
+        intent, error = _intent_for({'hadm_id': 90000009})
+
+        self.assertIsNone(intent)
+        self.assertIn('question', error.lower())
+
     def test_the_replay_adds_turns_and_nothing_else(self):
         """Continuity is the one thing this side contributes to a follow-up, and it
         contributes it as structure the agent replays rather than as text it
         pastes."""
-        intent = self._forwarded({'chip': 'risk', 'hadm_id': 90000009})
+        intent = self._forwarded({'chip': 'meds', 'hadm_id': 90000009})
         earlier = [{'question': 'q', 'answer': 'a'}]
 
         with patch('demo.views.replay_turns', return_value=earlier):
@@ -158,7 +166,7 @@ class ForwardedRequestTests(TestCase):
         intent, so they are merged at the last moment. Asserted on what the client
         layer was actually handed."""
         sent = []
-        requested = {'chip': 'risk', 'hadm_id': 90000009}
+        requested = {'chip': 'meds', 'hadm_id': 90000009}
 
         def fake_stream(body, trace=''):
             sent.append(dict(body))
@@ -181,7 +189,7 @@ class ForwardedRequestTests(TestCase):
     def test_an_unknown_field_is_refused_before_anything_is_spent(self):
         response = self.client.post(
             reverse('demo:a2ui_ask'),
-            data=json.dumps({'chip': 'risk', 'hadm_id': 90000009,
+            data=json.dumps({'chip': 'meds', 'hadm_id': 90000009,
                              'temperature': 0.2}),
             content_type='application/json',
         )

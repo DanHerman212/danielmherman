@@ -61,7 +61,7 @@ class ConversationLifecycleTests(TestCase):
 
     @patch('demo.views.ask_agent', return_value=dict(AGENT_REPLY))
     def test_opening_a_conversation_spends_one_credit(self, _mocked):
-        response = self._post({'hadm_id': 90000009, 'chip': 'risk'})
+        response = self._post({'hadm_id': 90000009, 'chip': 'meds'})
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(self._quota().used, 1)
@@ -71,7 +71,7 @@ class ConversationLifecycleTests(TestCase):
 
     @patch('demo.views.ask_agent', return_value=dict(AGENT_REPLY))
     def test_a_follow_up_spends_nothing(self, _mocked):
-        first = self._post({'hadm_id': 90000009, 'chip': 'risk'})
+        first = self._post({'hadm_id': 90000009, 'chip': 'meds'})
         conversation = Conversation.objects.get(user=self.user)
 
         second = self._post({'hadm_id': 90000009, 'question': 'And potassium?',
@@ -85,7 +85,7 @@ class ConversationLifecycleTests(TestCase):
 
     @patch('demo.views.ask_agent', return_value=dict(AGENT_REPLY))
     def test_a_follow_up_about_another_patient_is_refused(self, _mocked):
-        self._post({'hadm_id': 90000009, 'chip': 'risk'})
+        self._post({'hadm_id': 90000009, 'chip': 'meds'})
         conversation = Conversation.objects.get(user=self.user)
 
         response = self._post({'hadm_id': 90000010, 'question': 'And potassium?',
@@ -99,7 +99,7 @@ class ConversationLifecycleTests(TestCase):
 
     @patch('demo.views.ask_agent', return_value=dict(AGENT_REPLY))
     def test_the_ceiling_refuses_with_a_way_forward(self, _mocked):
-        self._post({'hadm_id': 90000009, 'chip': 'risk'})
+        self._post({'hadm_id': 90000009, 'chip': 'meds'})
         conversation = Conversation.objects.get(user=self.user)
         Conversation.objects.filter(pk=conversation.pk).update(
             turn_count=settings.DEMO_CONVERSATION_TURN_CEILING)
@@ -115,7 +115,7 @@ class ConversationLifecycleTests(TestCase):
 
     @patch('demo.views.ask_agent', return_value=dict(AGENT_REPLY))
     def test_an_expired_conversation_is_refused_even_before_the_sweep(self, _mocked):
-        self._post({'hadm_id': 90000009, 'chip': 'risk'})
+        self._post({'hadm_id': 90000009, 'chip': 'meds'})
         conversation = Conversation.objects.get(user=self.user)
         Conversation.objects.filter(pk=conversation.pk).update(
             expires_at=timezone.now())
@@ -128,7 +128,7 @@ class ConversationLifecycleTests(TestCase):
 
     @patch('demo.views.ask_agent', return_value=dict(AGENT_REPLY))
     def test_another_accounts_conversation_is_not_found(self, _mocked):
-        self._post({'hadm_id': 90000009, 'chip': 'risk'})
+        self._post({'hadm_id': 90000009, 'chip': 'meds'})
         conversation = Conversation.objects.get(user=self.user)
         other_user = User.objects.create_user('other', password='x')
         self.client.force_login(other_user)
@@ -148,7 +148,7 @@ class ConversationLifecycleTests(TestCase):
 
         mocked.side_effect = AgentError('agent refused', spent=True)
 
-        response = self._post({'hadm_id': 90000009, 'chip': 'risk'})
+        response = self._post({'hadm_id': 90000009, 'chip': 'meds'})
 
         self.assertEqual(response.status_code, 502)
         self.assertEqual(self._quota().used, 0, 'the credit came back')
@@ -179,7 +179,7 @@ class ConversationLifecycleTests(TestCase):
         thread is live continues it, and a continuation is already paid for — the
         ceiling, not the daily allowance, is what bounds a thread.
         """
-        self._post({'hadm_id': 90000009, 'chip': 'risk'})
+        self._post({'hadm_id': 90000009, 'chip': 'meds'})
         first = Conversation.objects.get(user=self.user)
 
         response = self._post({'hadm_id': 90000009, 'chip': 'meds'})
@@ -197,7 +197,7 @@ class ConversationLifecycleTests(TestCase):
         with the admission and no id. Resolving by patient is what makes the id an
         optimisation rather than the thing that decides.
         """
-        self._post({'hadm_id': 90000009, 'chip': 'risk'})
+        self._post({'hadm_id': 90000009, 'chip': 'meds'})
         first = Conversation.objects.get(user=self.user)
 
         response = self._post({'hadm_id': 90000009, 'chip': 'meds'})
@@ -207,8 +207,8 @@ class ConversationLifecycleTests(TestCase):
 
     @patch('demo.views.ask_agent', return_value=dict(AGENT_REPLY))
     def test_a_different_patient_gets_a_thread_of_their_own(self, _mocked):
-        self._post({'hadm_id': 90000009, 'chip': 'risk'})
-        self._post({'hadm_id': 90000010, 'chip': 'risk'})
+        self._post({'hadm_id': 90000009, 'chip': 'meds'})
+        self._post({'hadm_id': 90000010, 'chip': 'meds'})
 
         self.assertEqual(Conversation.objects.filter(user=self.user).count(), 2)
         self.assertEqual(self._quota().used, 2, 'two patients, two credits')
@@ -217,12 +217,12 @@ class ConversationLifecycleTests(TestCase):
     def test_an_expired_thread_is_not_the_one_continued(self, _mocked):
         """The window ends a thread. A patient whose thread has expired gets a new
         one rather than a refusal, which is what the expiry is for."""
-        self._post({'hadm_id': 90000009, 'chip': 'risk'})
+        self._post({'hadm_id': 90000009, 'chip': 'meds'})
         stale = Conversation.objects.get(user=self.user)
         Conversation.objects.filter(pk=stale.pk).update(
             expires_at=timezone.now() - timedelta(hours=1))
 
-        response = self._post({'hadm_id': 90000009, 'chip': 'risk'})
+        response = self._post({'hadm_id': 90000009, 'chip': 'meds'})
 
         self.assertNotEqual(response.json()['conversation_id'], stale.pk)
         self.assertEqual(Conversation.objects.filter(user=self.user).count(), 2)

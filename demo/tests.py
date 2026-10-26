@@ -217,9 +217,13 @@ class A2uiFixtureContractTests(TestCase):
         self.client.force_login(self.user)
 
     def test_a2ui_ask_returns_the_full_contract_from_fixture(self):
+        """`/ehr` is the fixture turn that carries a canvas: summary sections, the
+        estimate, and the entries the console draws them from. It is also the only
+        remaining command that requests `predict_readmission`, which is why the surface
+        assertions below look the way they did when `/risk` was one of the chips."""
         response = self.client.post(
             reverse('demo:a2ui_ask'),
-            data=json.dumps({'hadm_id': 90000015, 'chip': 'risk'}),
+            data=json.dumps({'hadm_id': 90000015, 'chip': 'summarize'}),
             content_type='application/json',
         )
         self.assertEqual(response.status_code, 200)
@@ -725,7 +729,7 @@ class RequestBoundaryTests(TestCase):
         self.assertIn('single-turn', error)
 
     def test_an_unknown_field_is_refused_by_name(self):
-        response = self._post({'hadm_id': 90000017, 'chip': 'risk', 'foo': 1})
+        response = self._post({'hadm_id': 90000017, 'chip': 'meds', 'foo': 1})
 
         self.assertEqual(response.status_code, 400)
         error = response.json()['error']
@@ -734,7 +738,7 @@ class RequestBoundaryTests(TestCase):
 
     def test_the_known_fields_still_answer(self):
         """The boundary must not refuse what the console actually sends."""
-        response = self._post({'hadm_id': 90000017, 'chip': 'risk'})
+        response = self._post({'hadm_id': 90000017, 'chip': 'meds'})
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()['source'], 'fixture')
@@ -1053,7 +1057,7 @@ class A2uiAskLiveTests(TestCase):
 
     @patch('demo.views.ask_agent', return_value=dict(A2UI_AGENT_REPLY))
     def test_live_branch_passes_the_agent_contract_through(self, mocked):
-        response = self._post({'hadm_id': 90000009, 'chip': 'risk'})
+        response = self._post({'hadm_id': 90000009, 'chip': 'meds'})
         self.assertEqual(response.status_code, 200)
         body = response.json()
         # Derived from the policy, not restated: this asserted 9 when the allowance
@@ -1063,7 +1067,7 @@ class A2uiAskLiveTests(TestCase):
         # Intent crosses this boundary, not prompt text: the wording lives with
         # the chain, so a prompt change cannot ship from this repository.
         self.assertEqual(mocked.call_args.args[0],
-                         {'chip': 'risk', 'hadm_id': 90000009})
+                         {'chip': 'meds', 'hadm_id': 90000009})
         # The presentation contract arrives from the agent pre-composed;
         # Django must forward it byte-for-byte, not recompose it.
         self.assertEqual(body['a2ui'], A2UI_AGENT_REPLY['a2ui'])
@@ -1091,7 +1095,7 @@ class A2uiAskLiveTests(TestCase):
         wording ever reappears in this body, the chain artifact has leaked back
         into the website.
         """
-        self._post({'hadm_id': 90000009, 'chip': 'risk'})
+        self._post({'hadm_id': 90000009, 'chip': 'meds'})
 
         intent = mocked.call_args.args[0]
         self.assertEqual(set(intent), {'chip', 'hadm_id'})
@@ -1140,7 +1144,10 @@ class A2uiAskLiveTests(TestCase):
 
     @patch('demo.views.ask_agent', return_value=dict(A2UI_AGENT_REPLY))
     def test_every_chip_travels_unchanged(self, mocked):
-        for chip in ('risk', 'meds', 'summarize', 'literature'):
+        # The chips this proxy accepts. `/risk` was the fifth and retired on 2026-10-26;
+        # `labs` has been a chip since Phase 4B and was never in this list, so the set is
+        # the vocabulary rather than whatever the loop happened to name.
+        for chip in ('meds', 'summarize', 'literature', 'labs'):
             with self.subTest(chip=chip):
                 self._post({'hadm_id': 90000009, 'chip': chip})
                 intent = dict(mocked.call_args.args[0])
@@ -1319,11 +1326,18 @@ class A2uiAskLiveTests(TestCase):
         ]}))
 
     @patch('demo.views.ask_agent', return_value=dict(A2UI_AGENT_REPLY))
-    def test_a_patient_with_nothing_asked_sends_only_the_admission(self, mocked):
-        """No chip and no text is still a question — the agent has a default for
-        exactly this case, so no wording is invented here."""
-        self._post({'hadm_id': 90000009})
-        self.assertEqual(mocked.call_args.args[0], {'hadm_id': 90000009})
+    def test_a_patient_with_nothing_asked_is_refused_rather_than_forwarded(self, mocked):
+        """No chip and no text used to be a question: the agent had a default for exactly
+        this case, and that default was the retired `/risk` command. There is nothing to
+        ask now, so nothing is forwarded and no credit is spent."""
+        DemoQuota.objects.create(user=self.user, daily_limit=5)
+
+        response = self._post({'hadm_id': 90000009})
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('question', response.json()['error'].lower())
+        self.assertEqual(DemoQuota.remaining(self.user), 5)
+        mocked.assert_not_called()
 
     @patch('demo.views.ask_agent')
     def test_the_compare_chip_is_gone(self, mocked):
@@ -1347,14 +1361,14 @@ class A2uiAskLiveTests(TestCase):
     @patch('demo.views.ask_agent')
     def test_quota_exhaustion_returns_429_without_calling_the_agent(self, mocked):
         DemoQuota.objects.create(user=self.user, daily_limit=0)
-        response = self._post({'hadm_id': 90000009, 'chip': 'risk'})
+        response = self._post({'hadm_id': 90000009, 'chip': 'meds'})
         self.assertEqual(response.status_code, 429)
         mocked.assert_not_called()
 
     @patch('demo.views.ask_agent', side_effect=AgentError('boom'))
     def test_agent_failure_refunds_the_credit(self, mocked):
         DemoQuota.objects.create(user=self.user, daily_limit=5)
-        response = self._post({'hadm_id': 90000009, 'chip': 'risk'})
+        response = self._post({'hadm_id': 90000009, 'chip': 'meds'})
         self.assertEqual(response.status_code, 502)
         self.assertEqual(DemoQuota.remaining(self.user), 5)
 
@@ -1371,7 +1385,7 @@ class A2uiAskLiveTests(TestCase):
         ]
         mocked.return_value = reply
         DemoQuota.objects.create(user=self.user, daily_limit=5)
-        response = self._post({'hadm_id': 90000009, 'chip': 'risk'})
+        response = self._post({'hadm_id': 90000009, 'chip': 'meds'})
         self.assertEqual(response.status_code, 502)
         self.assertEqual(DemoQuota.remaining(self.user), 5)
 
@@ -1388,7 +1402,7 @@ class A2uiAskLiveTests(TestCase):
         ]
         mocked.return_value = reply
         DemoQuota.objects.create(user=self.user, daily_limit=5)
-        response = self._post({'hadm_id': 90000009, 'chip': 'risk'})
+        response = self._post({'hadm_id': 90000009, 'chip': 'meds'})
         self.assertEqual(response.status_code, 502)
         self.assertEqual(DemoQuota.remaining(self.user), 5)
 
@@ -1483,7 +1497,7 @@ class A2uiAskStreamTests(TestCase):
         )
 
         response = self._post(
-            {'hadm_id': 90000009, 'chip': 'risk'}, accept='text/event-stream'
+            {'hadm_id': 90000009, 'chip': 'meds'}, accept='text/event-stream'
         )
 
         self.assertEqual(response.status_code, 200)
@@ -1513,7 +1527,7 @@ class A2uiAskStreamTests(TestCase):
         has always had — the new path cannot change existing behaviour."""
         mocked.side_effect = self._stream(('answer', dict(A2UI_AGENT_REPLY)))
         with patch('demo.views.ask_agent', return_value=dict(A2UI_AGENT_REPLY)):
-            response = self._post({'hadm_id': 90000009, 'chip': 'risk'})
+            response = self._post({'hadm_id': 90000009, 'chip': 'meds'})
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response['Content-Type'], 'application/json')
@@ -1560,7 +1574,7 @@ class A2uiAskStreamTests(TestCase):
         read = []
         mocked.side_effect = source(read)
         response = self._post(
-            {'hadm_id': 90000009, 'chip': 'risk'}, accept='text/event-stream'
+            {'hadm_id': 90000009, 'chip': 'meds'}, accept='text/event-stream'
         )
         self.assertIn(b'event: planning', next(iter(response.streaming_content)))
         self.assertEqual(
@@ -1574,7 +1588,7 @@ class A2uiAskStreamTests(TestCase):
         read = []
         mocked.side_effect = source(read)
         response = self._post(
-            {'hadm_id': 90000009, 'chip': 'risk'}, accept='text/event-stream'
+            {'hadm_id': 90000009, 'chip': 'meds'}, accept='text/event-stream'
         )
 
         async def read_one():
@@ -1606,7 +1620,7 @@ class A2uiAskStreamTests(TestCase):
 
         mocked.side_effect = generator
         response = self._post(
-            {'hadm_id': 90000009, 'chip': 'risk'}, accept='text/event-stream'
+            {'hadm_id': 90000009, 'chip': 'meds'}, accept='text/event-stream'
         )
 
         async def read_one_then_abandon():
@@ -1646,7 +1660,7 @@ class A2uiAskStreamTests(TestCase):
         nothing to narrate."""
         with override_settings(DEMO_FIXTURE_MODE=True):
             response = self._post(
-                {'hadm_id': 90000009, 'chip': 'risk'}, accept='text/event-stream'
+                {'hadm_id': 90000009, 'chip': 'meds'}, accept='text/event-stream'
             )
 
         self.assertEqual(response.status_code, 200)
@@ -1664,7 +1678,7 @@ class A2uiAskStreamTests(TestCase):
         DemoQuota.objects.create(user=self.user, daily_limit=5)
 
         response = self._post(
-            {'hadm_id': 90000009, 'chip': 'risk'}, accept='text/event-stream'
+            {'hadm_id': 90000009, 'chip': 'meds'}, accept='text/event-stream'
         )
 
         self.assertEqual(response.status_code, 502)
@@ -1677,7 +1691,7 @@ class A2uiAskStreamTests(TestCase):
         DemoQuota.objects.create(user=self.user, daily_limit=5)
 
         response = self._post(
-            {'hadm_id': 90000009, 'chip': 'risk'}, accept='text/event-stream'
+            {'hadm_id': 90000009, 'chip': 'meds'}, accept='text/event-stream'
         )
 
         self.assertEqual(response.status_code, 502)
@@ -1697,7 +1711,7 @@ class A2uiAskStreamTests(TestCase):
         DemoQuota.objects.create(user=self.user, daily_limit=5)
 
         response = self._post(
-            {'hadm_id': 90000009, 'chip': 'risk'}, accept='text/event-stream'
+            {'hadm_id': 90000009, 'chip': 'meds'}, accept='text/event-stream'
         )
 
         frames = self._frames(response)
@@ -1719,7 +1733,7 @@ class A2uiAskStreamTests(TestCase):
         DemoQuota.objects.create(user=self.user, daily_limit=5)
 
         response = self._post(
-            {'hadm_id': 90000009, 'chip': 'risk'}, accept='text/event-stream'
+            {'hadm_id': 90000009, 'chip': 'meds'}, accept='text/event-stream'
         )
 
         self.assertEqual(response.status_code, 200)
@@ -1738,7 +1752,7 @@ class A2uiAskStreamTests(TestCase):
         )
 
         response = self._post(
-            {'hadm_id': 90000009, 'chip': 'risk'}, accept='text/event-stream'
+            {'hadm_id': 90000009, 'chip': 'meds'}, accept='text/event-stream'
         )
 
         body = self._body(response).decode('utf-8')

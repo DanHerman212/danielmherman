@@ -67,6 +67,10 @@ async function drive(frames) {
   await settle();
 
   window.document.getElementById('cp-patient-id').value = '90000015';
+  // A question the reader typed. An empty composer sends nothing at all since the
+  // blank-submit default (`/risk`) was retired on 2026-10-26, and these tests are about
+  // what a run puts on screen, not about what starts one.
+  window.document.getElementById('cp-ask-input').value = 'What changed overnight?';
 
   const feed = window.document.getElementById('cp-feed');
   const snapshots = [];

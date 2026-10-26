@@ -1401,20 +1401,11 @@
     // together (ECC-22).
     var intent = intentField ? intentField.value : '';
     var typed = input ? input.value.trim() : '';
-    // A patient selected with nothing typed is still a submission, and the default
-    // action is the risk assessment. It goes as the COMMAND rather than as a question
-    // about risk: a question runs the free-text loop, which no longer holds the risk
-    // tool (UX Phase 1B), so that path could not answer it.
-    if (!intent && !typed) intent = 'risk';
     if (intent) {
       request.chip = intent;
-      // Written back into the field the composer owns before the heading reads it.
-      // The template's contract for that field is that what a submit would send is in
-      // the DOM — and the default above is a decision made here, so leaving it in a
-      // local variable alone would make the heading of the turn it just sent
-      // unreadable. It is cleared again immediately after, with the rest of the
-      // consumed composer state.
-      if (intentField && !intentField.value) intentField.value = intent;
+      // The field the composer owns already holds the command, so there is nothing to
+      // write back: what a submit would send is in the DOM because the reader put it
+      // there, not because the page decided it.
     }
     if (typed) request.question = typed;
 
@@ -1547,6 +1538,16 @@
   form.addEventListener('submit', function (event) {
     event.preventDefault();
     if (inFlight) return;
+
+    // An empty composer is not a question. Until 2026-10-26 this case silently became
+    // the readmission-risk command, so pressing Enter with a patient selected billed a
+    // turn about nothing the reader asked. That command is gone and no default replaces
+    // it: with nothing declared and nothing typed there is nothing to send, so nothing
+    // is sent and no turn is drawn — the same silence as pressing Enter in a box the
+    // reader had not started typing in.
+    var says = input ? input.value.trim() : '';
+    var armed = intentField ? intentField.value.trim() : '';
+    if (!declaredIntent && !says && !armed) return;
 
     var hadmId = patientField ? patientField.value : '';
     if (!hadmId) {

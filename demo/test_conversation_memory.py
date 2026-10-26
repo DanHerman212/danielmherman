@@ -84,7 +84,7 @@ class TurnStoreTests(_AskTestCase):
 
     @patch('demo.views.ask_agent', return_value=dict(AGENT_REPLY))
     def test_a_turn_is_stored_as_the_pair_it_was(self, _mocked):
-        self._post({'hadm_id': 90000009, 'chip': 'risk'})
+        self._post({'hadm_id': 90000009, 'chip': 'meds'})
 
         rows = list(Turn.objects.filter(conversation=self._conversation())
                     .order_by('ordinal'))
@@ -101,7 +101,7 @@ class TurnStoreTests(_AskTestCase):
         different questions: the run says what the model was shown and which
         tools ran, the row says what was answered after the tracing stack has
         been swept. Without the id an operator matches the two by timestamp."""
-        self._post({'hadm_id': 90000009, 'chip': 'risk'})
+        self._post({'hadm_id': 90000009, 'chip': 'meds'})
 
         stored = Turn.objects.get(conversation=self._conversation(),
                                   role=Turn.Role.AGENT).langfuse_trace_id
@@ -114,7 +114,7 @@ class TurnStoreTests(_AskTestCase):
         which is the point of the sink rule."""
         mocked.return_value = {**AGENT_REPLY, 'langfuse_trace_id': ''}
 
-        response = self._post({'hadm_id': 90000009, 'chip': 'risk'})
+        response = self._post({'hadm_id': 90000009, 'chip': 'meds'})
 
         self.assertEqual(response.status_code, 200)
         stored = Turn.objects.get(conversation=self._conversation(),
@@ -128,7 +128,7 @@ class TurnStoreTests(_AskTestCase):
         worse than no link, because it looks like evidence."""
         mocked.return_value = {**AGENT_REPLY, 'langfuse_trace_id': 12345678}
 
-        self._post({'hadm_id': 90000009, 'chip': 'risk'})
+        self._post({'hadm_id': 90000009, 'chip': 'meds'})
 
         stored = Turn.objects.get(conversation=self._conversation(),
                                   role=Turn.Role.AGENT)
@@ -141,7 +141,7 @@ class TurnStoreTests(_AskTestCase):
         """The passage is re-derived from the note when it is needed. Keeping it
         here would put discharge-note text in the web application's database,
         which is the one thing the memory policy refuses."""
-        self._post({'hadm_id': 90000009, 'chip': 'risk'})
+        self._post({'hadm_id': 90000009, 'chip': 'meds'})
 
         stored = Turn.objects.get(conversation=self._conversation(),
                                   role=Turn.Role.AGENT).citations
@@ -168,7 +168,7 @@ class TurnStoreTests(_AskTestCase):
                             'excerpt': 'admitted with pneumonia'}],
         }
 
-        self._post({'hadm_id': 90000009, 'chip': 'risk'})
+        self._post({'hadm_id': 90000009, 'chip': 'meds'})
 
         turn = turn_payloads(self._conversation())[0]
         self.assertEqual(len(turn['references']), 1)
@@ -184,7 +184,7 @@ class TurnStoreTests(_AskTestCase):
     def test_a_tool_result_is_kept_only_when_it_cannot_be_derived_again(
         self, _mocked
     ):
-        self._post({'hadm_id': 90000009, 'chip': 'risk'})
+        self._post({'hadm_id': 90000009, 'chip': 'meds'})
 
         stored = Turn.objects.get(conversation=self._conversation(),
                                   role=Turn.Role.AGENT).tool_calls
@@ -212,7 +212,7 @@ class TurnStoreTests(_AskTestCase):
                                 'med_dose_mismatch:5 mg'],
         }
 
-        self._post({'hadm_id': 90000009, 'chip': 'risk'})
+        self._post({'hadm_id': 90000009, 'chip': 'meds'})
 
         stored = Turn.objects.get(conversation=self._conversation(),
                                   role=Turn.Role.AGENT).guardrail_flags
@@ -221,7 +221,7 @@ class TurnStoreTests(_AskTestCase):
 
     @patch('demo.views.ask_agent', return_value=dict(AGENT_REPLY))
     def test_the_answer_carries_the_id_the_browser_sends_back(self, _mocked):
-        response = self._post({'hadm_id': 90000009, 'chip': 'risk'})
+        response = self._post({'hadm_id': 90000009, 'chip': 'meds'})
 
         self.assertEqual(response.json()['conversation_id'],
                          self._conversation().pk)
@@ -241,7 +241,7 @@ class TurnStoreTests(_AskTestCase):
 
         with patch('demo.views.ask_agent',
                    side_effect=AgentError('agent refused', spent=True)):
-            self._post({'hadm_id': 90000009, 'chip': 'risk'})
+            self._post({'hadm_id': 90000009, 'chip': 'meds'})
 
         self.assertEqual(Turn.objects.count(), 0)
 
@@ -280,7 +280,7 @@ class StoredPresentationTests(_AskTestCase):
     def test_the_composed_presentation_is_stored_with_the_turn(self, mocked):
         mocked.return_value = self._reply()
 
-        self._post({'hadm_id': 90000009, 'chip': 'risk'})
+        self._post({'hadm_id': 90000009, 'chip': 'meds'})
 
         stored = Turn.objects.filter(role=Turn.Role.AGENT).latest('ordinal')
         self.assertEqual(stored.presentation['a2ui'], A2UI_ENVELOPE)
@@ -289,7 +289,7 @@ class StoredPresentationTests(_AskTestCase):
     def test_a_turn_with_no_canvas_stores_an_empty_presentation(self, mocked):
         mocked.return_value = dict(AGENT_REPLY)  # `a2ui` is None
 
-        self._post({'hadm_id': 90000009, 'chip': 'risk'})
+        self._post({'hadm_id': 90000009, 'chip': 'meds'})
 
         stored = Turn.objects.filter(role=Turn.Role.AGENT).latest('ordinal')
         self.assertEqual(stored.presentation['a2ui'], {})
@@ -301,7 +301,7 @@ class StoredPresentationTests(_AskTestCase):
         failed rather than as a payload that was mis-stored."""
         mocked.return_value = {**AGENT_REPLY, 'a2ui': ['not', 'an', 'envelope']}
 
-        self._post({'hadm_id': 90000009, 'chip': 'risk'})
+        self._post({'hadm_id': 90000009, 'chip': 'meds'})
 
         stored = Turn.objects.filter(role=Turn.Role.AGENT).latest('ordinal')
         self.assertEqual(stored.presentation['a2ui'], {})
@@ -321,7 +321,7 @@ class StoredPresentationTests(_AskTestCase):
             'follow_ups': ['What changed overnight?', 'Which medications were held?'],
         }
 
-        self._post({'hadm_id': 90000009, 'chip': 'risk'})
+        self._post({'hadm_id': 90000009, 'chip': 'meds'})
 
         stored = Turn.objects.filter(role=Turn.Role.AGENT).latest('ordinal')
         self.assertEqual(stored.presentation['scope'], 'patient_chart')
@@ -349,7 +349,7 @@ class StoredPresentationTests(_AskTestCase):
         """One shape, used by a live turn and a restored one, so the client has one
         renderer rather than a live path and a hydrate path that drift apart."""
         mocked.return_value = self._reply()
-        self._post({'hadm_id': 90000009, 'chip': 'risk'})
+        self._post({'hadm_id': 90000009, 'chip': 'meds'})
 
         payloads = turn_payloads(self._conversation())
 
@@ -374,7 +374,7 @@ class StoredPresentationTests(_AskTestCase):
         showed. Re-composing on read would silently rewrite history every time the
         composer changed."""
         mocked.return_value = self._reply()
-        self._post({'hadm_id': 90000009, 'chip': 'risk'})
+        self._post({'hadm_id': 90000009, 'chip': 'meds'})
         conversation = self._conversation()
 
         stored = Turn.objects.filter(role=Turn.Role.AGENT).latest('ordinal')
@@ -390,13 +390,13 @@ class ReplayTests(_AskTestCase):
 
     @patch('demo.views.ask_agent', return_value=dict(AGENT_REPLY))
     def test_a_first_turn_replays_nothing(self, mocked):
-        self._post({'hadm_id': 90000009, 'chip': 'risk'})
+        self._post({'hadm_id': 90000009, 'chip': 'meds'})
 
         self.assertNotIn('turns', mocked.call_args.args[0])
 
     @patch('demo.views.ask_agent', return_value=dict(AGENT_REPLY))
     def test_a_follow_up_replays_the_earlier_turn(self, mocked):
-        self._post({'hadm_id': 90000009, 'chip': 'risk'})
+        self._post({'hadm_id': 90000009, 'chip': 'meds'})
         conversation = self._conversation()
 
         self._post({'hadm_id': 90000009, 'question': 'And potassium?',
@@ -432,7 +432,7 @@ class ReplayTests(_AskTestCase):
 
         mocked.side_effect = reply
 
-        self._post({'hadm_id': 90000009, 'chip': 'risk'})
+        self._post({'hadm_id': 90000009, 'chip': 'meds'})
         conversation = self._conversation()
         for index in range(MAX_REPLAYED_TURNS + 2):
             self._post({'hadm_id': 90000009, 'question': f'Question {index}?',
@@ -467,7 +467,7 @@ class ReplayTests(_AskTestCase):
         could push its own `turns` could put words in the copilot's mouth, and
         the site would store the answer as if they had been said.
         """
-        self._post({'hadm_id': 90000009, 'chip': 'risk'})
+        self._post({'hadm_id': 90000009, 'chip': 'meds'})
         conversation = self._conversation()
 
         response = self._post({'hadm_id': 90000009, 'question': 'And potassium?',
@@ -513,7 +513,7 @@ class FixtureModeIsSingleTurnTests(_AskTestCase):
     def test_fixture_mode_opens_no_conversation(self):
         response = self.client.post(
             reverse('demo:a2ui_ask'),
-            data=json.dumps({'hadm_id': 90000009, 'chip': 'risk'}),
+            data=json.dumps({'hadm_id': 90000009, 'chip': 'meds'}),
             content_type='application/json',
         )
 

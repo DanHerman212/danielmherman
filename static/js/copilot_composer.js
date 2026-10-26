@@ -221,11 +221,15 @@
 
   /* The commands the `/` menu offers, which is not every command that exists.
 
-     `/risk` is hidden (UX ruling 2026-10-16): the anchor turn `/ehr` now carries the same
-     score beside the narrative that explains it, so a second control for it is a second
-     thing to keep in step. Hidden rather than removed, and the difference is exactly what
-     `commands` above still holds — the submit handler resolves a TYPED `/risk` against the
-     full list, so the command keeps working for a reader who knows it is there. */
+     `/drugs` and `/drug` are aliases of `/meds`, hidden so the menu keeps its four
+     macros. Hidden rather than removed, and the difference is exactly what `commands`
+     above still holds — the submit handler resolves a TYPED `/drugs` against the full
+     list, so the alias works for a reader who types it.
+
+     `/risk` was the first entry to carry this flag and is no longer in the list at all:
+     the command was retired on 2026-10-26, and `/ehr` carries the estimate beside the
+     summary that explains it. A hidden command that exists and a command that does not
+     are different states, and only one of them resolves. */
   function offered() {
     return commands.filter(function (entry) { return !entry.hidden; });
   }

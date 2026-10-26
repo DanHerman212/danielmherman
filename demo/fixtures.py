@@ -73,10 +73,6 @@ def _agent_presentation():
 # holds the two together where drift is actually introduced — on a machine that has
 # both repositories.
 CHIPS = {
-    'risk': {
-        'label': 'Run 30-day readmission risk',
-        'question': 'Assess the 30-day readmission risk for this patient.',
-    },
     'meds': {
         'label': 'What medications were they discharged on?',
         'question': 'What medications was this patient discharged on?',
@@ -131,8 +127,6 @@ FIXTURE_UNAVAILABLE_CHIPS = frozenset()
 # record printed above an answer — because hiding a control and deleting a
 # capability are different acts, and only one of them was asked for.
 SLASH_COMMANDS = (
-    {'command': 'risk', 'chip': 'risk', 'hidden': True,
-     'description': 'Run the 30-day readmission risk model'},
     {'command': 'meds', 'chip': 'meds',
      'description': 'Extract the discharge medications'},
     # An alias, hidden so the menu keeps its four macros. `/drugs` is what a clinician
@@ -179,7 +173,6 @@ def chip_buttons() -> list[dict]:
 # A retrieval query per chip, used to ground the answer (matters when we have
 # captured rag passages; otherwise the honest empty path runs).
 _CHIP_QUERY = {
-    'risk': 'sepsis and elevated lactate on broad-spectrum antibiotics',
     'meds': 'medications',
     'summarize': 'summarize the hospital course and discharge diagnosis',
     # The condition `/pubmed` answers with in fixture mode. Three captures on disk
@@ -267,33 +260,7 @@ def _passages_of(tool_calls: list[dict]) -> list[dict]:
 def _compose_answer(chip: str, tool_calls: list[dict]) -> str:
     """Deterministic, cited prose composed from the tool payloads."""
     _, label_for = _agent_presentation()
-    pred = next((tc['response'] for tc in tool_calls
-                 if tc['name'] == 'predict_readmission'), None)
     passages = _passages_of(tool_calls)
-
-    if chip == 'risk' and pred and pred.get('probability') is not None:
-        p = float(pred['probability'])
-        thr = float(pred.get('threshold', 0.5))
-        band = 'above' if p >= thr else 'below'
-        sentences = [
-            f"Estimated 30-day unplanned readmission risk is {p:.3f} "
-            f"({p * 100:.1f}%), {band} the {thr:.2f} operating threshold."
-        ]
-        factors = pred.get('top_factors') or []
-        if factors:
-            top = factors[0]
-            sentences.append(
-                f"The strongest driver is {label_for(top['feature'])} "
-                f"({top['direction']} risk).")
-        if passages:
-            sec = passages[0]['section'].replace('_', ' ')
-            sentences.append(
-                f"The discharge note documents the admission in the "
-                f"{sec} section.^[1]")
-        else:
-            sentences.append(
-                'No supporting note passage was found for this question.')
-        return ' '.join(sentences)
 
     if chip in ('meds', 'summarize'):
         if passages:
@@ -362,14 +329,18 @@ def fixture_ask(payload: dict) -> dict:
                 'message': f'No admission {hadm_id} in the demo cohort.'}
 
     tool_calls = []
-    if chip == 'risk':
-        tool_calls.append(_tool_call(
-            'predict_readmission', {'hadm_id': hadm_id}, pred))
-    if chip in ('risk', 'meds', 'summarize'):
+    if chip in ('meds', 'summarize'):
         query = _CHIP_QUERY[chip]
         tool_calls.append(_tool_call(
             'rag_search', {'hadm_id': hadm_id, 'query': query, 'top_k': 5},
             _rag_response(hadm_id, query)))
+    if chip == 'summarize':
+        # `/ehr` has carried the readmission estimate beside its summary since Phase 1
+        # (routing.Command.supplementary). The fixture turn must carry it too, or fixture
+        # mode would draw a canvas the live turn cannot produce — and the canvas is the
+        # one thing this mode exists to reproduce faithfully.
+        tool_calls.append(_tool_call(
+            'predict_readmission', {'hadm_id': hadm_id}, pred))
     if chip == 'literature':
         # No rag call beside it: a literature answer rests on the records, and the
         # canvas swaps the risk widgets out for them rather than showing both.

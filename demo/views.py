@@ -349,9 +349,12 @@ def _intent_for(payload):
             if len(q) > MAX_QUESTION_CHARS:
                 return None, f'Question exceeds {MAX_QUESTION_CHARS} characters.'
             return _with_declaration({'question': q, 'hadm_id': hadm_id}, declared), None
-        # Patient selected, nothing asked: the agent has a default question for
-        # exactly this case.
-        return _with_declaration({'hadm_id': hadm_id}, declared), None
+        # Patient selected, nothing asked. This used to be forwarded: the agent had a
+        # default question for exactly this case, and that default ran the readmission
+        # model. The `/risk` command it belonged to was retired on 2026-10-26, so there
+        # is nothing to ask and nothing to spend a credit on — the honest answer is the
+        # refusal, not a turn about a question nobody asked.
+        return None, 'Ask a question, or pick a command.'
 
     question = payload.get('question')
     if not isinstance(question, str) or not question.strip():

@@ -93,30 +93,23 @@ class SlashCommandTests(SimpleTestCase):
                 self.assertRegex(entry['command'], r'^[a-zA-Z]+$')
                 self.assertTrue(entry['description'].strip())
 
-    def test_the_risk_command_is_hidden_from_the_menu_and_still_a_command(self):
-        """Phase 1.1 §3 (2026-10-16): the redundant control leaves the bar, not the vocabulary.
+    def test_the_risk_command_is_gone_from_the_menu_and_from_the_vocabulary(self):
+        """Phase 1.1 §3 (2026-10-16) hid `/risk`; 2026-10-26 deleted it.
 
-        `/ehr` carries the score and its drivers now, so a separate control for the same
-        number is one more thing to keep in step. The command stays declared, and so stays
-        resolvable when typed and accepted by the agent, because hiding a control and
-        deleting a capability are different acts — and only one of them was asked for.
+        `/ehr` carries the score and its drivers, so a separate control for the same
+        number was one more thing to keep in step — and the command it left behind
+        produced nothing at all when a patient was submitted with a blank composer,
+        because that blank submission WAS the command. Hiding a control and deleting a
+        capability are different acts, and this one was asked for: a typed `/risk` now
+        reaches the agent as text and is refused by name.
 
         `/labs` joined the OFFERED list in Phase 4B, which is the other half of the same
-        rule rather than a reversal of it: `/risk` left the bar because `/ehr` swallowed
-        its answer, while `/labs` entered it because the capability had no bar entry at
-        all, and hiding it pushed clinicians into the free-text question that was the
-        unreliable path.
+        rule rather than a reversal of it: `/risk` left because `/ehr` swallowed its
+        answer, while `/labs` entered because the capability had no bar entry at all.
         """
-        hidden = [entry['command'] for entry in SLASH_COMMANDS if entry.get('hidden')]
-
-        # `risk` is the one that left the bar, and it must still be first in the hidden
-        # list only in the sense that matters: it is hidden. The assertion no longer pins
-        # the whole list, because hidden is where ALIASES live too (`/drugs` -> meds,
-        # 2026-10-16) and pinning it made every alias look like a regression.
-        self.assertIn('risk', hidden)
-        self.assertIn('risk', CHIP_NAMES,
-                      'the intent has to stay one the site accepts')
-        self.assertNotIn('risk', [e['command'] for e in offered_commands()])
+        self.assertNotIn('risk', [entry['command'] for entry in SLASH_COMMANDS])
+        self.assertNotIn('risk', CHIP_NAMES,
+                         'the proxy would accept an intent no console draws')
         self.assertEqual([entry['command'] for entry in offered_commands()],
                          ['meds', 'ehr', 'labs', 'pubmed'])
 

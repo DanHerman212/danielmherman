@@ -97,6 +97,9 @@ test('a chip under a live answer sends the question it asks as a declared follow
     await settle();
 
     window.document.getElementById('cp-patient-id').value = '90000015';
+    // Typed, because an empty composer is a no-op since the blank-submit default went
+    // with the `/risk` command (2026-10-26).
+    window.document.getElementById('cp-ask-input').value = 'What changed overnight?';
     await submitTheComposer(window);
 
     const chip = window.document.querySelector('#cp-feed .cp-follow-up');
