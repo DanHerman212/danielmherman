@@ -1197,6 +1197,74 @@ class A2uiAskLiveTests(TestCase):
         self.assertEqual(mocked.call_args.args[0],
                          {'chip': 'literature', 'hadm_id': 90000009})
 
+    # --- the follow-up declaration -------------------------------------------------
+    #
+    # The reported defect (2026-10-26): clicking a chip under a `/labs` answer forced a
+    # second retrieval pass and answered twice. The agent's `route` ends a declared
+    # follow-up in one pass — `tests/agent/test_followup_routing.py` pins that with the
+    # real graph — and the console sends `intent: "follow_up"` on the click
+    # (`tests/js/copilot_followup_intent.test.mjs` pins that against the real scripts).
+    # The hop between them is this proxy, and until now nothing asserted it: every test
+    # in this class reads `ask_agent`, which is the BLOCKING path, while the console
+    # always asks for an event stream.
+
+    CHIP_QUESTION = ('How does the abnormal discharge Red blood cells (3.47 x10^6/uL) '
+                     'compare to its reference range and trend?')
+
+    @patch('demo.views.ask_agent', return_value=dict(A2UI_AGENT_REPLY))
+    def test_a_declared_follow_up_reaches_the_agent_unchanged(self, mocked):
+        """The declaration is not this side's to interpret, and not its to drop.
+
+        A caller that says a question was generated from the record is telling the agent
+        where its evidence is. A proxy that forwards the question without that fact
+        sends the agent back for evidence it already has — which is the whole defect.
+        """
+        response = self._post({'hadm_id': 90000009,
+                               'question': self.CHIP_QUESTION,
+                               'intent': 'follow_up'})
+
+        self.assertEqual(response.status_code, 200)
+        forwarded = mocked.call_args.args[0]
+        self.assertEqual(forwarded['intent'], 'follow_up')
+        self.assertEqual(forwarded['question'], self.CHIP_QUESTION)
+        self.assertEqual(forwarded['hadm_id'], 90000009)
+
+    @patch('demo.views.ask_agent_stream')
+    def test_the_streamed_path_forwards_the_same_declaration(self, mocked):
+        """The console's path, which is the one the defect happened on.
+
+        `Accept: text/event-stream` selects `_streaming_ask`, and that branch builds the
+        request body a second time (`prose_stream` and `follow_ups` are added to it). A
+        field added on one branch and not the other is exactly how a fix ships, passes
+        the suite, and changes nothing in production.
+        """
+        def frames():
+            # A generator, not a list: the view closes the stream once the answer
+            # frame has been relayed, and a list has nothing to close.
+            yield 'answer', dict(A2UI_AGENT_REPLY)
+
+        mocked.side_effect = lambda *args, **kwargs: frames()
+
+        response = self.client.post(
+            reverse('demo:a2ui_ask'),
+            data=json.dumps({'hadm_id': 90000009,
+                             'question': self.CHIP_QUESTION,
+                             'intent': 'follow_up',
+                             'stream_prose': True,
+                             'follow_ups': True}),
+            content_type='application/json',
+            HTTP_ACCEPT='text/event-stream',
+        )
+        # The frames are pulled here rather than in the view: the streaming response is
+        # lazy, and the request body is only built when the first frame is asked for.
+        self.assertEqual(response.status_code, 200)
+        b''.join(response.streaming_content)
+
+        forwarded = mocked.call_args.args[0]
+        self.assertEqual(forwarded['intent'], 'follow_up')
+        self.assertEqual(forwarded['question'], self.CHIP_QUESTION)
+        self.assertIs(forwarded['stream_prose'], True)
+
     def test_only_core_tool_failures_are_treated_as_an_outage(self):
         """A peripheral tool's failure must not cost the clinician their answer.
 
