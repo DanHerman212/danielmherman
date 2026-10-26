@@ -56,14 +56,15 @@ const RECORD_ROW = {
   pmid: '12345678',
 };
 
-/** Run one chart turn that serves `references`, and return the page it drew. */
-async function draw(references) {
+/** Run one turn that serves `references`, and return the page it drew. */
+async function draw(references, overrides = {}) {
   const payload = {
     answer: 'The patient was diuresed.',
     verified: true,
     scope: 'patient_chart',
     references,
     follow_ups: [],
+    ...overrides,
   };
   const page = boot({
     answer: () => streamed([frame('answer', payload)]),
@@ -129,8 +130,49 @@ test('the passage behind a claim is on screen, clamped, and the click opens it',
   assert.equal(head.getAttribute('aria-expanded'), 'true');
 });
 
-test('a published record is a link with a PubMed tag, not an expandable row', async () => {
-  const { rows } = await draw([RECORD_ROW]);
+test('a literature turn lists its records in the drawer too', async () => {
+  /* Reported live on `/pubmed hyperglycemia` (2026-10-26): three numbered pills, a
+     "General Medical Evidence" badge, and no REFERENCES drawer at all.
+
+     The drawer was gated on `scope === 'patient_chart'`, on the reasoning that a
+     literature turn illustrated its own sources so listing them again was the same
+     evidence twice. That stopped being true when those records became citations and the
+     canvas stopped drawing them — the gate was hiding the only place the papers could be
+     read. The rule is structural now: references were published, so references are
+     shown. */
+  const record = {
+    index: 1,
+    source: 'PubMed',
+    title: 'Hyperglycemia in the hospitalised patient',
+    label: '1 · Ugeskrift for laeger · 2024',
+    subtitle: 'Ugeskrift for laeger. 2024. Hansen K, Berg J, et al. · PMID 38123456',
+    year: '2024',
+    excerpt: 'BACKGROUND: Hyperglycemia is common on the ward.',
+    pmid: '38123456',
+    url: 'https://pubmed.ncbi.nlm.nih.gov/38123456/',
+  };
+
+  const { rows, turn } = await draw([record], {
+    answer: 'Two records were retrieved.^[PMID: 38123456]',
+    scope: 'general_evidence',
+    verified: false,
+  });
+
+  assert.equal(turn().querySelector('.cp-references').hidden, false,
+               'the drawer was suppressed on a literature turn');
+  const [row] = rows();
+  assert.ok(row, 'the drawer drew no rows');
+  assert.equal(row.querySelector('.cp-reference-title').textContent, record.title);
+  assert.equal(row.querySelector('.cp-reference-tag').textContent, 'PubMed · 2024');
+});
+
+test('a turn with no references still draws no drawer', async () => {
+  const { turn } = await draw([], { scope: 'general_evidence', verified: false });
+
+  assert.equal(turn().querySelector('.cp-references').hidden, true);
+});
+
+test('a published record is a link with a PubMed tag, not an expandable row', async () => {  const { rows } = await draw([RECORD_ROW]);
 
   const [row] = rows();
   assert.equal(row.querySelector('.cp-reference-tag').textContent, 'PubMed');

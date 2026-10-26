@@ -1183,14 +1183,7 @@
        Every field is defaulted, because a thread spans the change that introduced them:
        a turn stored before 4A-2 replays with none of the three, and it has to draw as an
        ordinary turn rather than as a broken one. `scope: null` in particular is a real
-       value — a redirect rested on nothing — so it shows no pill rather than a guess.
-
-       The references drawer is a CHART-turn affordance and is deliberately not drawn for
-       a literature turn. A literature turn already has its primary evidence surface: the
-       canvas draws the retrieved records themselves, with their journal, date and PMID
-       links. Listing the same articles again in a drawer beneath that is the same
-       evidence twice, and two renderings of one source read as two sources — which is
-       exactly the misreading the citation contract exists to prevent. */
+       value — a redirect rested on nothing — so it shows no pill rather than a guess. */
     function presentFacts(payload) {
       latest = payload;
       var scope = payload.scope || null;
@@ -1215,10 +1208,21 @@
          which is why this is `=== true` rather than truthiness: `undefined` is a turn
          recorded before the field existed, not a turn that failed verification. */
       if (payload.verified === true) showVerified();
-      // A note passage has no surface of its own — the canvas shows the answer, not the
-      // notes it was drawn from — so on a chart turn the drawer is the only place the
-      // passage behind a marker can be read, and it is the row that carries it.
-      presentReferences(scope === 'patient_chart' ? (payload.references || []) : []);
+      /* Every turn that has references lists them, whatever it answered from.
+
+         This was gated on `scope === 'patient_chart'`, on the reasoning that a chart turn
+         was the only turn whose evidence had no surface of its own — a literature turn
+         illustrated its own sources, so listing them again was the same evidence twice.
+
+         That reasoning stopped holding when a literature turn's records became citations
+         (Phase F, 2026-10-26): the canvas no longer draws them, so on `/pubmed` this gate
+         was suppressing the only place the papers could be read. Reported live as three
+         numbered pills and no `REFERENCES` drawer at all.
+
+         The rule is now structural rather than domain-shaped: if the turn published
+         references, the turn shows them. Nothing here should have to know what a scope
+         means. */
+      presentReferences(payload.references || []);
       presentFollowUps(payload.follow_ups || []);
     }
 
