@@ -1025,9 +1025,14 @@
         return;
       }
       var summary = document.createElement('summary');
-      summary.textContent = rows.length === 1
-        ? '1 reference' : rows.length + ' references';
+      // One label, upper-cased by the stylesheet, rather than a count: the rows are
+      // numbered now and a second number in the summary would be a count of the count.
+      summary.textContent = 'References';
       references.appendChild(summary);
+      // Open, because the rows ARE the evidence for an answer that cites them: a reader
+      // checking a marker should not have to find a control first. The disclosure stays
+      // so the row can be closed by a reader who wants the prose alone.
+      references.open = true;
       var list = el('ol', 'cp-reference-list');
       rows.forEach(function (row) { list.appendChild(referenceRow(row)); });
       references.appendChild(list);

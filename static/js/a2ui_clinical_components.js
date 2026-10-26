@@ -338,7 +338,10 @@ const pubmedUrl = (pmid) => `https://pubmed.ncbi.nlm.nih.gov/${pmid}/`;
 
 const NARRATIVE_STYLES = css`
   :host { display: block; }
-  .narrative { font-size: 0.95rem; line-height: 1.6; }
+  .narrative { font-size: 1rem; line-height: 1.65; }
+  /* The reading measure. A 68ch column is the editorial one: prose past it loses the
+     return sweep, and this answer is read as prose rather than scanned as a table. */
+  .prose { max-width: 68ch; }
   .prose > :first-child { margin-top: 0; }
   .prose > :last-child { margin-bottom: 0; }
   /* A section of the answer.
@@ -366,17 +369,17 @@ const NARRATIVE_STYLES = css`
      whole stylesheet is a template literal, so one backtick in a comment ends it, and the
      parse error lands somewhere else entirely. That has now happened twice. */
   .prose > h1, .prose > h2, .prose > h3, .prose > h4 {
-    font-size: 0.95rem;
-    font-weight: 600;
-    line-height: 1.45;
+    font-size: 1.05rem;
+    font-weight: 650;
+    line-height: 1.4;
     color: #0f172a;
-    margin: 1.25rem 0 0.25rem;
+    margin: 1.5rem 0 0.35rem;
   }
   /* The heading that opens a turn sits flush with the top of the answer. */
   .prose > h1:first-child, .prose > h2:first-child,
   .prose > h3:first-child, .prose > h4:first-child { margin-top: 0; }
   /* Enough air that two paragraphs read as two readings rather than one block. */
-  .prose > p { margin: 0 0 0.75rem; }
+  .prose > p { margin: 0 0 0.9rem; text-wrap: pretty; }
   .cite {
     font: inherit;
     font-size: 0.72em;
@@ -384,10 +387,14 @@ const NARRATIVE_STYLES = css`
     vertical-align: super;
     margin-left: 1px;
     padding: 1px 5px;
-    border: 1px solid rgba(17, 24, 39, 0.4);
+    /* Editorial, not chunky: a soft slate fill on a hairline border reads as a footnote
+       marker beside the sentence rather than as a control competing with it. It is still
+       a button with a popover, and still focusable — the softening is visual only. */
+    border: 1px solid #cbd5e1;
     border-radius: 999px;
-    background: #ffffff;
-    color: #1f2937;
+    background: #f1f5f9;
+    color: #334155;
+    font-variant-numeric: tabular-nums;
     cursor: pointer;
     /* A pill is one line, always. A button wraps its own text by default, so a long label
        broke the box across two lines and the rounded border read as a pill cut in half. The
@@ -395,7 +402,7 @@ const NARRATIVE_STYLES = css`
        whatever it is handed. */
     white-space: nowrap;
   }
-  .cite:hover { background: #eef1f5; }
+  .cite:hover { background: #e2e8f0; border-color: #94a3b8; }
   .cite:focus-visible { outline: 2px solid #1f2937; outline-offset: 1px; }
   /* The marker a drawer row has just opened, set by revealCitation. It lives here
      because this stylesheet already owns the marker's outline colour — the page used
