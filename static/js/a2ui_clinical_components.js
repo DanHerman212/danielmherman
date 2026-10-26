@@ -920,8 +920,16 @@ const CitedNarrativeApi = {
       index: z.number(),
       source: z.string(),
       title: z.string(),
-      // Present on a literature citation, which is the case where the marker shows an
-      // identifier and links out instead of opening a panel.
+      // What the pill reads. Resolved on the server so the clinical and the bibliographic
+      // vocabulary both live in one module; a payload without it falls back to the number.
+      label: z.string().optional(),
+      // The line under the title on a published record — `Journal. Year. Authors. · PMID`
+      // — so the card can be read as a citation rather than as a headline.
+      subtitle: z.string().optional(),
+      authors: z.string().optional(),
+      journal_citation: z.string().optional(),
+      // Present on a literature citation, whose card links out to the record as well as
+      // naming it. The marker itself no longer links out: one gesture, one surface.
       pmid: z.string().optional(),
       excerpt: z.string().optional(),
       url: z.string().optional(),
@@ -1089,30 +1097,28 @@ class CitedNarrativeElement extends A2uiLitElement {
       citations.find((entry) => Number(entry.index) === Number(digits)) ||
       citations.find((entry) => String(entry.pmid || '') === String(digits));
     // What the marker says, resolved by the server so the clinical vocabulary lives in one
-    // module: `1 · Hospital Course` on a note turn, the journal on a literature turn. The
-    // fallbacks are for a payload from an agent that predates the label — a bare number
-    // still answers its popover, so nothing breaks, it just reads the way it used to.
+    // module: `1 · Hospital Course` on a note turn, `1 · World neurosurgery · 2024` on a
+    // literature turn. The fallbacks are for a payload from an agent that predates the
+    // label — a bare number still answers its popover, so nothing breaks, it just reads
+    // the way it used to.
     const label = citation?.label || citation?.pmid || digits;
 
-    if (citation?.pmid) {
-      // Straight to the source. The record is the primary evidence, and a copy of its
-      // abstract in a floating panel is a second place to read the same thing — with
-      // the identifier already on screen, the shortest path is the useful one.
-      const link = document.createElement('a');
-      link.className = 'cite cite-pmid';
-      link.href = pubmedUrl(citation.pmid);
-      link.target = '_blank';
-      link.rel = 'noopener noreferrer';
-      link.textContent = label;
-      link.setAttribute(
-        'aria-label', `PMID ${citation.pmid}: ${citation.title} (opens PubMed)`);
-      return link;
-    }
-
+    /* One control, whatever the citation is a citation to (Phase F, 2026-10-26).
+     *
+     * A published record used to be rendered as an anchor straight to PubMed, on the
+     * reasoning that the record is the primary evidence and the shortest path is the
+     * useful one. The cost was that a literature turn was the only turn in the product
+     * whose pills did not open a card: the same `^[n]` gesture meant "read the passage
+     * here" on a note turn and "leave the page" on a literature turn, and the reference
+     * list at the foot of the turn never drew the papers it was summarising.
+     *
+     * The card is the destination now, and the trip to PubMed is inside it — the title is
+     * the link, which is where a reader who wants the paper looks first. The marker keeps
+     * its identifier so the gesture is still discoverable as "open this source". */
     const button = document.createElement('button');
     button.type = 'button';
     button.className = citation ? 'cite' : 'cite missing';
-    button.dataset.cite = digits;
+    button.dataset.cite = citation ? String(citation.index) : digits;
     button.textContent = label;
     if (citation) {
       button.setAttribute('aria-haspopup', 'dialog');
@@ -1120,7 +1126,9 @@ class CitedNarrativeElement extends A2uiLitElement {
       // A clickable label is not also a tooltip: a native `title` draws the browser's own
       // dark box over the card this pill opens, which is the tooltip a reader reported
       // seeing INSTEAD of the card. The accessible name still says what it opens.
-      button.setAttribute('aria-label', `Reference ${citation.index}: ${citation.title}`);
+      button.setAttribute('aria-label', citation.pmid
+        ? `Reference ${citation.index}, PMID ${citation.pmid}: ${citation.title}`
+        : `Reference ${citation.index}: ${citation.title}`);
     } else {
       button.disabled = true;
       button.setAttribute('aria-label', 'No matching citation in this response');
@@ -1367,6 +1375,15 @@ const ComparativeRiskMatrixApi = {
       horizon_days: z.number(),
       url: z.string(),
       excerpt: z.string(),
+      // The paper itself, carried beside the journal line. Optional, because a compact
+      // row is still a valid row — and `_citationFor` reads all four, so a schema that
+      // omitted them would reject the payload it is written to consume: this object's
+      // parser is strict, and a field the agent sends that is not declared here fails the
+      // whole table rather than dropping one property.
+      title: z.string().optional(),
+      authors: z.string().optional(),
+      journal: z.string().optional(),
+      year: z.string().optional(),
       // The turn's own number for this record, so the row can be cited beside the answer
       // that drew it. The agent registers each benchmark as a source at the end of its
       // note passages and stamps the row with the number it assigned, rather than the

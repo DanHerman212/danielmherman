@@ -272,26 +272,32 @@ class A2uiFixtureContractTests(TestCase):
 
         # A literature turn swaps the risk widgets for the records rather than showing
         # both: the question was about published evidence, not about this patient.
+        #
+        # And it no longer draws a second copy of them (Phase F, 2026-10-26). The records
+        # are citations now — a numbered pill in the prose, a hover card, and a row in the
+        # turn's references list — so a boxed list under the narrative was the same ten
+        # papers told twice, in two different shapes.
         comps = body['a2ui']['messages'][1]['updateComponents']['components']
         types = {c['component'] for c in comps}
-        self.assertIn('LiteratureList', types)
+        self.assertNotIn('LiteratureList', types)
         self.assertNotIn('RiskInfluencers', types)
 
-        # The comparative matrix is drawn above the records, with this patient's own
-        # estimate pinned first (Phase 2, 2026-10-16). Fixture mode makes the same two
-        # calls the live path makes — the search and the risk call — because a comparison
-        # with no patient in it is a table about strangers, and because the swap to live
-        # has to be a swap of the data rather than of the surface.
-        self.assertIn('ComparativeRiskMatrix', types)
-        order = [c['component'] for c in comps]
-        self.assertLess(order.index('ComparativeRiskMatrix'),
-                        order.index('LiteratureList'),
-                        'the comparison leads; the records are the sources beneath it')
+        # The citations the reader can open, which is what replaced that list.
+        self.assertTrue(body['references'], 'the turn published no references')
+        self.assertEqual(body['references'][0]['pmid'],
+                         body['literature']['articles'][0]['pmid'])
+        self.assertIn('PMID', body['references'][0]['subtitle'])
+        self.assertEqual(
+            [source['kind'] for source in body['sources'] if source.get('kind')],
+            ['Literature'] * len(body['literature']['articles']))
 
-        matrix = next(c for c in comps if c['component'] == 'ComparativeRiskMatrix')
-        self.assertIn('probability', matrix['baseline'])
-        self.assertEqual(matrix['rows'][0]['pmid'], '37495280',
-                         'the CHF capture holds a curated 30-day cohort rate')
+        # The comparative matrix needs a condition, and a condition needs a chart. This
+        # fixture turn is `/pubmed` on its own — the search and the risk call, no note —
+        # so there is nothing to resolve a phenotype from and no table: a cohort table
+        # asserts what the patient has, and this turn never established it. (Live, a
+        # `/pubmed` chip clicked in a thread that has read the chart does draw the table,
+        # because the discharge diagnosis is in the replay. Architect ruling 3, Phase E.)
+        self.assertNotIn('ComparativeRiskMatrix', types)
 
     def test_fixture_mode_never_invents_a_literature_synthesis(self):
         """With no capture for the query, the answer states the absence.
