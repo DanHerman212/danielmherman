@@ -1095,19 +1095,34 @@
       var main = el('div', 'cp-reference-main');
       main.appendChild(head);
 
-      if (!published && row.excerpt) {
+      /* The citation line, for a record that has one: journal, year, authors, identifier.
+         Without it a published row was a single line naming its journal — `5. The Journal
+         of Arthroplasty · 2022` — with no paper, no authors and nothing to weigh it by,
+         beside four note rows that each carried a passage. */
+      if (row.subtitle) {
+        var citationLine = el('div', 'cp-reference-subtitle');
+        citationLine.textContent = String(row.subtitle);
+        main.appendChild(citationLine);
+      }
+
+      if (row.excerpt) {
         var body = el('p', 'cp-reference-excerpt');
         body.textContent = String(row.excerpt);
         main.appendChild(body);
-        // The passage is on screen already, clamped to two lines. The click is what
-        // unclamps it — and, as before, it is also what points at the sentence the
-        // passage supports, so the row reads as provenance rather than as a menu item.
-        head.addEventListener('click', function () {
-          var opening = !item.classList.contains('is-open');
-          item.classList.toggle('is-open', opening);
-          head.setAttribute('aria-expanded', String(opening));
-          if (opening) revealMarker(row.index);
-        });
+        // A note passage is expanded by its own row, clamped to two lines until then. A
+        // published record's row is a link out, so its passage is shown and stays clamped:
+        // the click on that row already has a destination.
+        if (!published) {
+          // The passage is on screen already, clamped to two lines. The click is what
+          // unclamps it — and, as before, it is also what points at the sentence the
+          // passage supports, so the row reads as provenance rather than as a menu item.
+          head.addEventListener('click', function () {
+            var opening = !item.classList.contains('is-open');
+            item.classList.toggle('is-open', opening);
+            head.setAttribute('aria-expanded', String(opening));
+            if (opening) revealMarker(row.index);
+          });
+        }
       }
 
       item.append(mark, main);

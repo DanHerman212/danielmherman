@@ -143,6 +143,41 @@ test('a published record is a link with a PubMed tag, not an expandable row', as
                'a record with no passage was given an empty one');
 });
 
+test('the benchmark row names its paper, its authors and its finding', async () => {
+  // The reported defect: row 5 read `5. The Journal of Arthroplasty · 2022` and stopped.
+  // The four rows above it each carried a passage, and the cohort the comparison rests on
+  // carried nothing — a reader could not even tell which paper it was.
+  const benchmark = {
+    index: 5,
+    source: 'PubMed',
+    title: 'The Impact of Pre-Operative Healthcare Utilization on Complications, '
+      + 'Readmissions, and Post-Operative Healthcare Utilization Following Total Joint '
+      + 'Arthroplasty.',
+    label: '5 · The Journal of Arthroplasty · 2022',
+    subtitle: 'The Journal of Arthroplasty. 2022. Creager AE, Kleven AD, Kesimoglu ZN, '
+      + 'et al. · PMID 34793857',
+    excerpt: 'Elective primary total knee arthroplasty — The 30-day readmission rate was '
+      + '3.4%.',
+    pmid: '34793857',
+    url: 'https://pubmed.ncbi.nlm.nih.gov/34793857/',
+  };
+
+  const { rows } = await draw([benchmark]);
+  const [row] = rows();
+
+  const title = row.querySelector('.cp-reference-title');
+  assert.match(title.textContent, /^The Impact of Pre-Operative Healthcare/);
+  assert.equal(row.querySelector('.cp-reference-head').tagName, 'A');
+  assert.equal(row.querySelector('.cp-reference-head').getAttribute('href'),
+               benchmark.url);
+
+  assert.equal(row.querySelector('.cp-reference-subtitle').textContent,
+               benchmark.subtitle);
+
+  assert.match(row.querySelector('.cp-reference-excerpt').textContent,
+               /30-day readmission rate was 3\.4%/);
+});
+
 test('the card\'s request for the full list opens it AT THE ROW IT NAMED', async () => {
   const { window, turn } = await draw([NOTE_ROW]);
 

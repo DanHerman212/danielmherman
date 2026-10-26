@@ -501,7 +501,12 @@ const POPOVER_STYLES = css`
   }
   .close:hover { opacity: 1; }
   .title { margin: 0; font-weight: 650; color: #1d4ed8; }
-  .subtitle { margin: 2px 0 0; font-size: 0.78rem; color: #64748b; }
+  .title a { color: inherit; text-decoration: none; }
+  .title a:hover { text-decoration: underline; }
+  /* The card is 340px wide, so the citation line is allowed to read as a citation and
+     wrap: a full journal name, its year, three authors and the identifier do not fit on
+     one line, and truncating them would leave the reader unable to cite the paper. */
+  .subtitle { margin: 3px 0 0; font-size: 0.76rem; color: #64748b; line-height: 1.4; }
   .excerpt { margin: 8px 0 0; color: #334155; }
   .link { display: inline-block; margin-top: 8px; color: #1d4ed8; }
 `;
@@ -535,6 +540,11 @@ class CitationPopoverElement extends LitElement {
     this.citation = null;
     this._anchor = null;
     this._isOpen = false;
+    //: Where the card lives when it is not open, so it can be put back there.
+    this._home = null;
+    this._next = null;
+    //: True for the instant a re-parenting is in flight.
+    this._moving = false;
     //: What opened the card — `hover`, `focus` or `click`. A card the pointer or the
     //: caret opened is transient and closes when they leave; a clicked one is pinned
     //: and closes only when it is dismissed.
@@ -608,6 +618,8 @@ class CitationPopoverElement extends LitElement {
     this._openedBy = via;
     this.hidden = false;
     anchor.setAttribute('aria-expanded', 'true');
+    // Out of the tree that would clip it, before it is measured.
+    this._detach();
 
     document.addEventListener('keydown', this._boundKeyDown, true);
     document.addEventListener('pointerdown', this._boundPointerDown, true);
@@ -669,6 +681,7 @@ class CitationPopoverElement extends LitElement {
     document.removeEventListener('pointerdown', this._boundPointerDown, true);
     window.removeEventListener('scroll', this._boundReposition, true);
     window.removeEventListener('resize', this._boundReposition);
+    this._reattach();
 
     if (returnFocus) anchor?.focus({ preventScroll: true });
   }
@@ -722,15 +735,24 @@ class CitationPopoverElement extends LitElement {
   }
 
   _onPointerDown(event) {
-    // composedPath, not target: the marker lives in another shadow tree, so by
-    // the time this listener sees the event the target has been retargeted to the
-    // narrative element and would never match the anchor.
-    if (this.contains(event.target) || event.composedPath().includes(this._anchor)) return;
+    // The PATH, not the target. A listener out here is handed the retargeted target —
+    // for a click on this card's own button that is the `<citation-popover>` host, and a
+    // node does not contain itself. Testing `this.contains(event.target)` therefore said
+    // "outside" for every pointerdown INSIDE the card: the card closed on mousedown, the
+    // button was unmounted before mouseup, and the click that would have taken the reader
+    // to the reference list never happened. Reported as "the link does nothing".
+    //
+    // `composedPath()` is the real path — it names the inner button, this card and the
+    // marker — and it is the only one that survives being three shadow trees deep.
+    const path = event.composedPath();
+    if (path.includes(this) || path.includes(this._anchor)) return;
     this.close({ returnFocus: false });
   }
 
   disconnectedCallback() {
     super.disconnectedCallback();
+    // A move, not a teardown: see `_detach`.
+    if (this._moving) return;
     this.close({ returnFocus: false });
   }
 
@@ -742,8 +764,17 @@ class CitationPopoverElement extends LitElement {
    * across two shadow boundaries to scroll an element this element cannot see would be
    * the page's job done in the wrong place.
    */
-  seeAll() {
-    this.dispatchEvent(new CustomEvent('citation-see-all', {
+  seeAll(event) {
+    // The button is inside the card and the card sits inside a dialog the page listens
+    // to; neither wants this click counted as "somewhere else".
+    event?.preventDefault();
+    event?.stopPropagation();
+    // Raised from the ANCHOR, not from the card. While it is open the card is parented to
+    // the document (see `_detach`), so an event raised here would travel body → html and
+    // never pass through the turn that owns the reference list. The marker is still where
+    // the reader clicked, and it is inside the shadow trees the event has to cross.
+    const origin = this._anchor || this;
+    origin.dispatchEvent(new CustomEvent('citation-see-all', {
       bubbles: true,
       composed: true,
       detail: { index: this.citation?.index ?? null },
@@ -751,6 +782,41 @@ class CitationPopoverElement extends LitElement {
     // Focus goes with the reader: the turn moves it to the list it has just opened, so
     // returning it to the marker first would be two moves for one intent.
     this.close({ returnFocus: false });
+  }
+
+  /**
+   * Move the card out of whatever shadow tree it was rendered in, while it is open.
+   *
+   * A `position: fixed` box is positioned against the viewport — until an ancestor
+   * establishes a containing block, at which point it is positioned against THAT box and
+   * clipped by its overflow. Two ancestors here do exactly that: the block settle
+   * animation runs a `transform` on every card as it mounts, and the comparison table
+   * scrolls its own wrapper. A popover opened inside either one is drawn in the wrong
+   * place or not drawn at all.
+   *
+   * Parenting the open card to the document body takes it out of every such ancestor at
+   * once, which is the standard answer and the one that cannot be surprised by an
+   * ancestor added later. It goes back where it came from on close: the component that
+   * rendered it still owns it, and Lit holds a reference to this very node.
+   */
+  _detach() {
+    if (this._home) return;
+    this._home = this.parentNode;
+    this._next = this.nextSibling;
+    // Re-parenting is a disconnection as far as the element is concerned, and
+    // `disconnectedCallback` closes the card. This is the one move that must not.
+    this._moving = true;
+    document.body.appendChild(this);
+    this._moving = false;
+  }
+
+  _reattach() {
+    if (!this._home) return;
+    this._moving = true;
+    this._home.insertBefore(this, this._next || null);
+    this._moving = false;
+    this._home = null;
+    this._next = null;
   }
 
   render() {
@@ -765,18 +831,17 @@ class CitationPopoverElement extends LitElement {
         <div class="head">
           <span class="eyebrow">Reference</span>
           <button class="see-all" type="button"
-                  @click=${() => this.seeAll()}>See all references ↓</button>
+                  @click=${(event) => this.seeAll(event)}>See all references ↓</button>
           <button class="close" type="button" aria-label="Close citation"
                   @click=${() => this.close()}>×</button>
         </div>
         <div class="body">
-          <p class="title">${citation.index}. ${citation.title}</p>
+          <p class="title">${citation.index}. ${citation.url
+            ? html`<a href=${citation.url} target="_blank"
+                     rel="noopener noreferrer">${citation.title}</a>`
+            : citation.title}</p>
           <p class="subtitle">${citation.source}</p>
           ${citation.excerpt ? html`<p class="excerpt">${citation.excerpt}</p>` : nothing}
-          ${citation.url
-            ? html`<a class="link" href=${citation.url} target="_blank"
-                     rel="noopener noreferrer">Open source</a>`
-            : nothing}
         </div>
       </div>
     `;
@@ -1039,7 +1104,6 @@ class CitedNarrativeElement extends A2uiLitElement {
       link.target = '_blank';
       link.rel = 'noopener noreferrer';
       link.textContent = label;
-      link.title = `PMID ${citation.pmid} — ${citation.title}`;
       link.setAttribute(
         'aria-label', `PMID ${citation.pmid}: ${citation.title} (opens PubMed)`);
       return link;
@@ -1053,10 +1117,13 @@ class CitedNarrativeElement extends A2uiLitElement {
     if (citation) {
       button.setAttribute('aria-haspopup', 'dialog');
       button.setAttribute('aria-expanded', 'false');
-      button.title = citation.title;
+      // A clickable label is not also a tooltip: a native `title` draws the browser's own
+      // dark box over the card this pill opens, which is the tooltip a reader reported
+      // seeing INSTEAD of the card. The accessible name still says what it opens.
+      button.setAttribute('aria-label', `Reference ${citation.index}: ${citation.title}`);
     } else {
       button.disabled = true;
-      button.title = 'No matching citation in this response';
+      button.setAttribute('aria-label', 'No matching citation in this response');
     }
     return button;
   }
@@ -1249,6 +1316,13 @@ const _MATRIX_STYLES = css`
   .pills { display: flex; flex-wrap: wrap; gap: 4px; }
   .pill { border: 1px solid rgba(17, 24, 39, 0.18); border-radius: 999px;
           font-size: 0.72rem; padding: 1px 8px; white-space: nowrap; }
+  /* The first column is the comparison itself — who was studied — so it carries the
+     weight, and the design and the finding sit under it as subtext. */
+  .population { display: block; font-weight: 500; }
+  .design { color: #64748b; font-size: 0.72rem; margin-top: 4px; }
+  /* The source column holds a citation and nothing else. It used to stack a journal name,
+     a pill and a raw PMID link on one another, which is the same record told three times. */
+  .source { white-space: nowrap; }
   /* The abstract sits under its cohort rather than in a fifth column, and is clamped to
      three lines. Five text columns do not fit this console: measured at 759px, the excerpt
      column squeezed the cohort summary into eleven lines and the provenance into six,
@@ -1349,11 +1423,19 @@ class ComparativeRiskMatrixElement extends A2uiLitElement {
     const rows = this.controller?.props?.rows || [];
     const row = rows.find((entry) => Number(entry.source_index) === Number(index));
     if (!row) return null;
+    // The citation line, punctuated the way a reference is: journal, year, authors, id.
+    const journalCitation = [
+      row.journal ? `${row.journal}.` : '',
+      row.year ? `${row.year}.` : '',
+      row.authors || '',
+    ].filter(Boolean).join(' ').trim();
     return {
       index: Number(row.source_index),
-      source: [row.pmid ? `PMID ${row.pmid}` : '', row.evidence_tier]
-        .filter(Boolean).join(' · '),
-      title: row.source,
+      source: [journalCitation, row.pmid ? `PMID ${row.pmid}` : ''].filter(Boolean)
+        .join(' · '),
+      // The ARTICLE, not its journal: this is the heading the card is titled with and
+      // the text the reader is being asked to weigh.
+      title: row.title || row.source,
       excerpt: [row.cohort_summary, row.excerpt].filter(Boolean).join(' — '),
       url: row.url || pubmedUrl(row.pmid),
     };
@@ -1374,46 +1456,46 @@ class ComparativeRiskMatrixElement extends A2uiLitElement {
           : `Published ${horizon} readmission rates`}>
           <thead>
             <tr>
+              <th scope="col">Population / treatment</th>
+              <th scope="col">30-day readmission</th>
               <th scope="col">Source</th>
-              <th scope="col">Readmission rate</th>
-              <th scope="col">Cohort</th>
             </tr>
           </thead>
           <tbody>
             ${baseline ? html`
               <tr class="baseline">
                 <td>
-                  ${baseline.source}
-                  <div class="tier">${baseline.provenance}</div>
+                  <span class="population">${baseline.cohort}</span>
+                  <div class="design">Discharge readmission evaluation</div>
                 </td>
                 <td class="rate">
                   ${percent(baseline.probability)}
                   <span class="under">${bandLabel(baseline)}, threshold
                     ${percent(baseline.threshold)}</span>
                 </td>
-                <td>${baseline.cohort}</td>
+                <td>
+                  ${baseline.source}
+                  <div class="design">${baseline.provenance}</div>
+                </td>
               </tr>
             ` : nothing}
             ${rows.map((row) => html`
               <tr>
                 <td>
-                  <span class="journal">${row.source}</span>${row.source_index === undefined
-                    ? nothing
-                    : html`<button class="cite" type="button"
-                                   data-cite=${String(row.source_index)}
-                                   aria-haspopup="dialog" aria-expanded="false"
-                                   title=${row.source_label || row.source}>${row.source_label
-                                     || row.source}</button>`}
-                  <div class="pmid">PMID <a href=${row.url || pubmedUrl(row.pmid)}
-                    target="_blank" rel="noopener noreferrer">${row.pmid}</a></div>
+                  <span class="population">${row.cohort_summary}</span>
+                  <div class="design">${row.evidence_tier}</div>
+                  <div class="excerpt">${row.excerpt}</div>
                 </td>
                 <td class="rate">${row.reported_rate}
                   <span class="under">${row.horizon_days}-day</span></td>
-                <td>
-                  ${row.cohort_summary}
-                  <div class="tier">${row.evidence_tier}</div>
-                  <div class="excerpt">${row.excerpt}</div>
-                </td>
+                <td class="source">${row.source_index === undefined
+                  ? html`<span class="journal">${row.source}</span>`
+                  : html`<button class="cite" type="button"
+                                 data-cite=${String(row.source_index)}
+                                 aria-haspopup="dialog" aria-expanded="false"
+                                 aria-label="Reference ${row.source_index}: ${
+                                   row.title || row.source}">${row.source_label
+                                   || row.source}</button>`}</td>
               </tr>
             `)}
           </tbody>

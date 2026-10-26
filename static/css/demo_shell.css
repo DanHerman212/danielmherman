@@ -590,6 +590,12 @@ button.cp-menu-item {
   font-variant-numeric: tabular-nums;
 }
 .cp-reference-main { min-width: 0; }
+/* The citation line under a published record: journal, year, authors, identifier. Set
+   quieter than the title and allowed to wrap — it is long by nature and truncating it
+   would leave the reader unable to cite the paper. */
+.cp-reference-subtitle {
+  margin-top: 3px; color: #64748b; font-size: 0.8rem; line-height: 1.45;
+}
 /* The header line is the section or the article, in the link accent, with a pill saying
    what kind of source it is: a discharge note is the patient's own record and a journal
    article is published evidence, and the reader weighs the second differently. The pill
