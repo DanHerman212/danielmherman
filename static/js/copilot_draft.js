@@ -89,10 +89,26 @@
 
     // Emphasis is markup too. Removed from the text pieces only — a marker's own
     // digits are never emphasis and are never touched.
-    return pieces.map(function (piece) {
-      if (piece.cite !== undefined) return piece;
-      return { text: piece.text.replace(/\*/g, '') };
-    }).filter(function (piece) {
+    //
+    // The gap a marker leaves between itself and the punctuation that ends its clause is
+    // closed here as well, for the same reason the emphasis is: this text becomes a pill
+    // on screen, and the settled answer sets its pill flush against the full stop. A gap
+    // that survived the draft and closed at the handover would move the sentence under
+    // the reader at the moment they finished it.
+    var tightened = [];
+    pieces.forEach(function (piece) {
+      if (piece.cite !== undefined) {
+        tightened.push(piece);
+        return;
+      }
+      var afterMarker = tightened.length > 0
+        && tightened[tightened.length - 1].cite !== undefined;
+      var value = piece.text.replace(/\*/g, '');
+      if (afterMarker) value = value.replace(/^[ \t\u00a0]+([.,;:!?])/, '$1');
+      tightened.push({ text: value });
+    });
+
+    return tightened.filter(function (piece) {
       return piece.cite !== undefined || piece.text.length > 0;
     });
   }

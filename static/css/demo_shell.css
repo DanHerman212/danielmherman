@@ -545,8 +545,12 @@ button.cp-menu-item {
 }
 .cp-scope[hidden] { display: none; }
 
-/* ---------- the foot of a turn: its references and its next questions ---------- */
-.cp-turn-trail { display: flex; flex-direction: column; gap: 12px; margin-top: 14px; }
+/* The foot of a turn: its references and its next questions.
+
+   The gaps are the section rhythm, not decoration: 24px above the evidence block, 14px
+   between its rows, and 24px below it before the follow-up card, so the three parts of
+   the foot read as three parts rather than as one stack pressed together. */
+.cp-turn-trail { display: flex; flex-direction: column; gap: 24px; margin-top: 24px; }
 
 /* The references drawer, open by default and labelled in the editorial manner: the rows
    are part of the answer's evidence, and a reader checking a marker should not have to
@@ -564,34 +568,51 @@ button.cp-menu-item {
 .cp-references[open] > summary::before { content: '⌄ '; }
 .cp-reference-list {
   margin: 6px 0 0; padding: 0; list-style: none;
-  display: flex; flex-direction: column; gap: 10px;
-  counter-reset: cp-reference;
+  display: flex; flex-direction: column; gap: 14px;
 }
-/* The row number, from the list rather than from the markup: the order the answer cites
-   them IS the number, so a counter cannot disagree with the list. */
-.cp-reference-item::before {
-  counter-increment: cp-reference; content: counter(cp-reference) '.';
-  float: left; margin-left: -22px;
-  font-weight: 600; color: #94a3b8; font-variant-numeric: tabular-nums;
-}
-/* The left rule is the whole audit trail: every row hangs off it in the order the
-   answer cites them, so the list reads as provenance rather than as a menu. */
-.cp-reference-item { padding-left: 22px; border-left: 2px solid #e2e8f0; }
-.cp-reference-head { font-weight: 600; color: #334155; }
-.cp-reference-link { display: block; margin-top: 3px; color: #1d4ed8; }
-.cp-reference-excerpt { margin: 6px 0 0; color: #475569; line-height: 1.55; }
-.cp-reference-excerpt[hidden] { display: none; }
+/* Each row is an invisible two-column grid of 28px and the rest: the number sits once, in
+   the gutter, and the evidence hangs beside it. The grid draws no rules and no bullets,
+   because these rows are evidence and a reader should see a list of passages rather than a
+   list of controls.
 
-/* A note row is a control, not a label: it opens the passage behind the claim. */
-.cp-reference-toggle {
-  display: flex; align-items: baseline; gap: 12px; width: 100%;
-  padding: 0; border: 0; background: none; cursor: pointer;
-  font: inherit; color: inherit; text-align: left;
+   The number lives here and nowhere else. An earlier version carried `[1]` inside the row's
+   own label beside a counter that rendered `1.`, so production showed `1. [1] Discharge
+   note` — two numbers for one row, disagreeing about how to write it. */
+.cp-reference-item {
+  display: grid; grid-template-columns: 28px 1fr; align-items: start;
+  padding-left: 0; border-left: 0;
 }
-.cp-reference-toggle .cp-reference-head { flex: 1 1 auto; min-width: 0; }
-.cp-reference-toggle:hover .cp-reference-head { color: #1d4ed8; }
-.cp-reference-chevron { flex: none; color: #94a3b8; font-size: 1.05rem; line-height: 1; }
-.cp-reference-item.is-open .cp-reference-chevron { transform: rotate(90deg); }
+.cp-reference-index {
+  padding-top: 1px; color: #94a3b8; font-size: 0.8rem; line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+.cp-reference-main { min-width: 0; }
+/* The header line is the section or the article, in the link accent, with a pill saying
+   what kind of source it is: a discharge note is the patient's own record and a journal
+   article is published evidence, and the reader weighs the second differently. The pill
+   wraps under a long title rather than squeezing it into a column. */
+.cp-reference-head {
+  display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  max-width: 100%; padding: 0; border: 0; background: none;
+  font: inherit; font-weight: 600; color: #1d4ed8; text-align: left;
+  text-decoration: none; cursor: pointer;
+}
+.cp-reference-title { min-width: 0; }
+.cp-reference-head:hover .cp-reference-title { text-decoration: underline; }
+.cp-reference-tag {
+  flex: none; padding: 1px 8px; border: 1px solid #e2e8f0; border-radius: 999px;
+  background: #f1f5f9; color: #64748b; font-size: 0.7rem; font-weight: 500;
+  white-space: nowrap;
+}
+/* The opening passage is shown, not hidden behind a click, and clamped to two lines so a
+   long chunk cannot push the rest of the evidence off the screen. Clicking the row still
+   toggles the full text. */
+.cp-reference-excerpt {
+  margin: 4px 0 0; color: #475569; font-size: 0.88rem; line-height: 1.5;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.cp-reference-item.is-open .cp-reference-excerpt { -webkit-line-clamp: unset; }
 
 /* The follow-up rows: one control per row, full width, hairline-separated, with the
    chevron saying what a click does. Disabled once one is taken — see `askFollowUp`.

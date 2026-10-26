@@ -113,6 +113,29 @@ test('a hash in the middle of a sentence is not a heading', () => {
                'See record #1 discharge note');
 });
 
+test('a marker is set flush against the punctuation that ends its clause', () => {
+  // The draft becomes a pill on screen, and the settled answer sets its pill against the
+  // full stop. A gap that survived here and closed at the handover would move the
+  // sentence under the reader at the moment they finished reading it.
+  const pieces = CopilotDraft.segments('Discontinued ^[1] . Next sentence.');
+
+  assert.deepEqual(pieces, [
+    { text: 'Discontinued ' },
+    { cite: '1' },
+    { text: '. Next sentence.' },
+  ]);
+});
+
+test('a word gap after a marker is still a word gap', () => {
+  const pieces = CopilotDraft.segments('Admitted^[1] and treated');
+
+  assert.deepEqual(pieces, [
+    { text: 'Admitted' },
+    { cite: '1' },
+    { text: ' and treated' },
+  ]);
+});
+
 test('nothing the unfinished block shows ever contains markdown syntax', () => {
   const messy = raw('## Heading\n', '**bold** and *italic*\n', 'a^[3] b^[PMID: 9] c^[',
                     ' | 1 | 2 |\n', '---');

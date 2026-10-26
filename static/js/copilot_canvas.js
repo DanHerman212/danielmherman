@@ -959,6 +959,23 @@
       narrative.revealCitation(index);
     }
 
+    /* The card's "See all references" — a request to be taken to the whole list.
+
+       The card lives inside two shadow trees this page does not own and the list lives
+       out here, so the card announces the intent with a composed event and the turn
+       answers it: open the drawer, bring it into view, and put the caret on it, because
+       the reader asked to go there and should not have to hunt for it with the keyboard
+       after the click. */
+    root.addEventListener('citation-see-all', function () {
+      if (references.hidden) return;
+      references.open = true;
+      var reduce = window.matchMedia
+        && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      references.scrollIntoView({ block: 'center', behavior: reduce ? 'auto' : 'smooth' });
+      var summary = references.querySelector('summary');
+      if (summary) summary.focus({ preventScroll: true });
+    });
+
     /* One row of the drawer, and the two kinds of evidence a reference record can carry.
 
        A published record is a destination: the identifier and the link are all a reader
@@ -974,46 +991,63 @@
        somewhere else, which is not an audit trail. */
     function referenceRow(row) {
       var item = el('li', 'cp-reference-item');
-      var label = '[' + (row.index === undefined ? '?' : row.index) + '] '
-        + (row.source || 'Source') + (row.title ? ' · ' + row.title : '');
+      var published = !!(row.url || row.pmid);
 
-      if (row.url || row.pmid) {
-        var head = el('span', 'cp-reference-head');
-        head.textContent = label;
-        var link = document.createElement('a');
-        link.className = 'cp-reference-link';
-        link.href = row.url || ('https://pubmed.ncbi.nlm.nih.gov/' + row.pmid + '/');
-        link.target = '_blank';
-        link.rel = 'noopener';
-        link.textContent = row.pmid ? 'PMID ' + row.pmid : 'Open the record';
-        item.append(head, link);
-        return item;
+      /* The number, once, in the row's own gutter. It used to be inside the label as
+         `[1] Discharge note · …` beside a counter that rendered `1.`, and a reader saw
+         `1. [1] Discharge note`. The row's index is a column now, so nothing has to
+         agree with anything. */
+      var mark = el('span', 'cp-reference-index');
+      mark.setAttribute('aria-hidden', 'true');
+      mark.textContent = (row.index === undefined ? '?' : row.index) + '.';
+
+      /* What kind of source this is. A discharge note and a journal article are weighed
+         differently — one is the patient's own record, the other is published evidence —
+         and the row said so only in a word a reader had to parse out of the label. */
+      var tag = el('span', 'cp-reference-tag');
+      tag.textContent = published
+        ? ('PubMed' + (row.year ? ' · ' + row.year : ''))
+        : 'Clinical Note';
+
+      /* A published record is a destination: the row opens a tab. A note passage cannot
+         be one, because the passage is already in hand, so the row opens instead and
+         shows the text the answer was drawn from. */
+      var head;
+      if (published) {
+        head = document.createElement('a');
+        head.className = 'cp-reference-head';
+        head.href = row.url || ('https://pubmed.ncbi.nlm.nih.gov/' + row.pmid + '/');
+        head.target = '_blank';
+        head.rel = 'noopener';
+      } else {
+        head = document.createElement('button');
+        head.type = 'button';
+        head.className = 'cp-reference-head';
+        head.setAttribute('aria-expanded', 'false');
+      }
+      var title = el('span', 'cp-reference-title');
+      title.textContent = row.title || row.source || 'Source';
+      head.append(title, tag);
+
+      var main = el('div', 'cp-reference-main');
+      main.appendChild(head);
+
+      if (!published && row.excerpt) {
+        var body = el('p', 'cp-reference-excerpt');
+        body.textContent = String(row.excerpt);
+        main.appendChild(body);
+        // The passage is on screen already, clamped to two lines. The click is what
+        // unclamps it — and, as before, it is also what points at the sentence the
+        // passage supports, so the row reads as provenance rather than as a menu item.
+        head.addEventListener('click', function () {
+          var opening = !item.classList.contains('is-open');
+          item.classList.toggle('is-open', opening);
+          head.setAttribute('aria-expanded', String(opening));
+          if (opening) revealMarker(row.index);
+        });
       }
 
-      var toggle = document.createElement('button');
-      toggle.type = 'button';
-      toggle.className = 'cp-reference-toggle';
-      toggle.setAttribute('aria-expanded', 'false');
-      var text = el('span', 'cp-reference-head');
-      text.textContent = label;
-      var chevron = el('span', 'cp-reference-chevron');
-      chevron.setAttribute('aria-hidden', 'true');
-      chevron.textContent = '›';
-      toggle.append(text, chevron);
-
-      var body = el('p', 'cp-reference-excerpt');
-      body.textContent = row.excerpt ? String(row.excerpt) : '';
-      body.hidden = true;
-
-      toggle.addEventListener('click', function () {
-        var opening = body.hidden;
-        body.hidden = !opening;
-        toggle.setAttribute('aria-expanded', String(opening));
-        item.classList.toggle('is-open', opening);
-        if (opening) revealMarker(row.index);
-      });
-
-      item.append(toggle, body);
+      item.append(mark, main);
       return item;
     }
 

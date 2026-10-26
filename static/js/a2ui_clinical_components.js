@@ -336,6 +336,20 @@ const MARKER = /\^\[\s*(?:PMID\s*[:#]?\s*)?(\d+)\s*\]/gi;
  */
 const pubmedUrl = (pmid) => `https://pubmed.ncbi.nlm.nih.gov/${pmid}/`;
 
+/**
+ * The whitespace a marker leaves behind, tightened.
+ *
+ * A marker is set inside a sentence, and a gap between the pill and the punctuation that
+ * ends its clause reads as a space that has drifted: `… discontinued [1 · Course] .`
+ * rather than `… discontinued [1 · Course].` The prose is written by a model, so the gap
+ * is the model's; this seam is the only place that can close it without asking the model
+ * to be careful about spacing it cannot see. Only the whitespace immediately following a
+ * marker is touched — between two words it is the word gap, and it is left alone.
+ */
+const DETACHED_PUNCTUATION = /^[ \t\u00a0]+([.,;:!?])/;
+
+const tightenedAfterMarker = (text) => text.replace(DETACHED_PUNCTUATION, '$1');
+
 const NARRATIVE_STYLES = css`
   :host { display: block; }
   .narrative { font-size: 1rem; line-height: 1.65; }
@@ -434,33 +448,36 @@ const POPOVER_STYLES = css`
     border: 1px solid rgba(17, 24, 39, 0.18);
     border-radius: 10px;
     box-shadow: 0 14px 34px rgba(17, 24, 39, 0.18);
-    padding: 12px 14px;
+    /* The card is a header rule and a body, so the padding has moved into them; the
+       overflow keeps the header's rule inside the rounded corner. */
+    overflow: hidden;
+    padding: 0;
     font-size: 0.85rem;
     line-height: 1.45;
   }
   .popover:focus { outline: none; }
-  .head { display: flex; align-items: center; gap: 8px; }
-  .badge {
-    flex: none;
-    width: 18px;
-    height: 18px;
-    border-radius: 999px;
-    background: #1f2937;
-    color: #ffffff;
-    font-size: 0.7rem;
-    font-weight: 700;
-    display: inline-flex;
+  .head {
+    display: flex;
     align-items: center;
-    justify-content: center;
+    gap: 6px;
+    padding: 9px 10px 8px 14px;
+    border-bottom: 1px solid #eef2f7;
   }
-  .source {
-    flex: 1;
-    font-size: 0.7rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    opacity: 0.7;
+  /* The eyebrow says what the card is, quietly, because the marker already said which
+     reference it opens. */
+  .eyebrow { flex: 1; font-size: 0.72rem; font-style: italic; color: #94a3b8; }
+  .see-all {
+    flex: none;
+    border: 0;
+    background: none;
+    font: inherit;
+    font-size: 0.72rem;
+    padding: 2px 4px;
+    color: #1d4ed8;
+    cursor: pointer;
   }
+  .see-all:hover { text-decoration: underline; }
+  .body { padding: 10px 14px 12px; }
   .close {
     flex: none;
     border: 0;
@@ -474,10 +491,20 @@ const POPOVER_STYLES = css`
     opacity: 0.6;
   }
   .close:hover { opacity: 1; }
-  .title { font-weight: 600; margin-top: 8px; }
-  .excerpt { margin: 6px 0 0; opacity: 0.85; }
+  .title { margin: 0; font-weight: 650; color: #1d4ed8; }
+  .subtitle { margin: 2px 0 0; font-size: 0.78rem; color: #64748b; }
+  .excerpt { margin: 8px 0 0; color: #334155; }
   .link { display: inline-block; margin-top: 8px; color: #1d4ed8; }
 `;
+
+//: How long the pointer must rest on a marker before its card opens, and how long the
+//: card lingers once the pointer leaves it.
+//:
+//: The delay is what makes the card reachable at all. There are a few pixels between a
+//: marker and the card below it, and a card that closed the instant `pointerout` fired
+//: would be gone before the hand moving into it arrived.
+const HOVER_INTENT_MS = 150;
+const HOVER_CLOSE_MS = 150;
 
 /**
  * The evidence card behind one marker, as a custom element so it owns its own
@@ -499,18 +526,77 @@ class CitationPopoverElement extends LitElement {
     this.citation = null;
     this._anchor = null;
     this._isOpen = false;
+    //: What opened the card — `hover`, `focus` or `click`. A card the pointer or the
+    //: caret opened is transient and closes when they leave; a clicked one is pinned
+    //: and closes only when it is dismissed.
+    this._openedBy = null;
+    this._openTimer = null;
+    this._closeTimer = null;
     this._boundKeyDown = (event) => this._onKeyDown(event);
     this._boundPointerDown = (event) => this._onPointerDown(event);
     this._boundReposition = () => this.reposition();
   }
 
-  open(citation, anchor) {
+  /**
+   * Open after the gesture has settled, rather than on the gesture itself.
+   *
+   * A pointer crossing a sentence should not leave a trail of opened cards behind it, so
+   * the open waits for the rest to become an intent; a focus passes no delay, because
+   * arriving by keyboard already IS the intent and a card 150 ms late reads as lag.
+   */
+  scheduleOpen(citation, anchor, { via = 'hover', delay = HOVER_INTENT_MS } = {}) {
+    this._cancelTimers();
+    if (this._isOpen && this._anchor === anchor) return;
+    this._openTimer = setTimeout(() => {
+      this._openTimer = null;
+      this.open(citation, anchor, { via });
+    }, delay);
+  }
+
+  /**
+   * Close once the pointer has been away for the grace period.
+   *
+   * Cancelled by entering the card, which is the whole reason the delay exists. Refused
+   * for a card that was clicked: the reader committed to it, and a pointer that wanders
+   * off is not a dismissal.
+   */
+  scheduleClose(delay = HOVER_CLOSE_MS) {
+    this._cancelTimers();
+    if (!this._isOpen || this._openedBy === 'click') return;
+    this._closeTimer = setTimeout(() => {
+      this._closeTimer = null;
+      this.close({ returnFocus: false });
+    }, delay);
+  }
+
+  /** The pointer has come back — to the marker, or into the card itself. */
+  cancelClose() {
+    clearTimeout(this._closeTimer);
+    this._closeTimer = null;
+  }
+
+  _cancelTimers() {
+    clearTimeout(this._openTimer);
+    clearTimeout(this._closeTimer);
+    this._openTimer = null;
+    this._closeTimer = null;
+  }
+
+  open(citation, anchor, { via = 'click' } = {}) {
+    this._cancelTimers();
+    if (this._isOpen && this._anchor === anchor) {
+      // Already showing for this marker. Being clicked while open is a promotion, not a
+      // reopen: see `toggle`.
+      if (via === 'click') this._openedBy = 'click';
+      return;
+    }
     if (this._anchor && this._anchor !== anchor) {
       this._anchor.setAttribute('aria-expanded', 'false');
     }
     this.citation = citation;
     this._anchor = anchor;
     this._isOpen = true;
+    this._openedBy = via;
     this.hidden = false;
     anchor.setAttribute('aria-expanded', 'true');
 
@@ -521,20 +607,35 @@ class CitationPopoverElement extends LitElement {
 
     // Placed and focused after the render commits: before that the element has no
     // measured size, so it would be positioned as if it were empty.
+    //
+    // A card opened by the POINTER is not focused. Moving the cursor over a citation in
+    // an answer must not take the caret out of the composer the reader is typing in.
     this.updateComplete.then(() => {
       if (!this._isOpen) return;
       this.reposition();
+      if (via === 'hover') return;
       this.renderRoot.querySelector('.popover')?.focus({ preventScroll: true });
     });
   }
 
-  /** Re-clicking the marker that is already showing closes it. */
+  /**
+   * Re-clicking a marker that is already showing closes it.
+   *
+   * Unless the card was opened by the pointer or the keyboard: then the click is the
+   * reader claiming a card they were already being shown, and closing it under their
+   * cursor is the opposite of what they asked for. The next click dismisses it.
+   */
   toggle(citation, anchor) {
     if (this._isOpen && this._anchor === anchor) {
-      this.close();
+      if (this._openedBy === 'click') {
+        this.close();
+        return;
+      }
+      this._openedBy = 'click';
+      this._cancelTimers();
       return;
     }
-    this.open(citation, anchor);
+    this.open(citation, anchor, { via: 'click' });
   }
 
   /**
@@ -545,9 +646,11 @@ class CitationPopoverElement extends LitElement {
    * back would undo that choice.
    */
   close({ returnFocus = true } = {}) {
+    this._cancelTimers();
     if (!this._isOpen) return;
     const anchor = this._anchor;
     this._isOpen = false;
+    this._openedBy = null;
     this._anchor = null;
     this.citation = null;
     this.hidden = true;
@@ -622,25 +725,50 @@ class CitationPopoverElement extends LitElement {
     this.close({ returnFocus: false });
   }
 
+  /**
+   * Hand the reader to the whole evidence list, and get out of the way.
+   *
+   * The list belongs to the page — it is drawn by the turn, not by this card and not by
+   * the narrative — so this announces the request and lets the turn answer it. Reaching
+   * across two shadow boundaries to scroll an element this element cannot see would be
+   * the page's job done in the wrong place.
+   */
+  seeAll() {
+    this.dispatchEvent(new CustomEvent('citation-see-all', {
+      bubbles: true,
+      composed: true,
+      detail: { index: this.citation?.index ?? null },
+    }));
+    // Focus goes with the reader: the turn moves it to the list it has just opened, so
+    // returning it to the marker first would be two moves for one intent.
+    this.close({ returnFocus: false });
+  }
+
   render() {
     const citation = this.citation;
     if (!citation) return nothing;
 
     return html`
       <div class="popover" tabindex="-1" role="dialog"
-           aria-label="Citation ${citation.index}">
+           aria-label="Citation ${citation.index}"
+           @pointerenter=${() => this.cancelClose()}
+           @pointerleave=${() => this.scheduleClose()}>
         <div class="head">
-          <span class="badge">${citation.index}</span>
-          <span class="source">${citation.source}</span>
+          <span class="eyebrow">Reference</span>
+          <button class="see-all" type="button"
+                  @click=${() => this.seeAll()}>See all references ↓</button>
           <button class="close" type="button" aria-label="Close citation"
                   @click=${() => this.close()}>×</button>
         </div>
-        <div class="title">${citation.title}</div>
-        ${citation.excerpt ? html`<p class="excerpt">${citation.excerpt}</p>` : nothing}
-        ${citation.url
-          ? html`<a class="link" href=${citation.url} target="_blank"
-                   rel="noopener noreferrer">Open source</a>`
-          : nothing}
+        <div class="body">
+          <p class="title">${citation.index}. ${citation.title}</p>
+          <p class="subtitle">${citation.source}</p>
+          ${citation.excerpt ? html`<p class="excerpt">${citation.excerpt}</p>` : nothing}
+          ${citation.url
+            ? html`<a class="link" href=${citation.url} target="_blank"
+                     rel="noopener noreferrer">Open source</a>`
+            : nothing}
+        </div>
       </div>
     `;
   }
@@ -744,6 +872,15 @@ class CitedNarrativeElement extends A2uiLitElement {
       // the render and replaced on every update, so per-button listeners would
       // have to be re-attached each time and would leak when they were not.
       this.renderRoot.addEventListener('click', (event) => this._onMarkerClick(event));
+      // The card answers the pointer and the caret as well as the click. A marker is a
+      // footnote, and a footnote is read by resting on it as often as by opening it —
+      // the popover's own timers decide when the rest has become an intent.
+      this.renderRoot.addEventListener('pointerover',
+                                      (event) => this._onMarkerHover(event));
+      this.renderRoot.addEventListener('pointerout',
+                                      (event) => this._onMarkerUnhover(event));
+      this.renderRoot.addEventListener('focusin', (event) => this._onMarkerFocus(event));
+      this.renderRoot.addEventListener('focusout', (event) => this._onMarkerBlur(event));
     }
     this._syncProse();
     this._decorate();
@@ -789,12 +926,21 @@ class CitedNarrativeElement extends A2uiLitElement {
       const matches = [...node.data.matchAll(new RegExp(MARKER.source, MARKER.flags))];
       const fragment = document.createDocumentFragment();
       let cursor = 0;
+      let afterMarker = false;
       for (const match of matches) {
-        fragment.appendChild(document.createTextNode(node.data.slice(cursor, match.index)));
+        // The gap before this marker belongs to the marker before it, so it is tightened
+        // only when something was just replaced; the gap that opens the text node is
+        // ordinary word spacing and is left as it was written.
+        const gap = node.data.slice(cursor, match.index);
+        fragment.appendChild(
+          document.createTextNode(afterMarker ? tightenedAfterMarker(gap) : gap));
         fragment.appendChild(this._marker(match[1], citations));
         cursor = match.index + match[0].length;
+        afterMarker = true;
       }
-      fragment.appendChild(document.createTextNode(node.data.slice(cursor)));
+      const tail = node.data.slice(cursor);
+      fragment.appendChild(
+        document.createTextNode(afterMarker ? tightenedAfterMarker(tail) : tail));
       node.parentNode.replaceChild(fragment, node);
     }
 
@@ -847,15 +993,56 @@ class CitedNarrativeElement extends A2uiLitElement {
   }
 
   _onMarkerClick(event) {
-    const button = event.target.closest?.('button.cite:not([disabled])');
-    if (!button || !this._popover) return;
-
-    const citations = this.controller?.props?.citations || [];
-    const citation = citations.find(
-      (entry) => Number(entry.index) === Number(button.dataset.cite));
-    if (!citation) return;
+    const button = this._markerTarget(event);
+    const citation = button ? this._citationBehind(button) : null;
+    if (!citation || !this._popover) return;
 
     this._popover.toggle(citation, button);
+  }
+
+  /** The marker a pointer or focus event is about, or null for everything else. */
+  _markerTarget(event) {
+    return event.target.closest?.('button.cite:not([disabled])') || null;
+  }
+
+  /** The citation a marker names, resolved by position as the marker itself is. */
+  _citationBehind(button) {
+    const citations = this.controller?.props?.citations || [];
+    return citations.find(
+      (entry) => Number(entry.index) === Number(button.dataset.cite)) || null;
+  }
+
+  _onMarkerHover(event) {
+    const button = this._markerTarget(event);
+    if (!button || !this._popover) return;
+    const citation = this._citationBehind(button);
+    // The pointer is crossing a sentence on its way somewhere else more often than it is
+    // stopping, so the card waits for the rest to become an intention.
+    if (citation) this._popover.scheduleOpen(citation, button, { via: 'hover' });
+  }
+
+  _onMarkerUnhover(event) {
+    if (!this._markerTarget(event)) return;
+    this._popover?.scheduleClose();
+  }
+
+  _onMarkerFocus(event) {
+    const button = this._markerTarget(event);
+    if (!button || !this._popover) return;
+    const citation = this._citationBehind(button);
+    // No intent delay on the keyboard: arriving by Tab already is the intent, and a card
+    // that appeared 150 ms later would only look like it had lagged.
+    if (citation) this._popover.scheduleOpen(citation, button, { via: 'focus', delay: 0 });
+  }
+
+  _onMarkerBlur(event) {
+    if (!this._markerTarget(event)) return;
+    // Focus moving INTO the card is a reader reading it. It retargets to the card's host
+    // on the way out of that element's shadow tree, which is why the host is tested as
+    // well as its descendants.
+    const next = event.relatedTarget;
+    if (next && (next === this._popover || this._popover?.contains(next))) return;
+    this._popover?.scheduleClose();
   }
 
   /**
