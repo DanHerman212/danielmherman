@@ -394,6 +394,15 @@ const NARRATIVE_STYLES = css`
   .prose > h3:first-child, .prose > h4:first-child { margin-top: 0; }
   /* Enough air that two paragraphs read as two readings rather than one block. */
   .prose > p { margin: 0 0 0.9rem; text-wrap: pretty; }
+`;
+
+// The citation pill, in one sheet because two surfaces draw it.
+//
+// It began as the inline marker's own style, defined inside the narrative's stylesheet. The
+// comparative table now cites the cohort its own figures come from, and a pill there has to
+// be the SAME pill: a reader who has learned that a rounded grey badge opens a source card
+// must not meet a second shape for the same idea one component down.
+const CITE_STYLES = css`
   .cite {
     font: inherit;
     font-size: 0.72em;
@@ -776,6 +785,67 @@ class CitationPopoverElement extends LitElement {
 
 customElements.define('citation-popover', CitationPopoverElement);
 
+/**
+ * Bind a shadow root's citation pills to one popover.
+ *
+ * Two surfaces draw the same control — the inline markers in an answer's prose, and the
+ * pill beside the cohort a comparison table drew — and the gestures around it are not
+ * obvious enough to be worth writing twice: a pointer that rests opens the card, a pointer
+ * that crosses does not, a caret that arrives opens it without waiting, and a click pins
+ * what the other two opened. Written once here, so a fix to any of that lands on both.
+ *
+ * `resolve(button)` returns the citation behind a pill, or null. What a pill NAMES differs
+ * — a prose marker names a citation by position, a table pill names a registered source —
+ * and that is the caller's business; everything after the lookup is identical.
+ *
+ * `popover()` returns the `citation-popover` element, or null before the first render.
+ */
+function bindCitationMarkers(root, popover, resolve) {
+  const marker = (event) => event.target.closest?.('button.cite:not([disabled])') || null;
+  const citationFor = (button) => (button ? resolve(button) : null);
+
+  root.addEventListener('click', (event) => {
+    const button = marker(event);
+    const citation = citationFor(button);
+    const card = popover();
+    if (!citation || !card) return;
+    card.toggle(citation, button);
+  });
+
+  root.addEventListener('pointerover', (event) => {
+    const button = marker(event);
+    const citation = citationFor(button);
+    const card = popover();
+    // The pointer is crossing a sentence on its way somewhere else more often than it is
+    // stopping, so the card waits for the rest to become an intention.
+    if (citation && card) card.scheduleOpen(citation, button, { via: 'hover' });
+  });
+
+  root.addEventListener('pointerout', (event) => {
+    if (marker(event)) popover()?.scheduleClose();
+  });
+
+  root.addEventListener('focusin', (event) => {
+    const button = marker(event);
+    const citation = citationFor(button);
+    const card = popover();
+    // No intent delay on the keyboard: arriving by Tab already is the intent, and a card
+    // that appeared 150 ms later would only look like it had lagged.
+    if (citation && card) card.scheduleOpen(citation, button, { via: 'focus', delay: 0 });
+  });
+
+  root.addEventListener('focusout', (event) => {
+    if (!marker(event)) return;
+    // Focus moving INTO the card is a reader reading it. It retargets to the card's host on
+    // the way out of that element's shadow tree, which is why the host is tested as well as
+    // its descendants.
+    const card = popover();
+    const next = event.relatedTarget;
+    if (next && (next === card || card?.contains(next))) return;
+    card?.scheduleClose();
+  });
+}
+
 /** Props: the prose, and the evidence its markers point at. */
 const CitedNarrativeApi = {
   name: 'CitedNarrative',
@@ -795,7 +865,10 @@ const CitedNarrativeApi = {
 };
 
 class CitedNarrativeElement extends A2uiLitElement {
-  static styles = NARRATIVE_STYLES;
+  // The narrative's own sheet, then the pill's: the pill rules are shared with the
+  // comparative table, and appending them keeps the cascade the same as it was when they
+  // were written inline above.
+  static styles = [NARRATIVE_STYLES, CITE_STYLES];
 
   createController() {
     return new A2uiController(this, CitedNarrativeApi);
@@ -868,19 +941,15 @@ class CitedNarrativeElement extends A2uiLitElement {
     this._popover = this._popover || this.renderRoot.querySelector('citation-popover');
     if (!this._wired) {
       this._wired = true;
-      // One delegated listener on the shadow root. The markers are created after
-      // the render and replaced on every update, so per-button listeners would
-      // have to be re-attached each time and would leak when they were not.
-      this.renderRoot.addEventListener('click', (event) => this._onMarkerClick(event));
-      // The card answers the pointer and the caret as well as the click. A marker is a
-      // footnote, and a footnote is read by resting on it as often as by opening it —
-      // the popover's own timers decide when the rest has become an intent.
-      this.renderRoot.addEventListener('pointerover',
-                                      (event) => this._onMarkerHover(event));
-      this.renderRoot.addEventListener('pointerout',
-                                      (event) => this._onMarkerUnhover(event));
-      this.renderRoot.addEventListener('focusin', (event) => this._onMarkerFocus(event));
-      this.renderRoot.addEventListener('focusout', (event) => this._onMarkerBlur(event));
+      // One delegated binding for the whole shadow root. The markers are created after the
+      // render and replaced on every update, so per-button listeners would have to be
+      // re-attached each time and would leak when they were not. The gestures themselves
+      // live in `bindCitationMarkers`, because the comparison table draws the same pill.
+      bindCitationMarkers(
+        this.renderRoot,
+        () => this._popover,
+        (button) => this._citationBehind(button),
+      );
     }
     this._syncProse();
     this._decorate();
@@ -992,57 +1061,11 @@ class CitedNarrativeElement extends A2uiLitElement {
     return button;
   }
 
-  _onMarkerClick(event) {
-    const button = this._markerTarget(event);
-    const citation = button ? this._citationBehind(button) : null;
-    if (!citation || !this._popover) return;
-
-    this._popover.toggle(citation, button);
-  }
-
-  /** The marker a pointer or focus event is about, or null for everything else. */
-  _markerTarget(event) {
-    return event.target.closest?.('button.cite:not([disabled])') || null;
-  }
-
   /** The citation a marker names, resolved by position as the marker itself is. */
   _citationBehind(button) {
     const citations = this.controller?.props?.citations || [];
     return citations.find(
       (entry) => Number(entry.index) === Number(button.dataset.cite)) || null;
-  }
-
-  _onMarkerHover(event) {
-    const button = this._markerTarget(event);
-    if (!button || !this._popover) return;
-    const citation = this._citationBehind(button);
-    // The pointer is crossing a sentence on its way somewhere else more often than it is
-    // stopping, so the card waits for the rest to become an intention.
-    if (citation) this._popover.scheduleOpen(citation, button, { via: 'hover' });
-  }
-
-  _onMarkerUnhover(event) {
-    if (!this._markerTarget(event)) return;
-    this._popover?.scheduleClose();
-  }
-
-  _onMarkerFocus(event) {
-    const button = this._markerTarget(event);
-    if (!button || !this._popover) return;
-    const citation = this._citationBehind(button);
-    // No intent delay on the keyboard: arriving by Tab already is the intent, and a card
-    // that appeared 150 ms later would only look like it had lagged.
-    if (citation) this._popover.scheduleOpen(citation, button, { via: 'focus', delay: 0 });
-  }
-
-  _onMarkerBlur(event) {
-    if (!this._markerTarget(event)) return;
-    // Focus moving INTO the card is a reader reading it. It retargets to the card's host
-    // on the way out of that element's shadow tree, which is why the host is tested as
-    // well as its descendants.
-    const next = event.relatedTarget;
-    if (next && (next === this._popover || this._popover?.contains(next))) return;
-    this._popover?.scheduleClose();
   }
 
   /**
@@ -1207,6 +1230,11 @@ const _MATRIX_STYLES = css`
      browser sizes them from their longest word and the slack goes where it is useful. */
   .wrap { overflow-x: auto; }
   table { border-collapse: collapse; width: 100%; font-size: 0.82rem; }
+  /* The pill beside a cohort, sized for a table cell rather than for a sentence. The
+     shared sheet sets it as a superscript inside prose; here it sits on the baseline next
+     to the journal, because a row has no sentence to hang it off. This sheet is parsed
+     after the shared one, so these three declarations are the only difference. */
+  .cite { vertical-align: baseline; font-size: 0.68rem; margin-left: 6px; }
   caption { caption-side: top; text-align: left; color: #64748b; font-size: 0.72rem;
             letter-spacing: 0.04em; text-transform: uppercase; padding: 0 0 6px; }
   th, td { text-align: left; vertical-align: top; padding: 8px 10px;
@@ -1265,15 +1293,70 @@ const ComparativeRiskMatrixApi = {
       horizon_days: z.number(),
       url: z.string(),
       excerpt: z.string(),
+      // The turn's own number for this record, so the row can be cited beside the answer
+      // that drew it. The agent registers each benchmark as a source at the end of its
+      // note passages and stamps the row with the number it assigned, rather than the
+      // surface resolving a PMID back to an index a second time.
+      //
+      // Optional, and it stays optional: a turn composed before the agent registered
+      // benchmarks is still a valid table, and a schema that demanded the number would
+      // stop that table drawing at all.
+      source_index: z.number().optional(),
+      source_label: z.string().optional(),
     })).default([]),
   }).strict(),
 };
 
 class ComparativeRiskMatrixElement extends A2uiLitElement {
-  static styles = [_MATRIX_STYLES, BLOCK_SETTLE];
+  // The pill's sheet first, then this component's own: a later sheet wins at equal
+  // specificity, which is how the table overrides the prose sizing of `.cite`.
+  static styles = [CITE_STYLES, _MATRIX_STYLES, BLOCK_SETTLE];
+
+  constructor() {
+    super();
+    this._popover = null;
+    this._wired = false;
+  }
 
   createController() {
     return new A2uiController(this, ComparativeRiskMatrixApi);
+  }
+
+  updated() {
+    this._popover = this._popover || this.renderRoot.querySelector('citation-popover');
+    if (this._wired) return;
+    this._wired = true;
+    // The same gestures the prose markers use: rest to open, cross to leave, click to
+    // pin. A reader who has met one pill in this product has met both.
+    bindCitationMarkers(
+      this.renderRoot,
+      () => this._popover,
+      (button) => this._citationFor(Number(button.dataset.cite)),
+    );
+  }
+
+  /**
+   * The source behind a table pill, shaped like a prose citation.
+   *
+   * The agent registers each benchmark as a source and stamps the row with the number it
+   * assigned (`source_index`), so this is a lookup and not a second numbering. The card
+   * wants a title, a subtitle and the passage, and a table row carries those as fields
+   * rather than as prose: the journal and year are its `source`, the identifier and the
+   * evidence tier make the subtitle, and the cohort description plus the sentence the rate
+   * was read from make the passage.
+   */
+  _citationFor(index) {
+    const rows = this.controller?.props?.rows || [];
+    const row = rows.find((entry) => Number(entry.source_index) === Number(index));
+    if (!row) return null;
+    return {
+      index: Number(row.source_index),
+      source: [row.pmid ? `PMID ${row.pmid}` : '', row.evidence_tier]
+        .filter(Boolean).join(' · '),
+      title: row.source,
+      excerpt: [row.cohort_summary, row.excerpt].filter(Boolean).join(' — '),
+      url: row.url || pubmedUrl(row.pmid),
+    };
   }
 
   render() {
@@ -1314,7 +1397,13 @@ class ComparativeRiskMatrixElement extends A2uiLitElement {
             ${rows.map((row) => html`
               <tr>
                 <td>
-                  ${row.source}
+                  <span class="journal">${row.source}</span>${row.source_index === undefined
+                    ? nothing
+                    : html`<button class="cite" type="button"
+                                   data-cite=${String(row.source_index)}
+                                   aria-haspopup="dialog" aria-expanded="false"
+                                   title=${row.source_label || row.source}>${row.source_label
+                                     || row.source}</button>`}
                   <div class="pmid">PMID <a href=${row.url || pubmedUrl(row.pmid)}
                     target="_blank" rel="noopener noreferrer">${row.pmid}</a></div>
                 </td>
@@ -1330,6 +1419,7 @@ class ComparativeRiskMatrixElement extends A2uiLitElement {
           </tbody>
         </table>
       </div>
+      <citation-popover></citation-popover>
     `;
   }
 }

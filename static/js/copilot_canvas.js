@@ -110,12 +110,31 @@
     return node;
   }
 
-  /* Smooth, unless the reader has asked their system not to be moved around. */
+  /* Bring a node's TOP into view, and never its bottom.
+
+     A clinical answer is long — prose, a canvas, a references drawer, three questions — and
+     it is read from the beginning. Scrolling to the bottom of the turn as it grew put the
+     end of an answer on screen before the start of it, and every chunk that arrived moved
+     the reader's own place. The anchor is the turn's head, set once when the turn is
+     created; everything that arrives afterwards grows downward below the fold, where the
+     reader will get to it at their own pace. */
   function scrollIntoView(node) {
     if (!node || !node.scrollIntoView) return;
     var reduce = window.matchMedia
       && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    node.scrollIntoView({ block: 'end', behavior: reduce ? 'auto' : 'smooth' });
+    node.scrollIntoView({ block: 'start', behavior: reduce ? 'auto' : 'smooth' });
+  }
+
+  /* Centre a node in the viewport, for a request that named it.
+
+     Used when the reader has ASKED to be taken somewhere — a citation's "see all
+     references" — which is the one case where moving their view is the point rather than
+     an interruption. */
+  function centreIntoView(node) {
+    if (!node || !node.scrollIntoView) return;
+    var reduce = window.matchMedia
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    node.scrollIntoView({ block: 'center', behavior: reduce ? 'auto' : 'smooth' });
   }
 
   /* What was asked, in the terms it was asked in: the command chosen in the
@@ -572,12 +591,16 @@
       if (retired) return;
       retired = true;
       if (foot.parentNode) {
-        // The run's own history takes the live row's place. Kept, the labels are the
-        // account of what the run did; a restored turn has none, because the progress
-        // it passed through was never stored, and its foot goes away as it always did.
+        // The run's own history is kept — the labels are the account of what the run did
+        // — but it belongs under the HEADER now rather than under the answer. It is the
+        // first thing about this turn, not the last: a reader checking whether the
+        // assistant looked at the right places wants that before the prose, and at the
+        // foot of a long answer it was below the fold of a screen they had already read
+        // past. The live row it replaces goes with the foot; what is left of the foot is
+        // nothing.
         var history = stageHistory();
-        if (history) foot.replaceChild(history, status);
-        else foot.remove();
+        if (history) root.insertBefore(history, body);
+        foot.remove();
       }
       // The run is over and the turn is settled. Both paths land here — `finish` for a
       // live run, `restore` for a turn read back from the store — so this is the one
@@ -632,10 +655,26 @@
       retire();
     }
 
-    /* A turn that came back from the store. Its row is not merely empty, it is
-       absent: the run it records finished days ago, and the progress it passed
-       through was never stored. */
-    function restore() {
+    /* A turn that came back from the store.
+
+       `steps` is the workflow the agent recorded with the answer (Phase B). Without it a
+       refreshed turn showed nothing about how it was answered: those labels only ever
+       existed as progress frames, and frames die with the response that carried them.
+
+       The console's own opening row — "Sending the question" — is NOT one of the agent's
+       steps. It is drawn locally the moment a question is submitted, before any frame has
+       arrived, so it is put back here. That is what makes a refreshed turn show the same
+       count and order as the live one rather than one row fewer, and it is why the label
+       is read off the status element rather than written a second time. */
+    function restore(steps) {
+      var labels = (steps || []).filter(function (label) {
+        return typeof label === 'string' && label.trim();
+      });
+      if (labels.length && labels[0] !== statusText.textContent) {
+        labels.unshift(statusText.textContent);
+      }
+      stages.length = 0;
+      labels.forEach(function (label) { stages.push(label); });
       retire();
     }
 
@@ -963,17 +1002,38 @@
 
        The card lives inside two shadow trees this page does not own and the list lives
        out here, so the card announces the intent with a composed event and the turn
-       answers it: open the drawer, bring it into view, and put the caret on it, because
-       the reader asked to go there and should not have to hunt for it with the keyboard
-       after the click. */
-    root.addEventListener('citation-see-all', function () {
-      if (references.hidden) return;
+       answers it. The event carries the index of the citation it was opened from, and that
+       is the row to land on: a reader who asked about `5 · The Journal of Arthroplasty`
+       wants row 5, not the top of a drawer holding five rows.
+
+       The row is marked for a moment afterwards, because a smooth scroll ends somewhere
+       and the reader has to be able to tell which of the rows it ended at. */
+    var referenceMarkerTimer = null;
+    function showReference(index) {
+      if (references.hidden) return false;
       references.open = true;
-      var reduce = window.matchMedia
-        && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      references.scrollIntoView({ block: 'center', behavior: reduce ? 'auto' : 'smooth' });
-      var summary = references.querySelector('summary');
-      if (summary) summary.focus({ preventScroll: true });
+      var target = null;
+      if (index !== null && index !== undefined) {
+        target = references.querySelector(
+          '[data-reference-index="' + Number(index) + '"]');
+      }
+      centreIntoView(target || references);
+      if (!target) return true;
+      target.classList.add('is-target');
+      clearTimeout(referenceMarkerTimer);
+      referenceMarkerTimer = setTimeout(function () {
+        target.classList.remove('is-target');
+      }, 1600);
+      // The caret travels with the view, so a keyboard reader arrives where the scroll
+      // took them. The row's own control is focused rather than the drawer: the drawer's
+      // summary would put them back above the row they just asked for.
+      var control = target.querySelector('.cp-reference-head');
+      if (control) control.focus({ preventScroll: true });
+      return true;
+    }
+
+    root.addEventListener('citation-see-all', function (event) {
+      showReference((event.detail || {}).index);
     });
 
     /* One row of the drawer, and the two kinds of evidence a reference record can carry.
@@ -992,6 +1052,9 @@
     function referenceRow(row) {
       var item = el('li', 'cp-reference-item');
       var published = !!(row.url || row.pmid);
+      // What a citation's "see all references" scrolls to. The number is already in the
+      // gutter; this is the same number as an address rather than as text.
+      item.dataset.referenceIndex = String(row.index);
 
       /* The number, once, in the row's own gutter. It used to be inside the label as
          `[1] Discharge note · …` beside a counter that rendered `1.`, and a reader saw
@@ -1547,7 +1610,11 @@
         // generic failure, because the failure was in the transport, not the answer.
         block.finish();
       }
-      scrollIntoView(block.root);
+      // No scroll here. This line used to take the viewport to the turn's bottom the
+      // moment the answer settled — after a long `/ehr` that is the end of the
+      // references drawer, with the answer the reader came for somewhere above them.
+      // The anchor set at submit (block:'start') is the whole policy: the turn's head
+      // stays where it was put, and the answer grows downward from it.
     } catch (error) {
       block.finish();
       block.say('The clinical copilot is unavailable. Please try again.', true);

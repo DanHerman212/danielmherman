@@ -158,14 +158,17 @@ button.cp-menu-item {
   .typing-dots span, .cp-status-text { animation: none !important; }
 }
 
-/* What the run did, after it stopped being news.
+/* What the run did, under the turn's HEADER rather than under its answer.
 
-   Deliberately quiet: a chevron the width of its own words, not a panel. The answer
-   above it is what the reader came for, and this is the footnote that says how it got
-   there — read on demand, out of the way when it is not. The arrow is the browser's
-   own marker, rotated by `[open]` rather than replaced by a glyph, so the control is
-   still a `details` element to a screen reader and to the keyboard. */
-.cp-stages { font-size: 0.78rem; color: #64748b; }
+   Deliberately quiet: a chevron the width of its own words, not a panel. The answer below
+   it is what the reader came for, and this is the line that says how it got there — read on
+   demand, out of the way when it is not. It moved here from the foot of the turn: at the
+   bottom of a long /ehr answer it sat below the fold of a screen the reader had already
+   read past, and the question it answers (did it look in the right places?) is asked
+   before the answer is read, not after. The arrow is the browser's own marker, rotated by
+   `[open]` rather than replaced by a glyph, so the control is still a `details` element to
+   a screen reader and to the keyboard. */
+.cp-stages { font-size: 0.78rem; color: #64748b; margin: 0 0 10px; }
 .cp-stages-summary {
   cursor: pointer; list-style: none; display: inline-flex; align-items: center; gap: 5px;
   padding: 2px 0; border-radius: 6px;
@@ -613,6 +616,15 @@ button.cp-menu-item {
   overflow: hidden;
 }
 .cp-reference-item.is-open .cp-reference-excerpt { -webkit-line-clamp: unset; }
+/* The row a citation's "see all references" landed on.
+
+   A smooth scroll ends somewhere, and this is how the reader can tell where: the same
+   outline the prose marker wears when a drawer row points back at it, applied to the row
+   the card sent them to. It clears itself after a moment (the page owns the timer), so the
+   list is left as it was found. */
+.cp-reference-item.is-target {
+  outline: 2px solid #1f2937; outline-offset: 4px; border-radius: 6px;
+}
 
 /* The follow-up rows: one control per row, full width, hairline-separated, with the
    chevron saying what a click does. Disabled once one is taken — see `askFollowUp`.

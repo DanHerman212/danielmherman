@@ -337,12 +337,17 @@ class StoredPresentationTests(_AskTestCase):
         """
         from demo.conversations import _presentation_parts
 
-        envelope, scope, references, follow_ups = _presentation_parts(A2UI_ENVELOPE)
+        envelope, scope, references, follow_ups, steps = _presentation_parts(
+            A2UI_ENVELOPE)
 
         self.assertEqual(envelope, A2UI_ENVELOPE)
         self.assertIsNone(scope)
         self.assertEqual(references, [])
         self.assertEqual(follow_ups, [])
+        # A turn stored before the agent sent its workflow has no steps to show, and
+        # saying so with an empty list is what keeps every downstream reader from
+        # needing to know when the field arrived.
+        self.assertEqual(steps, [])
 
     @patch('demo.views.ask_agent')
     def test_the_canonical_turn_carries_what_the_console_renders(self, mocked):

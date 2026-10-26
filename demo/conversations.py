@@ -158,11 +158,17 @@ def _stored_presentation(result):
         # live turn showed: the judgement belongs to the moment the answer was composed,
         # and re-deriving it later would be a second opinion about the same answer.
         'verified': result.get('verified') is True,
+        # The workflow the turn went through, in the order the reader watched it. The SSE
+        # frames are gone the moment the run ends, so without this a browser refresh took
+        # the whole account of the run with it — `Agent workflow - N steps` simply
+        # disappeared from every stored turn. Stored here rather than recomposed because
+        # the steps are a record of what happened, not something derivable from the answer.
+        'steps': _strings(result.get('steps')),
     }
 
 
 def _presentation_parts(stored):
-    """(envelope, scope, references, follow_ups) out of whatever a turn stored.
+    """(envelope, scope, references, follow_ups, steps) out of whatever a turn stored.
 
     Two shapes are readable at once, and no marker says which is which. A turn stored
     since 4A-2 holds the dict of facts above; a turn stored before it holds the bare A2UI
@@ -175,9 +181,9 @@ def _presentation_parts(stored):
     is the point: the client has one shape to draw rather than two.
     """
     if not isinstance(stored, dict):
-        return {}, None, [], []
+        return {}, None, [], [], []
     if 'messages' in stored or 'surface_id' in stored:
-        return stored, None, [], []
+        return stored, None, [], [], []
     envelope = stored.get('a2ui')
     scope = stored.get('scope')
     return (
@@ -185,6 +191,7 @@ def _presentation_parts(stored):
         scope if isinstance(scope, str) and scope else None,
         _records(stored.get('references')),
         _strings(stored.get('follow_ups')),
+        _strings(stored.get('steps')),
     )
 
 def turn_payloads(conversation):
@@ -225,7 +232,8 @@ def turn_payloads(conversation):
             continue
         if not asked and not row.answer:
             continue
-        envelope, scope, references, follow_ups = _presentation_parts(row.presentation)
+        envelope, scope, references, follow_ups, steps = _presentation_parts(
+            row.presentation)
         payloads.append({
             'asked': label,
             'answer': row.answer,
@@ -239,6 +247,10 @@ def turn_payloads(conversation):
             'scope': scope,
             'references': references,
             'follow_ups': follow_ups,
+            # Phase B. The run's own account of itself, so a refreshed browser shows
+            # the workflow the live turn showed instead of losing it with the frames.
+            # Empty for every turn stored before the agent sent it.
+            'steps': steps,
             # The badge a restored turn shows. `presentation` is read through
             # `_presentation_parts` for the older shapes above, so this is asked of the
             # stored dict directly and defaults to False for every turn written before

@@ -143,24 +143,48 @@ test('a published record is a link with a PubMed tag, not an expandable row', as
                'a record with no passage was given an empty one');
 });
 
-test('the card\'s request for the full list opens it and moves the caret to it', async () => {
+test('the card\'s request for the full list opens it AT THE ROW IT NAMED', async () => {
   const { window, turn } = await draw([NOTE_ROW]);
 
   const drawer = turn().querySelector('.cp-references');
-  const summary = drawer.querySelector('summary');
   drawer.open = false;
 
-  let scrolled = 0;
-  window.Element.prototype.scrollIntoView = function scrollIntoView() { scrolled += 1; };
+  const scrolled = [];
+  window.Element.prototype.scrollIntoView = function scrollIntoView() {
+    scrolled.push(this);
+  };
+  const row = drawer.querySelector('[data-reference-index="1"]');
   let focused = 0;
-  // jsdom does not treat `summary` as focusable, so the call is what is asserted rather
-  // than the document's activeElement.
-  summary.focus = () => { focused += 1; };
+  // jsdom does not lay anything out and does not treat every control as focusable, so the
+  // call is what is asserted: the caret has to travel with the view.
+  row.querySelector('.cp-reference-head').focus = () => { focused += 1; };
 
-  turn().querySelector('.cp-answer').dispatchEvent(
-    new window.CustomEvent('citation-see-all', { bubbles: true, composed: true }));
+  // The detail is what the popover sends: the index of the citation it was opened from.
+  turn().querySelector('.cp-answer').dispatchEvent(new window.CustomEvent(
+    'citation-see-all', { bubbles: true, composed: true, detail: { index: 1 } }));
 
   assert.equal(drawer.open, true, 'the drawer was left closed');
-  assert.equal(scrolled, 1, 'the drawer was opened off screen and left there');
-  assert.equal(focused, 1, 'the reader was sent to a list that did not take the caret');
+  assert.deepEqual(scrolled, [row], 'the viewport went to the drawer, not to the row');
+  assert.equal(row.classList.contains('is-target'), true,
+               'the row the scroll landed on is not marked');
+  assert.equal(focused, 1, 'the reader was sent to a row that did not take the caret');
+});
+
+test('a request with no index in it opens the list and stops at the list', async () => {
+  const { window, turn } = await draw([NOTE_ROW]);
+
+  const drawer = turn().querySelector('.cp-references');
+  drawer.open = false;
+
+  const scrolled = [];
+  window.Element.prototype.scrollIntoView = function scrollIntoView() {
+    scrolled.push(this);
+  };
+
+  turn().querySelector('.cp-answer').dispatchEvent(new window.CustomEvent(
+    'citation-see-all', { bubbles: true, composed: true }));
+
+  assert.equal(drawer.open, true);
+  assert.deepEqual(scrolled, [drawer],
+                   'a request that named no row scrolled to a row anyway');
 });

@@ -393,7 +393,10 @@
       // is not awaited is a turn drawn after the one below it.
       var block = canvas().createTurn(stored[index].asked);
       await canvas().fillTurn(block, stored[index]);
-      block.restore();
+      // The workflow the agent recorded with the turn (Phase B). Without it a refreshed
+      // thread lost the run's own account of itself, because those labels only ever
+      // existed as progress frames.
+      block.restore(stored[index].steps);
     }
     rememberConversation(payload.conversation_id);
     loadedHadm = payload.hadm_id;

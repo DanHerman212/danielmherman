@@ -37,6 +37,12 @@ class AgentSuccess(TypedDict, total=False):
     #: recorded before the field existed must read as "not verified" rather than as a
     #: rejected response.
     verified: bool
+    #: The workflow the agent went through, in order, as the labels the reader watched.
+    #: Carried in the answer rather than only in the SSE frames so the store can keep it
+    #: and a refreshed browser can still show `Agent workflow - N steps`. Optional for the
+    #: same reason as `verified`: an agent revision that predates the field still answers,
+    #: and its turns simply have no steps to restore.
+    steps: list[str]
     model: str
     code_revision: str
     # The pointer to the run behind this answer. Optional here rather than
@@ -115,5 +121,15 @@ def validate_agent_response(result: Any) -> AgentSuccess:
     # the record, so `"false"` and `1` are both wrong in a way the reader cannot see.
     if "verified" in result and not isinstance(result["verified"], bool):
         raise AgentResponseError("Agent returned an invalid verified field.")
+
+    # The workflow steps are written into the DOM of a restored turn, so a non-string in
+    # the list is a crash on a page that loaded fine. The agent cleans its own list; this
+    # is the boundary refusing to store what it would then have to trust.
+    steps = result.get("steps")
+    if steps is not None and (
+        not isinstance(steps, list)
+        or not all(isinstance(step, str) for step in steps)
+    ):
+        raise AgentResponseError("Agent returned malformed workflow steps.")
 
     return result
