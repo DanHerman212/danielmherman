@@ -13,6 +13,7 @@ nothing else. Two properties are tested as rules rather than as implementation:
 """
 
 import json
+from unittest import skipUnless
 from unittest.mock import patch
 
 from django.conf import settings
@@ -20,6 +21,7 @@ from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
+from .fixtures import AGENT_IMPORTABLE, AGENT_MISSING
 from .conversations import MAX_REPLAYED_TURNS, replay_turns, turn_payloads
 from .models import Conversation, DemoPatient, Turn
 
@@ -515,6 +517,7 @@ class ReplayTests(_AskTestCase):
 class FixtureModeIsSingleTurnTests(_AskTestCase):
     """Offline scaffolding answers one question at a time, and says so."""
 
+    @skipUnless(AGENT_IMPORTABLE, AGENT_MISSING)
     def test_fixture_mode_opens_no_conversation(self):
         response = self.client.post(
             reverse('demo:a2ui_ask'),

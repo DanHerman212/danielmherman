@@ -27,6 +27,7 @@ Honesty rule: patients without captured rag passages return an EMPTY result
 (returned: 0) — the same empty-is-a-real-answer contract as the live tool.
 """
 
+import importlib.util
 import json
 import sys
 from functools import lru_cache
@@ -41,6 +42,27 @@ FIXTURES_DIR = Path(__file__).resolve().parent / 'data' / 'demo_fixtures'
 _ECC_ROOT = Path(__file__).resolve().parents[2] / 'enterprise_clinical_copilot'
 if _ECC_ROOT.is_dir() and str(_ECC_ROOT) not in sys.path:
     sys.path.insert(0, str(_ECC_ROOT))
+
+
+def _agent_importable():
+    """Whether the agent's presentation code can be imported from here.
+
+    `find_spec` rather than an import: it answers the question without executing
+    the agent's module or paying for its imports, and it answers it for the code
+    path that actually runs. False is not a failure — the deployment never has
+    this package, because the site's image installs its own requirements only.
+    """
+    try:
+        return importlib.util.find_spec('services.agent.a2ui') is not None
+    except (ImportError, ValueError):
+        return False
+
+
+# Read by the tests that assert fixture-mode output. Cloud Build checks out one
+# repository, so those tests have nothing to compare against there and skip with
+# this reason rather than fail — see docs/deployment_strategy.md §deploy gates.
+AGENT_IMPORTABLE = _agent_importable()
+AGENT_MISSING = 'the agent repository is not checked out next to this one'
 
 
 @lru_cache(maxsize=1)

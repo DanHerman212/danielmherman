@@ -9,6 +9,7 @@ it does.
 import json
 import os
 from datetime import timedelta
+from unittest import skipUnless
 from unittest.mock import patch
 
 from asgiref.sync import async_to_sync
@@ -22,7 +23,7 @@ from django.utils import timezone
 
 from .agent_client import AgentError, AgentRefused
 from .conversations import MAX_REPLAYED_TURNS, replay_turns
-from .fixtures import SLASH_COMMANDS
+from .fixtures import AGENT_IMPORTABLE, AGENT_MISSING, SLASH_COMMANDS
 from .models import Conversation, DemoPatient, DemoQuota, Turn
 
 # A live agent reply shaped like the real /ask response: the agent composes
@@ -217,6 +218,7 @@ class A2uiFixtureContractTests(TestCase):
         self.user = User.objects.create_user('demo', password='x')
         self.client.force_login(self.user)
 
+    @skipUnless(AGENT_IMPORTABLE, AGENT_MISSING)
     def test_a2ui_ask_returns_the_full_contract_from_fixture(self):
         """`/ehr` is the fixture turn that carries a canvas: summary sections, the
         estimate, and the entries the console draws them from. It is also the only
@@ -247,6 +249,7 @@ class A2uiFixtureContractTests(TestCase):
         self.assertEqual(body['source'], 'fixture')
         self.assertIn('remaining', body)
 
+    @skipUnless(AGENT_IMPORTABLE, AGENT_MISSING)
     def test_fixture_mode_answers_the_literature_chip_from_captured_records(self):
         """`/pubmed` left FIXTURE_UNAVAILABLE_CHIPS when its records were captured.
 
@@ -300,6 +303,7 @@ class A2uiFixtureContractTests(TestCase):
         # because the discharge diagnosis is in the replay. Architect ruling 3, Phase E.)
         self.assertNotIn('ComparativeRiskMatrix', types)
 
+    @skipUnless(AGENT_IMPORTABLE, AGENT_MISSING)
     def test_fixture_mode_never_invents_a_literature_synthesis(self):
         """With no capture for the query, the answer states the absence.
 
@@ -843,6 +847,7 @@ class RequestBoundaryTests(TestCase):
         self.assertIn("'foo'", error)
         self.assertIn('Send a question', error)
 
+    @skipUnless(AGENT_IMPORTABLE, AGENT_MISSING)
     def test_the_known_fields_still_answer(self):
         """The boundary must not refuse what the console actually sends."""
         response = self._post({'hadm_id': 90000017, 'chip': 'meds'})
@@ -1762,6 +1767,7 @@ class A2uiAskStreamTests(TestCase):
         self.assertEqual(DemoQuota.remaining(self.user), 5)
 
     @patch('demo.views.ask_agent_stream')
+    @skipUnless(AGENT_IMPORTABLE, AGENT_MISSING)
     def test_fixture_mode_never_streams(self, mocked):
         """Captured payloads answer instantly: no chain runs, so there is
         nothing to narrate."""

@@ -14,12 +14,14 @@ invisible to every test this repository had:
 
 import json
 from pathlib import Path
+from unittest import skipUnless
 
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from .agent_contract import AgentResponseError, validate_agent_response
+from .fixtures import AGENT_IMPORTABLE, AGENT_MISSING
 from .conversations import record_answer, turn_payloads
 from .models import Conversation, DemoPatient
 
@@ -175,6 +177,7 @@ class FixtureLiteraryPayloadTests(TestCase):
             sex='F', summary='70F', split_name='test',
         )
 
+    @skipUnless(AGENT_IMPORTABLE, AGENT_MISSING)
     def test_a_clinician_question_does_not_draw_a_literature_card(self):
         response = self.client.post(
             reverse('demo:a2ui_ask'),

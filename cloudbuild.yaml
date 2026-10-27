@@ -26,6 +26,15 @@ steps:
   # able to reach the production database, and they do not need Cloud SQL to
   # prove what they prove. Every setting that differs in production is covered
   # by `check --deploy`, which the migrate job runs against the real environment.
+  #
+  # `collectstatic` first, and it is not decoration. The templates and views
+  # resolve their static URLs through the manifest storage, whose manifest is
+  # written by collectstatic; a fresh checkout has no staticfiles/ (it is
+  # gitignored and regenerated inside the image), so fifteen assertions about
+  # pages, CSP headers and the forms fail on a missing manifest entry otherwise.
+  # That failure says nothing about the change under test, which is the worst
+  # kind of gate. The output lands in the gitignored staticfiles/, which
+  # .dockerignore excludes, so the image built below is unaffected.
   - name: 'python:3.12-slim'
     entrypoint: 'bash'
     args:
@@ -33,6 +42,7 @@ steps:
       - |
         set -euo pipefail
         pip install --quiet --no-cache-dir -r requirements.txt
+        ENVIRONMENT=development python manage.py collectstatic --noinput
         ENVIRONMENT=development python manage.py test --verbosity 1
 
   # Build the Docker image
