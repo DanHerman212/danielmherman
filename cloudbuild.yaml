@@ -8,6 +8,33 @@
 serviceAccount: 'projects/$PROJECT_ID/serviceAccounts/cicd-deployer@$PROJECT_ID.iam.gserviceaccount.com'
 
 steps:
+  # Gate (F-12.1): both suites run BEFORE the image is built, so a failing test
+  # means no image is pushed and no revision is created — production is not
+  # touched, and there is nothing to roll back. Until now every one of these
+  # assertions ran on a developer's machine and the trigger fired on the push
+  # alone; a push that skipped them shipped.
+  #
+  # `npm ci`, not `install`: the JS suite imports eslint and jsdom, and the
+  # lockfile is the only thing that says which versions the assertions were
+  # written against. .dockerignore excludes node_modules, so installing here
+  # cannot leak into the image built below.
+  - name: 'node:22-slim'
+    entrypoint: 'sh'
+    args: ['-c', 'npm ci --no-audit --no-fund && npm test']
+
+  # The Django suite runs in development mode on SQLite: the tests must not be
+  # able to reach the production database, and they do not need Cloud SQL to
+  # prove what they prove. Every setting that differs in production is covered
+  # by `check --deploy`, which the migrate job runs against the real environment.
+  - name: 'python:3.12-slim'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        set -euo pipefail
+        pip install --quiet --no-cache-dir -r requirements.txt
+        ENVIRONMENT=development python manage.py test --verbosity 1
+
   # Build the Docker image
   - name: 'gcr.io/cloud-builders/docker'
     args:
@@ -199,6 +226,38 @@ steps:
       - 'us-east1'
       - '--platform'
       - 'managed'
+
+  # Post-shift smoke check (F-12.2). The ordering above is right — the revision
+  # is created without traffic, migrations and the cohort seed run against the
+  # old revision still serving, and only then does traffic move. What was absent
+  # is anything that looks at the site AFTER the move: a revision that boots but
+  # fails on its first real request had already taken production by the time
+  # anyone noticed.
+  #
+  # It retries because the shift is not instantaneous at the edge, and it fails
+  # the build after five attempts, which is the only outcome that is useful —
+  # a check that logs and continues is the same as no check. The root path is
+  # the cheapest true request: it renders the landing page through the view
+  # layer and the database, so a broken revision, a failed migration or an
+  # unreachable database all show up as a non-2xx/3xx.
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        set -euo pipefail
+        CODE=000
+        for attempt in 1 2 3 4 5; do
+          CODE=$$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 \
+            https://danielmherman.com/ || true)
+          echo "smoke attempt $$attempt: HTTP $${CODE}"
+          case "$${CODE}" in
+            2*|3*) exit 0 ;;
+          esac
+          sleep 10
+        done
+        echo "site not serving after the traffic shift (last status $${CODE})" >&2
+        exit 1
 
 images:
   - 'us-east1-docker.pkg.dev/$PROJECT_ID/danielmherman-repo/danielmherman:$COMMIT_SHA'

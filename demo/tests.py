@@ -21,6 +21,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from .agent_client import AgentError, AgentRefused
+from .conversations import MAX_REPLAYED_TURNS, replay_turns
 from .fixtures import SLASH_COMMANDS
 from .models import Conversation, DemoPatient, DemoQuota, Turn
 
@@ -512,6 +513,57 @@ class ConversationStoreTests(TestCase):
         self.assertEqual(conversation.expires_at, expected)
         self.assertFalse(conversation.is_expired)
 
+    # --- the replay window (Phase 6 Step B, 2026-10-27) -------------------
+    #
+    # `replay_turns` windows a conversation down to what the agent accepts, and
+    # the window is not "the most recent N": it keeps the FIRST turn as well,
+    # because that is the question that established what is being asked about
+    # this patient. The rule lived only in the function's docstring, and it runs
+    # on every thread past turn 6 — the ordinary case for the demo's multi-turn
+    # traces.
+
+    def _answered(self, conversation, count):
+        """`count` question/answer pairs, numbered as `record_answer` writes them."""
+        for index in range(count):
+            ordinal = index * 2 + 1
+            Turn.objects.create(conversation=conversation, ordinal=ordinal,
+                                role=Turn.Role.USER, question=f'question {index}')
+            Turn.objects.create(conversation=conversation, ordinal=ordinal + 1,
+                                role=Turn.Role.AGENT, answer=f'answer {index}')
+
+    def test_a_short_conversation_replays_every_turn_in_order(self):
+        conversation = self._conversation()
+        self._answered(conversation, 3)
+
+        replayed = replay_turns(conversation)
+
+        self.assertEqual([turn['question'] for turn in replayed],
+                         ['question 0', 'question 1', 'question 2'])
+
+    def test_a_long_conversation_replays_the_anchor_and_the_recent_turns(self):
+        """The anchor is load-bearing: a window of recent turns alone would let the
+        agent reason about the patient from the last few exchanges only."""
+        conversation = self._conversation()
+        self._answered(conversation, 10)
+
+        replayed = replay_turns(conversation)
+
+        self.assertEqual(len(replayed), MAX_REPLAYED_TURNS)
+        self.assertEqual(replayed[0]['question'], 'question 0', 'the anchor is gone')
+        self.assertEqual([turn['question'] for turn in replayed[1:]],
+                         [f'question {index}' for index in range(5, 10)])
+
+    def test_the_replay_never_exceeds_what_the_agent_accepts(self):
+        """One more than the bound would be a `413 too_many_turns` for every thread
+        past this point, so the bound is asserted directly rather than implied."""
+        conversation = self._conversation()
+        self._answered(conversation, 25)
+
+        replayed = replay_turns(conversation)
+
+        self.assertLessEqual(len(replayed), MAX_REPLAYED_TURNS)
+        self.assertTrue(replay_turns(None) == [])
+
     def test_an_expired_conversation_reports_itself_as_expired(self):
         conversation = self._conversation()
         Conversation.objects.filter(pk=conversation.pk).update(
@@ -691,6 +743,55 @@ class PurgeExpiredConversationsTests(TestCase):
         conversation = self._conversation(expired=False)
 
         self.user.delete()
+
+        self.assertFalse(Conversation.objects.filter(pk=conversation.pk).exists())
+
+    # --- why an empty table is not the sweep's doing (Phase 6 Step B) -----
+    #
+    # `demo_conversation` was found empty 12 hours after a turn had been answered.
+    # These two tests settle what the sweep CAN explain, because the investigation
+    # needs the impossible causes eliminated rather than assumed away.
+
+    def test_a_conversation_from_this_morning_survives_the_sweep(self):
+        """The reported shape: a turn at 00:36, the table read at 12:36.
+
+        The retention window is 168 hours, so a twelve-hour-old conversation is not
+        merely kept — it is nine tenths of a week away from being eligible. Asserted
+        against the production TTL rather than the test one, because the number is
+        the whole answer to "could the sweep have taken it".
+        """
+        with override_settings(DEMO_CONVERSATION_TTL_HOURS=168,
+                               DEMO_CONVERSATION_TURN_CEILING=20):
+            conversation = Conversation.objects.create(
+                user=self.user, patient=self.patient)
+            Turn.objects.create(conversation=conversation, ordinal=1,
+                                role=Turn.Role.USER, question='Answered at 00:36')
+            Turn.objects.create(conversation=conversation, ordinal=2,
+                                role=Turn.Role.AGENT, answer='Answer.')
+            # Twelve hours pass.
+            Conversation.objects.filter(pk=conversation.pk).update(
+                created_at=timezone.now() - timedelta(hours=12),
+                expires_at=timezone.now() + timedelta(hours=156),
+            )
+
+            call_command('purge_expired_conversations')
+
+            self.assertTrue(Conversation.objects.filter(pk=conversation.pk).exists(),
+                            'the sweep deleted a conversation inside its window')
+
+    def test_deleting_a_patient_takes_their_conversations_with_it(self):
+        """The other mechanism that empties the table, and the one a deploy can fire.
+
+        `Conversation.patient` is `on_delete=CASCADE`, and the deploy runs
+        `seed_demo_patients --prune`, which deletes every `DemoPatient` absent from
+        the artifact. So refreshing the cohort silently deletes the conversations of
+        any patient the artifact no longer carries — no expiry, no sweep, no log.
+        This test pins the mechanism, not the policy: whether a cohort refresh should
+        be allowed to do that is a decision for the Architect.
+        """
+        conversation = self._conversation(expired=False)
+
+        self.patient.delete()
 
         self.assertFalse(Conversation.objects.filter(pk=conversation.pk).exists())
 

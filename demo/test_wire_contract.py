@@ -28,6 +28,11 @@ from django.urls import reverse
 
 from .fixtures import CHIP_NAMES
 from .models import DemoPatient
+from .conversations import (
+    MAX_REPLAYED_TOOL_CALLS,
+    MAX_REPLAYED_TURNS,
+    MAX_TURN_ANSWER_CHARS,
+)
 from .views import (
     APPROVED_REQUEST_FIELDS,
     CORE_TOOLS,
@@ -233,6 +238,28 @@ class SiblingContractTests(SimpleTestCase):
         self.assertIn('turns', accepted)
         self.assertLessEqual(APPROVED_REQUEST_FIELDS - {'conversation_id', 'asked'},
                              accepted)
+
+    @skipUnless(HAS_SIBLING, NO_SIBLING)
+    def test_the_replay_bounds_are_the_same_numbers_in_both(self):
+        """`conversations.py` windows a replay to what the agent accepts, and the
+        window is this repository's own literals.
+
+        The failure is asymmetric and silent until it bites: sending more turns
+        than the agent admits is a `413 too_many_turns`, so a thread that has been
+        working stops working at the turn where the two numbers part — for every
+        account, with both suites green. Guarded by the sibling checkout, like the
+        ceiling and the chip vocabulary beside it.
+        """
+        for name, ours in (
+            ('MAX_REPLAYED_TURNS', MAX_REPLAYED_TURNS),
+            ('MAX_REPLAYED_TOOL_CALLS', MAX_REPLAYED_TOOL_CALLS),
+            ('MAX_TURN_ANSWER_CHARS', MAX_TURN_ANSWER_CHARS),
+        ):
+            with self.subTest(bound=name):
+                self.assertEqual(
+                    ast.literal_eval(_assignment(AGENT_CONTRACTS, name)), ours,
+                    f'{name} disagrees with the agent',
+                )
 
     @skipUnless(HAS_SIBLING, NO_SIBLING)
     def test_the_policy_refusals_are_a_subset_of_what_the_agent_can_say(self):

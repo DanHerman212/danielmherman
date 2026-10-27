@@ -617,7 +617,7 @@ def _stream_frames(
                 # materialised.
                 if _tools_errored(data):
                     logger.error('a2ui_ask: tool error in streamed answer trace=%s', trace or '-')
-                    DemoQuota.refund(user, period)
+                    DemoQuota.refund(user, period, trace=trace)
                     yield _sse('error', {
                         'error': UNAVAILABLE,
                         'remaining': DemoQuota.remaining(user),
@@ -641,7 +641,7 @@ def _stream_frames(
 
             if event == 'error':
                 logger.error('a2ui_ask: stream failed mid-answer trace=%s: %s', trace or '-', data)
-                DemoQuota.refund(user, period)
+                DemoQuota.refund(user, period, trace=trace)
                 yield _sse('error', {
                     'error': UNAVAILABLE,
                     'remaining': DemoQuota.remaining(user),
@@ -654,7 +654,7 @@ def _stream_frames(
         # it ever becomes reachable, the credit comes back rather than staying
         # spent on an answer that never arrived, and the browser is told rather
         # than left on its pending turn.
-        DemoQuota.refund(user, period)
+        DemoQuota.refund(user, period, trace=trace)
         yield _sse('error', {
             'error': UNAVAILABLE,
             'remaining': DemoQuota.remaining(user),
@@ -943,7 +943,7 @@ def a2ui_ask(request):
         logger.info(
             'a2ui_ask: agent refused trace=%s code=%s', trace or '-', exc.code
         )
-        DemoQuota.refund(request.user, period, spent=exc.spent)
+        DemoQuota.refund(request.user, period, spent=exc.spent, trace=trace)
         return JsonResponse({
             'error': exc.message,
             'remaining': DemoQuota.remaining(request.user),
@@ -956,7 +956,7 @@ def a2ui_ask(request):
         logger.error(
             'a2ui_ask: agent call failed trace=%s: %s', trace or '-', exc
         )
-        DemoQuota.refund(request.user, period, spent=exc.spent)
+        DemoQuota.refund(request.user, period, spent=exc.spent, trace=trace)
         return JsonResponse({
             'error': UNAVAILABLE,
             'remaining': DemoQuota.remaining(request.user),
@@ -966,7 +966,7 @@ def a2ui_ask(request):
     # payloads with HTTP 200 — refund + 502 so a credit is never silently
     # consumed for an answer that never materialized.
     if _tools_errored(result):
-        DemoQuota.refund(request.user, period)
+        DemoQuota.refund(request.user, period, trace=trace)
         return JsonResponse({
             'error': UNAVAILABLE,
             'remaining': DemoQuota.remaining(request.user),
@@ -1028,7 +1028,7 @@ def _streaming_ask(request, intent, trace, period, conversation=None, asked='',
             'a2ui_ask: agent refused the stream before its first frame trace=%s code=%s',
             trace or '-', exc.code,
         )
-        DemoQuota.refund(request.user, period, spent=exc.spent)
+        DemoQuota.refund(request.user, period, spent=exc.spent, trace=trace)
         return JsonResponse({
             'error': exc.message,
             'remaining': DemoQuota.remaining(request.user),
@@ -1038,7 +1038,7 @@ def _streaming_ask(request, intent, trace, period, conversation=None, asked='',
             'a2ui_ask: agent stream failed before its first frame trace=%s: %s',
             trace or '-', exc,
         )
-        DemoQuota.refund(request.user, period, spent=exc.spent)
+        DemoQuota.refund(request.user, period, spent=exc.spent, trace=trace)
         return JsonResponse({
             'error': UNAVAILABLE,
             'remaining': DemoQuota.remaining(request.user),
@@ -1050,7 +1050,7 @@ def _streaming_ask(request, intent, trace, period, conversation=None, asked='',
         # failed call rather than opening a stream that will never carry an
         # answer.
         logger.error('a2ui_ask: agent stream produced no frames trace=%s', trace or '-')
-        DemoQuota.refund(request.user, period)
+        DemoQuota.refund(request.user, period, trace=trace)
         return JsonResponse({
             'error': UNAVAILABLE,
             'remaining': DemoQuota.remaining(request.user),

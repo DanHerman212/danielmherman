@@ -18,6 +18,14 @@ from django.db import models
 from django.db.models import F
 from django.utils import timezone
 
+import logging
+
+logger = logging.getLogger(__name__)
+
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 class DemoPatient(models.Model):
     class Sex(models.TextChoices):
@@ -128,7 +136,7 @@ class DemoQuota(models.Model):
         return today if granted else None
 
     @classmethod
-    def refund(cls, user, period, spent=True):
+    def refund(cls, user, period, spent=True, trace=''):
         """Return a credit after a failure that was not the user's fault.
 
         Without this an agent outage silently eats the day's allowance: the
@@ -150,9 +158,20 @@ class DemoQuota(models.Model):
         """
         qs = cls.objects.filter(user=user, period_start=period, used__gt=0)
         if spent:
-            qs.filter(refunds__lt=settings.DEMO_DAILY_REFUND_CAP).update(
+            cap = settings.DEMO_DAILY_REFUND_CAP
+            granted = qs.filter(refunds__lt=cap).update(
                 used=F('used') - 1, refunds=F('refunds') + 1
             )
+            if not granted:
+                # The row is there and still holds a spent credit, so only the cap can
+                # have refused it. Checked rather than assumed, so a rolled-over period
+                # (a legitimate no-op) does not raise the alarm.
+                if cls.objects.filter(user=user, period_start=period,
+                                      used__gt=0).exists():
+                    logger.warning(
+                        'refund refused: daily refund cap of %s reached '
+                        'period=%s trace=%s', cap, period, trace or '-',
+                    )
         else:
             qs.update(used=F('used') - 1)
 
