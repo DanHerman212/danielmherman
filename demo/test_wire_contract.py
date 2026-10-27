@@ -45,9 +45,9 @@ from .views import (
 # The sibling repository, when it is checked out beside this one. CI mounts one
 # repository at a time, so every read of it is guarded rather than assumed.
 SIBLING = Path(__file__).resolve().parents[2] / 'enterprise_clinical_copilot'
-AGENT_CONTRACTS = SIBLING / 'services' / 'agent' / 'contracts.py'
-AGENT_HTTP = SIBLING / 'services' / 'agent' / 'http.py'
-AGENT_QUESTIONS = SIBLING / 'services' / 'agent' / 'questions.py'
+AGENT_CONTRACTS = SIBLING / 'services' / 'agent' / 'ingress' / 'contracts.py'
+AGENT_HTTP = SIBLING / 'services' / 'agent' / 'ingress' / 'http.py'
+AGENT_QUESTIONS = SIBLING / 'services' / 'agent' / 'routing' / 'routing.py'
 MCP_SERVER = SIBLING / 'services' / 'mcp' / 'server.py'
 
 HAS_SIBLING = AGENT_CONTRACTS.exists()
@@ -265,7 +265,7 @@ class SiblingContractTests(SimpleTestCase):
     def test_the_policy_refusals_are_a_subset_of_what_the_agent_can_say(self):
         spoken = {
             node.value
-            for path in sorted((SIBLING / 'services' / 'agent').glob('*.py'))
+            for path in sorted((SIBLING / 'services' / 'agent').rglob('*.py'))
             for node in ast.walk(ast.parse(path.read_text()))
             if isinstance(node, ast.Constant) and isinstance(node.value, str)
         }

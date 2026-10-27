@@ -28,11 +28,11 @@ _ECC_ROOT = Path(__file__).resolve().parents[2] / 'enterprise_clinical_copilot'
 
 def _agent_chip_questions():
     """The agent's chip table, or None when the sibling repository is absent."""
-    if not (_ECC_ROOT / 'services' / 'agent' / 'questions.py').is_file():
+    if not (_ECC_ROOT / 'services' / 'agent' / 'routing' / 'routing.py').is_file():
         return None
     if str(_ECC_ROOT) not in sys.path:
         sys.path.insert(0, str(_ECC_ROOT))
-    from services.agent.questions import CHIP_QUESTIONS
+    from services.agent.routing.routing import CHIP_QUESTIONS
 
     return CHIP_QUESTIONS
 

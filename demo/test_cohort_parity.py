@@ -26,7 +26,7 @@ from django.test import SimpleTestCase
 # The sibling repository, when it is checked out beside this one. CI mounts one
 # repository at a time, so the read is guarded rather than assumed.
 SIBLING = Path(__file__).resolve().parents[2] / 'enterprise_clinical_copilot'
-AGENT_SERVED = SIBLING / 'services' / 'agent' / 'served_admissions.py'
+AGENT_SERVED = SIBLING / 'services' / 'agent' / 'ingress' / 'contracts.py'
 
 SEED = Path(__file__).resolve().parent / 'data' / 'demo_cohort.json'
 
