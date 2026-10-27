@@ -22,11 +22,12 @@ A clear architectural boundary separates the **Django Web Application Tier** (th
 
 * **Web Application Tier Responsibilities (This Workstream):**
   * Information architecture, navigation, progressive disclosure documentation, and interactive resume presentation.
+  * Ad-blocker-proof **Django Server-Side Funnel Telemetry** logging page views, referrers/UTMs, and key conversion events directly to PostgreSQL and surfacing them in Django Admin.
   * Self-service authentication perimeter using **Google and Microsoft Social OAuth** (allowing both personal and corporate accounts).
   * Automated provisioning of a **20-request live quota** per authenticated user, governed by a **100-user global concurrency/capacity cap** and IP-level initiation throttling (replacing the need for a standalone CAPTCHA).
   * Dual-mode routing inside `/demo/`: serving a self-service **Simulated Sandbox** to unauthenticated visitors and unlocking the **Live Agent Runtime** for authenticated users.
 * **Agent Backend Tier Responsibilities (External Workstream):**
-  * Supplying deterministic, verified golden dataset payloads (recorded SSE streams and structured JSON responses for `/risk`, `/meds`, `/ehr`, and literature queries) to power the unauthenticated Simulated Sandbox at zero LLM inference cost.
+  * Supplying deterministic, verified golden dataset payloads (recorded SSE streams and structured JSON responses for `/ehr`, `/meds`, and literature queries) to power the unauthenticated Simulated Sandbox at zero LLM inference cost.
 
 ---
 
@@ -45,7 +46,7 @@ A clear architectural boundary separates the **Django Web Application Tier** (th
 
 ## 4. Phased Execution Roadmap (Ordered Lowest to Highest Complexity)
 
-Each phase below will be expanded into its own self-contained Tactical Specification Document (`01` through `06`) only when we are ready to execute that specific phase.
+Each phase below will be expanded into its own self-contained Tactical Specification Document (`01` through `07`) only when we are ready to execute that specific phase.
 
 ### Phase 1: Information Architecture, Routing & Navigation Pruning (Lowest Effort)
 * **Strategic Goal:** Eliminate dead click-paths, retire empty catalog links from the global navigation bar, redirect `/projects/` to the flagship architecture page, and embed a persistent direct-contact bar in the global footer.
@@ -67,12 +68,17 @@ Each phase below will be expanded into its own self-contained Tactical Specifica
 * **Target Scope:** `content/views.py` (`ResumeView` context), `content/templates/content/resume.html`, `content/static/js/main.js`, `content/static/css/style.css`.
 * **Verification Gate:** Lens filtering operates smoothly without inline-script CSP violations; `window.print()` produces a clean multi-page PDF layout.
 
-### Phase 5: Top-Right Hamburger Menu & User Guide Experience (Medium Effort)
-* **Strategic Goal:** Introduce an OpenEvidence-inspired top-right navigation/help drawer inside the application experience providing frictionless access to the updated User Guide (format—static visual reference vs. guided walkthrough—to be finalized at Phase 5 kickoff).
+### Phase 5: Django Server-Side Funnel Telemetry (Medium Effort)
+* **Strategic Goal:** Capture 100% ad-blocker-proof visitor analytics without loosening Content Security Policy rules or adding third-party tracking scripts. Track high-signal funnel events (`page_view`, `sandbox_launch`, `oauth_start`, `resume_lens_toggle`), referrer/UTM tags, and anonymized client IP hashes (`X-Forwarded-For`), exposing clean summary filters in Django Admin.
+* **Target Scope:** `content/models.py` (`FunnelEvent` model + migration), `content/admin.py`, `content/views.py` (lightweight event logging helper/endpoint).
+* **Verification Gate:** Zero impact on page-load latency; bot/health-check user agents filtered out; funnel events visible and filterable by event type, path, and referrer inside Django Admin.
+
+### Phase 6: Top-Right Hamburger Menu & User Guide Experience (Medium Effort)
+* **Strategic Goal:** Introduce an OpenEvidence-inspired top-right navigation/help drawer inside the application experience providing frictionless access to the updated User Guide (format—static visual reference vs. guided walkthrough—to be finalized at Phase 6 kickoff).
 * **Target Scope:** `demo/templates/demo/...` header templates and `/demo/guide/` view/template assets.
 * **Verification Gate:** Accessible from both unauthenticated Sandbox and authenticated Live modes; zero layout shift in the clinical console.
 
-### Phase 6: Social OAuth (Google/MSFT) & Simulated Sandbox Mode (Highest Complexity)
+### Phase 7: Social OAuth (Google/MSFT) & Simulated Sandbox Mode (Highest Complexity)
 * **Strategic Goal:** Enable frictionless self-service registration via Google and Microsoft OAuth (personal and work emails allowed), enforce IP-level login initiation throttling, auto-provision the 20-credit `DemoQuota` up to the 100-user global cap, and wire `/demo/` to serve recorded golden SSE streams to unauthenticated users.
 * **Target Scope:** `danielmherman/settings.py`, `danielmherman/urls.py`, `demo/models.py`, `demo/views.py`, and golden fixture integration from the Agent Evaluation workstream.
 * **Verification Gate:** End-to-end OAuth handshake test, oversubscription gate verification (101st user / 0-credit block directing to `dan@danielmherman.com`), and zero-cost SSE replay in unauthenticated mode.

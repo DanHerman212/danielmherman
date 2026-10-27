@@ -53,7 +53,7 @@ def _agent_importable():
     this package, because the site's image installs its own requirements only.
     """
     try:
-        return importlib.util.find_spec('services.agent.a2ui') is not None
+        return importlib.util.find_spec('services.agent.presentation.a2ui') is not None
     except (ImportError, ValueError):
         return False
 
@@ -68,8 +68,8 @@ AGENT_MISSING = 'the agent repository is not checked out next to this one'
 @lru_cache(maxsize=1)
 def _agent_presentation():
     """(compose_presentation, label_for) imported from the agent repo."""
-    from services.agent.a2ui import compose_presentation
-    from services.agent.feature_labels import label_for
+    from services.agent.presentation.a2ui import compose_presentation
+    from services.agent.presentation.domain import label_for
     return compose_presentation, label_for
 
 
