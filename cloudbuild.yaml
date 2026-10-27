@@ -8,59 +8,79 @@
 serviceAccount: 'projects/$PROJECT_ID/serviceAccounts/cicd-deployer@$PROJECT_ID.iam.gserviceaccount.com'
 
 steps:
-  # Gate (F-12.1): both suites run BEFORE the image is built, so a failing test
-  # means no image is pushed and no revision is created — production is not
-  # touched, and there is nothing to roll back. Until now every one of these
-  # assertions ran on a developer's machine and the trigger fired on the push
-  # alone; a push that skipped them shipped.
+  # Gate (F-12.1), unchanged in strictness, halved in cost. Both suites still run
+  # before anything is pushed or deployed: `docker push` waits on both of them, and
+  # every deploy step waits on the push. A failing test still aborts the build with
+  # nothing in Artifact Registry and no revision created.
   #
-  # `npm ci`, not `install`: the JS suite imports eslint and jsdom, and the
-  # lockfile is the only thing that says which versions the assertions were
-  # written against. .dockerignore excludes node_modules, so installing here
-  # cannot leak into the image built below.
-  - name: 'node:22-slim'
-    entrypoint: 'sh'
-    args: ['-c', 'npm ci --no-audit --no-fund && npm test']
+  # What changed is where the Python suite runs. It used to run in a throwaway
+  # `python:3.12-slim` container that installed the requirements again — 206 s of
+  # the build, a second full install of dependencies the image installs anyway.
+  # It now runs inside the image that is about to be pushed, so the tested
+  # interpreter and packages are exactly the deployed ones (F-12.1's intent, more
+  # literally than before) and the duplicate install is gone. `collectstatic` no
+  # longer needs a step either: the Dockerfile already runs it, so the manifest the
+  # page assertions resolve through is present in the image.
+  #
+  # The seed pull is best effort: a cold repository has no `:latest` to pull and
+  # `|| true` keeps the first build after a wipe from failing on that.
 
-  # The Django suite runs in development mode on SQLite: the tests must not be
-  # able to reach the production database, and they do not need Cloud SQL to
-  # prove what they prove. Every setting that differs in production is covered
-  # by `check --deploy`, which the migrate job runs against the real environment.
-  #
-  # `collectstatic` first, and it is not decoration. The templates and views
-  # resolve their static URLs through the manifest storage, whose manifest is
-  # written by collectstatic; a fresh checkout has no staticfiles/ (it is
-  # gitignored and regenerated inside the image), so fifteen assertions about
-  # pages, CSP headers and the forms fail on a missing manifest entry otherwise.
-  # That failure says nothing about the change under test, which is the worst
-  # kind of gate. The output lands in the gitignored staticfiles/, which
-  # .dockerignore excludes, so the image built below is unaffected.
-  - name: 'python:3.12-slim'
+  - id: 'pull-cache'
+    name: 'gcr.io/cloud-builders/docker'
     entrypoint: 'bash'
     args:
       - '-c'
-      - |
-        set -euo pipefail
-        pip install --quiet --no-cache-dir -r requirements.txt
-        ENVIRONMENT=development python manage.py collectstatic --noinput
-        ENVIRONMENT=development python manage.py test --verbosity 1
+      - 'docker pull us-east1-docker.pkg.dev/$PROJECT_ID/danielmherman-repo/danielmherman:latest || true'
 
-  # Build the Docker image
-  - name: 'gcr.io/cloud-builders/docker'
+  # `npm ci`, not `install`: the JS suite imports eslint and jsdom, and the
+  # lockfile is the only thing that says which versions the assertions were
+  # written against. .dockerignore excludes node_modules, so installing here
+  # cannot leak into the image built below. It runs alongside the image build
+  # because the two share no inputs.
+  - id: 'js-tests'
+    name: 'node:22-slim'
+    entrypoint: 'sh'
+    args: ['-c', 'npm ci --no-audit --no-fund && npm test']
+    waitFor: ['-']
+
+  - id: 'build'
+    name: 'gcr.io/cloud-builders/docker'
     args:
       - 'build'
+      - '--cache-from'
+      - 'us-east1-docker.pkg.dev/$PROJECT_ID/danielmherman-repo/danielmherman:latest'
       - '-t'
       - 'us-east1-docker.pkg.dev/$PROJECT_ID/danielmherman-repo/danielmherman:$COMMIT_SHA'
       - '-t'
       - 'us-east1-docker.pkg.dev/$PROJECT_ID/danielmherman-repo/danielmherman:latest'
       - '.'
+    waitFor: ['pull-cache']
 
-  # Push the image to Artifact Registry
-  - name: 'gcr.io/cloud-builders/docker'
+  # The Django suite, in development mode on SQLite: the tests must not be able to
+  # reach the production database, and they do not need Cloud SQL to prove what
+  # they prove. Every setting that differs in production is covered by
+  # `check --deploy`, which the migrate job runs against the real environment.
+  - id: 'django-tests'
+    name: 'gcr.io/cloud-builders/docker'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        set -euo pipefail
+        docker run --rm -e ENVIRONMENT=development \
+          --entrypoint python \
+          us-east1-docker.pkg.dev/$PROJECT_ID/danielmherman-repo/danielmherman:$COMMIT_SHA \
+          manage.py test --verbosity 1
+    waitFor: ['build']
+
+  # Push the image to Artifact Registry, behind both gates.
+  - id: 'push'
+    name: 'gcr.io/cloud-builders/docker'
     args:
       - 'push'
       - '--all-tags'
       - 'us-east1-docker.pkg.dev/$PROJECT_ID/danielmherman-repo/danielmherman'
+    waitFor: ['django-tests', 'js-tests']
 
   # Deploy the new revision with --no-traffic FIRST (ECC-56): the revision is
   # created but receives no traffic, so the OLD revision keeps serving
@@ -257,14 +277,14 @@ steps:
       - |
         set -euo pipefail
         CODE=000
-        for attempt in 1 2 3 4 5; do
+        for attempt in 1 2 3 4 5 6 7 8; do
           CODE=$$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 \
             https://danielmherman.com/ || true)
           echo "smoke attempt $$attempt: HTTP $${CODE}"
           case "$${CODE}" in
             2*|3*) exit 0 ;;
           esac
-          sleep 10
+          sleep 5
         done
         echo "site not serving after the traffic shift (last status $${CODE})" >&2
         exit 1
@@ -275,3 +295,7 @@ images:
 
 options:
   logging: CLOUD_LOGGING_ONLY
+  # The default worker is 1 vCPU. `docker build` and the Django suite are the two
+  # CPU-bound steps and they are the reason npm was ever serialised behind them;
+  # eight cores is what makes the parallel layout above worth having.
+  machineType: 'E2_HIGHCPU_8'
