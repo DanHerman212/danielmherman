@@ -13,16 +13,12 @@ script, and any bug report that refers to a patient by name.
 
 from datetime import timedelta
 
+import logging
+
 from django.conf import settings
 from django.db import models
 from django.db.models import F
 from django.utils import timezone
-
-import logging
-
-logger = logging.getLogger(__name__)
-
-import logging
 
 logger = logging.getLogger(__name__)
 

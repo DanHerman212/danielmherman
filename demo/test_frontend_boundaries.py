@@ -9,10 +9,17 @@ Both directions are asserted here, plus the two properties that made the split
 possible: nothing on the page walks a shadow root, and the new scripts keep the
 module-scope indentation this page's tests already depend on.
 
-This repository has no DOM harness, so source is what can be checked. These are
-stronger than they look: every one of them fails on a rename, a missing namespace
-member, or a script tag in the wrong order — the three ways this refactor could have
-broken in a browser and passed CI silently.
+These read source because that is the right tool for THIS question: whether one file's
+namespace still contains everything another file calls, and whether the script tags
+that load them are in the order the page needs. Behaviour is tested by running the page
+— `tests/js/` boots it in jsdom (`tests/js/support/page.mjs`) and drives it with
+`node --test`, which is a different check and does not subsume this one: source
+assertions fail on a rename or a missing namespace member, and a DOM test that never
+takes the path a rename broke still passes.
+
+Stronger than they look for that reason: every one of them fails on a rename, a missing
+namespace member, or a script tag in the wrong order — the three ways this refactor
+could have broken in a browser and passed CI silently.
 """
 
 import re

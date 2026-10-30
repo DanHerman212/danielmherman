@@ -21,6 +21,19 @@ class AgentSuccess(TypedDict, total=False):
     guardrail_flags: list[str]
     tool_calls: list[AgentToolCall]
     a2ui: dict[str, Any] | None
+    # What the turn presented besides its answer, composed by the agent and read by the
+    # console: the scope pill, the records its markers resolve to, the next questions, and
+    # the note that a free-text question was routed to a command.
+    #
+    # Named here rather than only in the browser, because `validate_agent_response` passes
+    # them through and a field nothing declares is a field nothing misses when it stops
+    # arriving. `routed_to` had no declaration on this side at all until
+    # `test_payload_contract.py` asked which source produces every published key and the
+    # answer for it was "none".
+    scope: str | None
+    references: list[dict[str, Any]]
+    follow_ups: list[str]
+    routed_to: str | None
     sources: list[dict[str, Any]]
     # Published records the answer rests on, if it rests on any. Separate from
     # `sources`, which is the discharge-note citation channel: that list is numbered,

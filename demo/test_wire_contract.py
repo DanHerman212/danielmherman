@@ -49,6 +49,7 @@ AGENT_CONTRACTS = SIBLING / 'services' / 'agent' / 'ingress' / 'contracts.py'
 AGENT_HTTP = SIBLING / 'services' / 'agent' / 'ingress' / 'http.py'
 AGENT_QUESTIONS = SIBLING / 'services' / 'agent' / 'routing' / 'routing.py'
 MCP_SERVER = SIBLING / 'services' / 'mcp' / 'server.py'
+MCP_TOOLS_INIT = SIBLING / 'services' / 'mcp' / 'tools' / '__init__.py'
 
 HAS_SIBLING = AGENT_CONTRACTS.exists()
 NO_SIBLING = 'the agent repository is not checked out beside this one'
@@ -84,12 +85,39 @@ def _declared_names(path, name):
 
 
 def _registered_tools(path):
-    """The tool names a server registers, read from its own calls."""
+    """The tool names a server registers, read from its own calls.
+
+    Two registration shapes, because the server has had both. It used to call
+    `add_tool(discharge_medications)` once per tool, and a name in the call was a name on
+    the wire. Since 2026-10-29 it registers from the package's declared list —
+
+        for _name in tools.__all__:
+            server.add_tool(getattr(tools, _name))
+
+    — so the call no longer names anything. The names are then `__all__` in
+    `services/mcp/tools/__init__.py`, which is where the package already declares what it
+    serves; that is read with `ast` rather than imported, because this test must not drag
+    the sibling's import graph and virtual environment into this run.
+
+    Recognising the loop rather than the `getattr` call is deliberate: the loop is what
+    says "every name in this list is served", which is the fact the assertion needs.
+    """
+    tree = ast.parse(path.read_text())
     names = set()
-    for node in ast.walk(ast.parse(path.read_text())):
+    iterates_declared_list = False
+
+    for node in ast.walk(tree):
         if isinstance(node, ast.Call) and getattr(node.func, 'attr', None) == 'add_tool':
             if node.args and isinstance(node.args[0], ast.Name):
                 names.add(node.args[0].id)
+        if isinstance(node, ast.For):
+            source = node.iter
+            if (isinstance(source, ast.Attribute) and source.attr == '__all__'
+                    and isinstance(source.value, ast.Name)):
+                iterates_declared_list = True
+
+    if iterates_declared_list and MCP_TOOLS_INIT.exists():
+        names |= _declared_names(MCP_TOOLS_INIT, '__all__')
     return names
 
 
