@@ -117,7 +117,31 @@ steps:
       # DEMO_FIXTURE_MODE is intentionally absent: dev scaffolding, forbidden
       # in production by settings.py (S1-02).
       - '--set-env-vars'
-      - '^@^ENVIRONMENT=production@GOOGLE_CLOUD_PROJECT=$PROJECT_ID@CLOUD_SQL_CONNECTION_NAME=$PROJECT_ID:us-east1:danielmherman-db@GS_BUCKET_NAME=danielmherman-media@ALLOWED_HOSTS=danielmherman.com,www.danielmherman.com,.run.app@CSRF_TRUSTED_ORIGINS=https://danielmherman.com,https://www.danielmherman.com@DEMO_AGENT_URL=https://agent-jamycsjjzq-ue.a.run.app@LANGFUSE_UI_URL=https://observability.danielmherman.com'
+      - '^@^ENVIRONMENT=production@GOOGLE_CLOUD_PROJECT=$PROJECT_ID@CLOUD_SQL_CONNECTION_NAME=$PROJECT_ID:us-east1:danielmherman-db@GS_BUCKET_NAME=danielmherman-media@ALLOWED_HOSTS=danielmherman.com,www.danielmherman.com,.run.app@CSRF_TRUSTED_ORIGINS=https://danielmherman.com,https://www.danielmherman.com@DEMO_AGENT_URL=https://agent-jamycsjjzq-ue.a.run.app@LANGFUSE_UI_URL=https://observability.danielmherman.com@LANGFUSE_HOST=https://observability.danielmherman.com'
+      # The two Langfuse credentials are MOUNTED, not written here: the site reads
+      # them the way the agent does, from the same two project secrets, so a public
+      # key never enters this file or a revision's environment literals. The host is
+      # a literal because it is a URL rather than a credential, and it is the same
+      # canonical name the agent uses — one project, one hostname, whether the reader
+      # is checking the UI or the score API.
+      #
+      # `--set-secrets` REPLACES the whole secret set exactly as `--set-env-vars`
+      # replaces the whole env set (the lesson recorded in
+      # `services/mcp/cloudbuild.yaml`). This service sets none today, so the first
+      # use is safe; a second secret added by hand would be dropped here.
+      #
+      # Needed at all because a site without them answers normally and drops every
+      # rating in silence: `langfuse_scores.score()` returned False before its
+      # request and the reader saw the same 204 a recorded rating returns. It was
+      # deployed without them until 2026-10-30 — `langfuse_scores.missing()` now
+      # names whatever is absent, and `attach_score` warns against the trace it
+      # could not reach.
+      #
+      # The site's runtime account (`website-sa`) needs
+      # `roles/secretmanager.secretAccessor` on both secrets; Cloud Run validates
+      # that at deploy time and fails the build rather than mounting nothing.
+      - '--set-secrets'
+      - '^@^LANGFUSE_PUBLIC_KEY=langfuse-project-public-key:latest@LANGFUSE_SECRET_KEY=langfuse-project-secret-key:latest'
 
   # Run migrations — before the new revision serves traffic.
   # Deploying first would briefly run new code against the old schema.
