@@ -35,6 +35,8 @@ CLIPBOARD = (STATIC_JS / 'copilot_clipboard.js').read_text(encoding='utf-8')
 THREADS = (STATIC_JS / 'copilot_threads.js').read_text(encoding='utf-8')
 TSV = (STATIC_JS / 'copilot_tsv.js').read_text(encoding='utf-8')
 COMPONENTS = (STATIC_JS / 'a2ui_clinical_components.js').read_text(encoding='utf-8')
+NARRATIVE = (STATIC_JS / 'a2ui' / 'cited_narrative.js').read_text(encoding='utf-8')
+SHARED = (STATIC_JS / 'a2ui' / 'shared.js').read_text(encoding='utf-8')
 CONSOLE = TEMPLATE.read_text(encoding='utf-8')
 
 
@@ -101,16 +103,16 @@ class ShadowBoundaryTests(SimpleTestCase):
         self.assertNotIn('outlineOffset', CANVAS)
 
     def test_the_narrative_owns_the_reveal(self):
-        self.assertIn('revealCitation(index)', COMPONENTS)
-        self.assertIn('.cite.is-target', COMPONENTS)
+        self.assertIn('revealCitation(index)', NARRATIVE)
+        self.assertIn('.cite.is-target', SHARED)
         # The timer belongs to the element that owns the marker, so a replaced
         # node cannot be left outlined by a callback that outlived it.
-        self.assertIn('clearTimeout(this._revealTimer)', COMPONENTS)
+        self.assertIn('clearTimeout(this._revealTimer)', NARRATIVE)
 
     def test_the_ready_event_crosses_both_shadow_boundaries(self):
         """`composed` carries it out of the component's root, `bubbles` out of the
         surface's — without both, the turn never hears it."""
-        dispatch = COMPONENTS[COMPONENTS.index('a2ui-cited-narrative-ready'):]
+        dispatch = NARRATIVE[NARRATIVE.index('a2ui-cited-narrative-ready'):]
         dispatch = dispatch[:dispatch.index('});')]
 
         self.assertIn('bubbles: true', dispatch)

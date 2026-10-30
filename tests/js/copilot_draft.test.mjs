@@ -21,7 +21,7 @@ import assert from 'node:assert/strict';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const DRAFT = readFileSync(join(HERE, '..', '..', 'static', 'js', 'copilot_draft.js'), 'utf8');
 const COMPONENTS = readFileSync(
-  join(HERE, '..', '..', 'static', 'js', 'a2ui_clinical_components.js'), 'utf8');
+  join(HERE, '..', '..', 'static', 'js', 'a2ui', 'shared.js'), 'utf8');
 
 // Run in this realm rather than in a `vm` context. The module is pure and hangs itself
 // on `window`, so nothing is gained by a separate realm — and a separate realm would hand

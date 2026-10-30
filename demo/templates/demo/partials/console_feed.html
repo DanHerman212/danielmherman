@@ -1,0 +1,47 @@
+{% load static %}
+{% comment %}
+The context bar and the conversation column. `data-renderer-url` names the A2UI bundle
+for the feed as a whole: fetched on demand, once, and mounted per turn.
+{% endcomment %}
+    {% comment %}
+    The context bar: what the whole thread is about, and how long the store will
+    keep it. The patient is a property of the conversation rather than of the turn
+    being read, so it is stated once above the feed.
+
+    Deliberately not here: the turn counter. "Turn 3 of 20" is the system's
+    bookkeeping, not the clinician's, and a limit they can run into without having
+    done anything wrong is not something to keep in front of them.
+    {% endcomment %}
+    <div class="cp-context" id="cp-context">
+      <span class="cp-context-pill" id="cp-context-patient" hidden>
+        <i class="fa-solid fa-user" aria-hidden="true"></i>
+        <span id="cp-context-name"></span>
+        <span class="cp-context-hadm" id="cp-context-hadm"></span>
+      </span>
+      <span class="cp-context-state" id="cp-context-state"></span>
+    </div>
+
+    {% comment %}
+    The conversation: one continuous column of turns, oldest first. This is the
+    only zone that scrolls, and the turns are constrained to a centred column so
+    they do not run flush against the sidebar.
+
+    There is no navigator above the composer and no card to fold away. Each turn's
+    question heads it and sticks to the top of the scroll area while its own answer
+    passes under it, so the reader always has the question that the text in front
+    of them is answering — which is what the navigator was for, without a second
+    control to keep in step with the first.
+
+    The blocks are built by the client and nothing in them is addressed by a
+    page-wide id, because a conversation holds several canvases, several citation
+    triggers and several status rows at once. `data-renderer-url` names the A2UI
+    bundle for the feed as a whole: it is fetched on demand, once, and mounted per
+    turn — never at page load, because its module graph is large and nothing on
+    first paint needs it.
+    {% endcomment %}
+    <section class="cp-feed" id="cp-feed" aria-live="polite" aria-label="Conversation"
+             data-renderer-url="{% static 'js/bundled/a2ui_clinical.js' %}?v=16"
+             data-conversation-url="{% url 'demo:conversation_detail' 0 %}"
+             data-history-url="{% url 'demo:conversation_history' %}"
+             data-feedback-url="{% url 'demo:feedback' %}"
+             data-retention-days="{{ retention_days }}"></section>

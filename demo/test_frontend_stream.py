@@ -30,9 +30,12 @@ FACTS = (STATIC_JS / 'copilot_turn_facts.js').read_text(encoding='utf-8')
 REVEAL = (STATIC_JS / 'copilot_reveal.js').read_text(encoding='utf-8')
 DRAFT = (STATIC_JS / 'copilot_draft.js').read_text(encoding='utf-8')
 COMPONENTS = (STATIC_JS / 'a2ui_clinical_components.js').read_text(encoding='utf-8')
+NARRATIVE = (STATIC_JS / 'a2ui' / 'cited_narrative.js').read_text(encoding='utf-8')
 SHELL = (ROOT / 'static' / 'css' / 'demo_shell.css').read_text(encoding='utf-8')
-CONSOLE = (ROOT / 'demo' / 'templates' / 'demo' / 'a2ui_console.html').read_text(
-    encoding='utf-8')
+CONSOLE = '\n'.join(
+    p.read_text(encoding='utf-8')
+    for p in [ROOT / 'demo' / 'templates' / 'demo' / 'a2ui_console.html']
+    + sorted((ROOT / 'demo' / 'templates' / 'demo' / 'partials').glob('*.html')))
 
 
 def _flat(source):
@@ -83,7 +86,7 @@ class DraftTypographyTests(SimpleTestCase):
 
     def test_the_body_text_is_set_identically_in_both(self):
         draft = _declarations(SHELL, '.cp-answer-text')
-        narrative = _declarations(COMPONENTS, '.narrative')
+        narrative = _declarations(NARRATIVE, '.narrative')
 
         self.assertEqual(draft['font-size'], narrative['font-size'])
         self.assertEqual(draft['line-height'], narrative['line-height'])
@@ -93,7 +96,7 @@ class DraftTypographyTests(SimpleTestCase):
             SHELL, '.cp-answer-text > h1, .cp-answer-text > h2, '
                    '.cp-answer-text > h3, .cp-answer-text > h4')
         narrative = _declarations(
-            COMPONENTS, '.prose > h1, .prose > h2, .prose > h3, .prose > h4')
+            NARRATIVE, '.prose > h1, .prose > h2, .prose > h3, .prose > h4')
 
         for name in ('font-size', 'font-weight', 'line-height', 'margin'):
             self.assertEqual(draft[name], narrative[name], f'{name} differs')
@@ -101,7 +104,7 @@ class DraftTypographyTests(SimpleTestCase):
     def test_a_paragraph_is_followed_by_the_same_space_in_both(self):
         draft = _declarations(
             SHELL, '.cp-answer-text > p, .cp-answer-text > ul, .cp-answer-text > ol')
-        narrative = _declarations(COMPONENTS, '.prose > p')
+        narrative = _declarations(NARRATIVE, '.prose > p')
 
         self.assertEqual(draft['margin'], narrative['margin'])
 

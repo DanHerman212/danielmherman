@@ -1,0 +1,64 @@
+{% load static %}
+{% comment %}
+The top of the working surface: the account menu and the request count, the offline
+notice when the console answers from captured payloads, and the mark. The question and
+the run are not here — they belong to a turn.
+{% endcomment %}
+    {# ---------------- top right of the page: the menu ---------------- #}
+    <header class="cp-head">
+      <div class="cp-actions">
+        <div class="cp-menu-anchor">
+          <button type="button" class="cp-icon-btn" id="cp-menu-btn"
+                  aria-expanded="false" aria-controls="cp-menu"
+                  aria-label="Open menu" title="Menu">
+            <i class="fa-solid fa-bars" aria-hidden="true"></i>
+          </button>
+          <div class="cp-menu" id="cp-menu" hidden>
+            <a class="cp-menu-item" href="{% url 'demo:guide' %}">
+              <i class="fa-regular fa-circle-question" aria-hidden="true"></i>
+              <span>Demo User Guide</span>
+            </a>
+            <span class="cp-menu-item cp-menu-quota">
+              <i class="fa-solid fa-bolt" aria-hidden="true"></i>
+              <span>Requests left</span>
+              <strong id="remaining">{{ remaining }}</strong>
+            </span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    {% if fixture_mode %}
+    {% comment %}
+      Offline scaffolding, and it says so. This mode answers captured payloads and
+      keeps no conversation, so a follow-up here is a new question rather than a
+      remembered one. The banner is not decoration: presenting canned answers as
+      if they came from the live agent is the one thing this demo must never do.
+    {% endcomment %}
+    <p class="cp-note" role="note">
+      <i class="fa-solid fa-plug-circle-xmark" aria-hidden="true"></i>
+      <span>Offline demonstration: answers come from captured payloads, one question
+      at a time. Follow-up questions need the live agent.</span>
+    </p>
+    {% endif %}
+
+    <div class="cp-top">
+      <div class="cp-brand">
+        <svg class="cp-logo" viewBox="0 0 48 48" role="img" aria-hidden="true">
+          <rect x="1" y="1" width="46" height="46" rx="11" fill="#1f2937"/>
+          <text x="24" y="31" text-anchor="middle"
+                font-family="Inter, system-ui, sans-serif"
+                font-size="17" font-weight="700" letter-spacing="1"
+                fill="#ffffff">ECC</text>
+        </svg>
+        <h1 class="cp-brand-name">Enterprise Clinical Copilot</h1>
+      </div>
+
+      {% comment %}
+      The question and the run used to sit here, as one box and one status row for
+      the page. They are now part of a turn: the question is that turn's header and
+      the status row is its footer, so a conversation can show twenty of each
+      without one turn's row standing in for another's. The client builds them
+      (`createTurn`) for a live turn and for a turn restored from the store alike.
+      {% endcomment %}
+    </div>

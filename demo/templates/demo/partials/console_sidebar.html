@@ -1,0 +1,128 @@
+{% load static %}
+{% comment %}
+The left menu: the thread drawer, its filter, the list, and the account menu.
+{% endcomment %}
+  {# ---------------- left: the menu ---------------- #}
+  <aside class="cp-side" id="cp-side">
+    <div class="cp-side-head">
+      <button type="button" class="cp-icon-btn" id="cp-side-toggle"
+              aria-expanded="true" aria-controls="cp-side"
+              aria-label="Collapse navigation" title="Collapse navigation">
+        {% comment %}
+        Drawn rather than taken from the icon font: the reference is a panel with
+        a divider and a chevron, and no free FontAwesome glyph matches it exactly.
+        The two arrows are both in the button and one is hidden by CSS, so the
+        swap on collapse needs no scripting.
+        {% endcomment %}
+        <svg class="cp-side-toggle-icon cp-icon-when-open" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor" stroke-width="1.8"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="3" y="4" width="18" height="16" rx="4"/>
+          <path d="M9 4v16"/>
+          <path d="M16.5 9.5 13.5 12l3 2.5"/>
+        </svg>
+        <svg class="cp-side-toggle-icon cp-icon-when-collapsed" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor" stroke-width="1.8"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="3" y="4" width="18" height="16" rx="4"/>
+          <path d="M9 4v16"/>
+          <path d="M13.5 9.5 16.5 12l-3 2.5"/>
+        </svg>
+      </button>
+      {% comment %}
+      The magnifying glass, which reveals the thread filter below it. Not a
+      placeholder any more: the list it filters is on screen from the moment the
+      page loads, so there is something for it to act on.
+      {% endcomment %}
+      <button type="button" class="cp-icon-btn cp-side-search" id="cp-search-btn"
+              aria-expanded="false" aria-controls="cp-thread-search"
+              aria-label="Search threads" title="Search threads">
+        <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+      </button>
+    </div>
+
+    <nav class="cp-side-nav" aria-label="Copilot sections">
+      {% comment %}
+      New Conversation and the thread list are controls; Discover and Tools are
+      labels reserved for a later phase, rendered `disabled` for the same reason
+      as before: a control that does nothing should not look like one that is
+      broken.
+      {% endcomment %}
+      <button type="button" class="cp-nav-item" id="cp-new-btn"
+              title="Start a new conversation">
+        <i class="fa-regular fa-pen-to-square" aria-hidden="true"></i>
+        <span>New Conversation</span>
+      </button>
+      <button type="button" class="cp-nav-item" disabled>
+        <i class="fa-regular fa-compass" aria-hidden="true"></i>
+        <span>Discover</span>
+      </button>
+      <button type="button" class="cp-nav-item" disabled>
+        <i class="fa-solid fa-screwdriver-wrench" aria-hidden="true"></i>
+        <span>Tools</span>
+      </button>
+    </nav>
+
+    {% comment %}
+    The search field, revealed by the magnifying glass in the sidebar's head. An
+    input that is always there spends a row of the sidebar on a question nobody
+    asked yet; one that arrives when its control is pressed spends nothing.
+    {% endcomment %}
+    <div class="cp-thread-search" id="cp-thread-search" hidden>
+      <label class="cp-sr-only" for="cp-thread-filter">Filter threads</label>
+      <input type="search" id="cp-thread-filter" class="cp-thread-input"
+             placeholder="Search patients" autocomplete="off">
+    </div>
+
+    {% comment %}
+    The thread list, populated on load rather than hidden behind a control. There
+    is one thread per patient (a thread is about exactly one patient, and asking
+    about the same patient again continues theirs), so a row is a patient: the
+    name, and a menu for the three things that can be done to it.
+
+    The rows are built by the client because the list changes as threads are
+    opened, renamed, pinned and deleted, and the store is the only thing that
+    knows which of those happened.
+    {% endcomment %}
+    <section class="cp-threads" id="cp-threads" aria-labelledby="cp-threads-label">
+      <p class="cp-threads-label" id="cp-threads-label">Patients</p>
+      <p class="cp-threads-empty" id="cp-threads-empty" hidden></p>
+      <ul class="cp-thread-list" id="cp-thread-list"></ul>
+    </section>
+
+    <div class="cp-side-foot">
+      {% comment %}
+      The identity is a control again: it opens the account menu above it. The
+      menu carries the account being signed in as, a Settings placeholder, and
+      sign-out — the reference interface's shape without the rows that have no
+      meaning here yet (add account, inbox).
+      {% endcomment %}
+      <button type="button" class="cp-user" id="cp-account-btn"
+              aria-expanded="false" aria-controls="cp-account-menu">
+        <span class="cp-avatar" aria-hidden="true">{{ profile.initials }}</span>
+        <span class="cp-user-text">
+          <span class="cp-user-name">{{ profile.name }}</span>
+          <span class="cp-user-email">{{ profile.email }}</span>
+        </span>
+        <i class="fa-solid fa-chevron-right cp-user-caret" aria-hidden="true"></i>
+      </button>
+
+      <div class="cp-account-menu" id="cp-account-menu" hidden>
+        <span class="cp-menu-item cp-account-current">
+          <i class="fa-solid fa-check" aria-hidden="true"></i>
+          <span>{{ profile.email }}</span>
+        </span>
+        <button type="button" class="cp-menu-item" disabled>
+          <i class="fa-solid fa-gear" aria-hidden="true"></i>
+          <span>Settings</span>
+        </button>
+        <form class="cp-account-logout" method="post" action="{% url 'logout' %}">
+          {% csrf_token %}
+          <button type="submit" class="cp-menu-item">
+            <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i>
+            <span>Log out</span>
+          </button>
+        </form>
+      </div>
+    </div>
+  </aside>

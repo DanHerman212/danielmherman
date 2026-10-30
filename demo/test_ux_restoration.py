@@ -117,7 +117,12 @@ class TurnChromeTests(TestCase):
         # grown to twice the size the comments in it describe.
         scripts = sorted(STATIC.glob('copilot_*.js'))
         self.canvas = ''.join(p.read_text(encoding='utf-8') for p in scripts)
-        self.console = (TEMPLATES / 'a2ui_console.html').read_text(encoding='utf-8')
+        # The console's markup, read the same way: the shell and every partial it
+        # includes. A marker is where the reader can find it, not in whichever file
+        # happened to hold it this month.
+        pages = [TEMPLATES / 'a2ui_console.html'] + sorted(
+            (TEMPLATES / 'partials').glob('*.html'))
+        self.console = ''.join(p.read_text(encoding='utf-8') for p in pages)
 
     def test_the_turn_toolbar_and_its_actions_are_drawn(self):
         for marker in ('cp-turn-toolbar', 'fa-copy', 'fa-download',

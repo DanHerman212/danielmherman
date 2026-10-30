@@ -1,0 +1,48 @@
+{% load static %}
+{% comment %}
+The ask bar: the patient pill, the box, the hidden fields a submit carries, the send
+control and the two dropdowns.
+{% endcomment %}
+      {% comment %}
+      The composer: the `@` patient selector and the `/` command menu.
+
+      The bar is the flex container. A chosen patient and a chosen command are
+      pills that are siblings of the text box rather than children of it: a box that
+      holds text holds text and nothing else, so the bar is what holds both. Each pill
+      shows what was chosen; a hidden field carries its value (`hadm_id`, `chip`), so
+      nothing has to be parsed back out of the text box and what a submit would send is
+      in the DOM.
+
+      The box is a `<textarea>` with `rows="1"` rather than an `<input>`, so a long
+      question wraps and grows upward instead of scrolling sideways (Phase 4 §6).
+      Enter still sends and Shift+Enter breaks the line — that is script, because a
+      textarea would otherwise insert a newline. `aria-multiline` is deliberately not
+      set: it would tell assistive technology the opposite of what Enter does.
+      {% endcomment %}
+      <form class="cp-ask" id="cp-ask" role="search" autocomplete="off"
+            data-submit="live"
+            data-lookup-url="{% url 'demo:patient_autocomplete' %}">
+        {% csrf_token %}
+        <span class="patient-pill" id="cp-patient-pill" hidden>
+          <span id="cp-patient-label"></span>
+          <button type="button" class="patient-pill-clear" id="cp-patient-clear"
+                  aria-label="Remove the selected patient">
+            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+          </button>
+        </span>
+        <label class="cp-sr-only" for="cp-ask-input">Ask the copilot</label>
+        <textarea id="cp-ask-input" class="cp-ask-input" rows="1"
+               placeholder="Search for patient using @ command or /slash commands for agent requests"
+               role="combobox" aria-expanded="false" aria-controls="cp-patient-list"
+               aria-autocomplete="list" aria-haspopup="listbox"></textarea>
+        <input type="hidden" name="hadm_id" id="cp-patient-id" value="">
+        <input type="hidden" name="chip" id="cp-command-intent" value="">
+        <button type="submit" class="cp-send" aria-label="Send">
+          <i class="fa-solid fa-arrow-up" aria-hidden="true"></i>
+        </button>
+        <ul class="cp-patient-list" id="cp-patient-list" role="listbox"
+            aria-label="Patients" hidden></ul>
+        <ul class="cp-command-list" id="cp-command-list" role="listbox"
+            aria-label="Commands" hidden></ul>
+      </form>
+      {{ commands|json_script:"cp-command-data" }}
