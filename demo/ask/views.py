@@ -174,11 +174,13 @@ def a2ui_ask(request):
     # tool evidence is visible. Django is a pass-through for it; the envelope
     # builder adds the three facts only this side knows.
     record_turn(conversation)
-    record_answer(conversation, result, asked)
+    # The stored row is the identity a rating names, so the envelope carries its key.
+    stored_turn = record_answer(conversation, result, asked)
     return JsonResponse(envelope.for_client(
         result,
         remaining=DemoQuota.remaining(request.user),
         conversation=conversation,
+        turn=stored_turn,
     ))
 
 

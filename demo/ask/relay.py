@@ -221,13 +221,17 @@ def stream_frames(
                 # that an answer exists, and stores it so the next question can
                 # be answered as a follow-up.
                 record_turn(conversation)
-                record_answer(conversation, data, asked)
+                stored_turn = record_answer(conversation, data, asked)
                 # The same builder the blocking path uses, so the two cannot
                 # disagree about which keys an answer carries.
                 yield _sse('answer', envelope.for_client(
                     data,
                     remaining=DemoQuota.remaining(user),
                     conversation=conversation,
+                    # The row that stored this answer. The console rates a turn by
+                    # this and by nothing else, so it has to arrive on the frame the
+                    # answer arrives on.
+                    turn=stored_turn,
                 ))
                 return
 

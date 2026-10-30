@@ -62,7 +62,7 @@ PUBLISHED_ENVELOPE_KEYS = frozenset({
     # They are the gap this phase exists to close: an envelope may not lose one.
     'scope', 'references', 'follow_ups', 'routed_to',
     # Added by this proxy, on both paths.
-    'remaining', 'conversation_id', 'expires_at',
+    'remaining', 'conversation_id', 'expires_at', 'turn_id',
 })
 
 #: Keys that ride on an SSE frame body rather than on the answer envelope. `error` is
@@ -97,7 +97,7 @@ LIVE_ONLY_KEYS = frozenset({'routed_to'})
 #: `should_fillTurn`/`presentFacts` reads them; the named ones are the task's list.
 RESTORED_TURN_KEYS = frozenset({
     'asked', 'answer', 'verified', 'scope', 'references', 'follow_ups', 'a2ui',
-    'flags', 'steps', 'ordinal',
+    'flags', 'steps', 'ordinal', 'turn_id',
 })
 
 DEMO = Path(__file__).resolve().parent
@@ -264,9 +264,21 @@ class AskPathParityTests(TestCase):
 
         self.assertEqual(sorted(json_body), sorted(stream_body),
                          'the two ask paths disagree about the envelope key set')
-        for key in sorted(PUBLISHED_ENVELOPE_KEYS):
+        # `turn_id` is the one key two requests cannot agree about: it names the row
+        # each answer was stored as, and these are two different turns. It is held to
+        # the store immediately below instead, which is the stronger check anyway —
+        # two paths that both wrote the same id would pass an equality test and be
+        # wrong about one of them.
+        for key in sorted(PUBLISHED_ENVELOPE_KEYS - {'turn_id'}):
             with self.subTest(key=key):
                 self.assertEqual(json_body[key], stream_body[key])
+
+        conversation = Conversation.objects.get(pk=json_body['conversation_id'])
+        answered = list(conversation.turns.filter(role=Turn.Role.AGENT)
+                        .order_by('ordinal'))
+        self.assertEqual([json_body['turn_id'], stream_body['turn_id']],
+                         [row.pk for row in answered],
+                         'each answer must name the row it was stored as')
 
     @patch('demo.views.ask_agent_stream')
     @patch('demo.views.ask_agent')
@@ -393,14 +405,34 @@ class RestoredTurnShapeTests(TestCase):
         turn = self._restored()
         live = set(AGENT_REPLY) - LIVE_ONLY_KEYS
         # `turn_payloads` publishes `flags` where the agent says `guardrail_flags`, and
-        # adds the two coordinates a rating needs. Those are the only differences, and
+        # adds the coordinates a rating needs. Those are the only differences, and
         # naming them here is the point: a second difference would be a field one
-        # renderer gets and the other does not.
+        # renderer gets and the other does not. Both carry `turn_id`, which is why it
+        # does not appear below.
         self.assertEqual(live - set(turn),
                          {'guardrail_flags', 'question', 'model', 'code_revision',
                           'langfuse_trace_id', 'mcp_transport', 'tool_calls',
                           'sources', 'literature'})
-        self.assertEqual(set(turn) - live, {'flags', 'ordinal', 'asked'})
+        self.assertEqual(set(turn) - live, {'flags', 'ordinal', 'asked', 'turn_id'})
+
+    def test_every_restored_turn_names_its_own_row(self):
+        """The identity a rating sends, restored: distinct per turn and the stored one.
+
+        The defect this replaces was invisible to every existing test because each of
+        them built one turn. A page counter and a row id agree on turn 1; they disagree
+        from the second turn onward, and a reload makes them disagree about the first.
+        """
+        record_answer(self.conversation, dict(AGENT_REPLY), asked='/meds')
+        record_answer(self.conversation, dict(AGENT_REPLY), asked='/labs')
+
+        restored = turn_payloads(self.conversation)
+        stored = list(self.conversation.turns.filter(role=Turn.Role.AGENT)
+                      .order_by('ordinal'))
+
+        self.assertEqual([turn['turn_id'] for turn in restored],
+                         [row.pk for row in stored])
+        self.assertNotEqual(restored[0]['turn_id'], restored[1]['turn_id'],
+                            'two turns sharing an identity is the bug, not a detail')
 
 
 class SourceKeyAgreementTests(SimpleTestCase):

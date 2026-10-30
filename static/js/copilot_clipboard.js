@@ -79,8 +79,10 @@
       var link = document.createElement('a');
       link.href = url;
       // Named for the turn, so two exports from one thread do not overwrite each other.
-      link.download = 'ecc-turn-'
-        + String(turnIdOf()).replace(/[^a-zA-Z0-9]+/g, '-') + '.tsv';
+      // The stored row id where there is one; a turn the server did not store still
+      // exports, so it falls back to a name rather than writing `ecc-turn-.tsv`.
+      var named = String(turnIdOf() || '').replace(/[^a-zA-Z0-9]+/g, '-');
+      link.download = 'ecc-turn-' + (named || 'unsaved') + '.tsv';
       document.body.appendChild(link);
       link.click();
       link.remove();

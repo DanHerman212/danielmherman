@@ -12,10 +12,13 @@ Three rules, the same three `services/agent/observability.py` earned:
    exceptions. The endpoint answers 204 regardless: the reader has already moved on,
    and there is nothing they could do about a score that did not land.
 
-2. **Unconfigured means off, silently.** No host or no keys, no call and no warning.
-   The site needs this for scores only; it is not a tracing dependency, and a demo
-   deployment without Langfuse credentials is a supported state rather than a
-   misconfiguration.
+2. **Unconfigured means off, but not silently.** No host or no keys, no call — and one
+   warning naming what is missing. The site needs this for scores only; it is not a
+   tracing dependency, and a demo deployment without Langfuse credentials is a supported
+   state rather than a misconfiguration. What is not supported is looking like a working
+   feature: until 2026-10-30 this returned False with no log at all, so a service missing
+   all three variables answered every rating exactly as a service that recorded it, and
+   the reader's judgement was dropped in silence for as long as nobody compared the two.
 
 3. **A turn with no trace is not an error.** Tracing may be off, or the run may never
    have started. The caller drops the rating quietly rather than reporting it.
@@ -47,9 +50,18 @@ SCORE_NAME = 'user-feedback'
 TIMEOUT_SECONDS = 3.0
 
 
+def missing() -> list[str]:
+    """The environment variables this deployment has not been given.
+
+    Named rather than counted: a warning that says "not configured" sends whoever reads
+    it to the deploy config to guess, and the fix is always the same list of three.
+    """
+    return [name for name in _ENV_VARS if not (os.environ.get(name) or '').strip()]
+
+
 def configured() -> bool:
     """True when this deployment can record a score. Says nothing about reachability."""
-    return all((os.environ.get(name) or '').strip() for name in _ENV_VARS)
+    return not missing()
 
 
 def score(trace_id: str, value: int, *, comment: str = '') -> bool:
@@ -69,7 +81,12 @@ def score(trace_id: str, value: int, *, comment: str = '') -> bool:
     the live API on 2026-10-17: two posts with one id leave exactly one row whose value
     is the later one.
     """
-    if not trace_id or not configured():
+    if not trace_id:
+        return False
+    if not configured():
+        logger.warning(
+            'langfuse scoring is off for this service: %s unset, so this rating was '
+            'dropped rather than recorded', ', '.join(missing()))
         return False
 
     host = os.environ['LANGFUSE_HOST'].strip().rstrip('/')

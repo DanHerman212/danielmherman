@@ -22,7 +22,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from .agent_client import AgentError, AgentRefused
-from .conversations import MAX_REPLAYED_TURNS, replay_turns
+from .conversations import MAX_REPLAYED_TURNS, replay_turns, turn_payloads
 from .fixtures import AGENT_IMPORTABLE, AGENT_MISSING, SLASH_COMMANDS
 from .models import Conversation, DemoPatient, DemoQuota, Turn
 
@@ -416,7 +416,10 @@ class FeedbackTraceScoreTests(TestCase):
         self.url = reverse('demo:feedback')
 
     def _answered(self, ordinal, trace):
-        """One stored turn: the user row and the agent row `record_answer` writes."""
+        """One stored turn: the user row and the agent row `record_answer` writes.
+
+        Returns the agent row, because that is the identity a rating names.
+        """
         Turn.objects.create(conversation=self.conversation, ordinal=ordinal,
                             role=Turn.Role.USER, question='q')
         return Turn.objects.create(
@@ -431,34 +434,108 @@ class FeedbackTraceScoreTests(TestCase):
 
     def test_a_rating_lands_on_the_trace_of_the_turn_it_names(self):
         self._answered(1, 'trace-first')
-        self._answered(3, 'trace-second')
+        second = self._answered(3, 'trace-second')
 
         with patch('demo.langfuse_scores.score', return_value=True) as scored:
-            response = self._rate(f'{self.conversation.pk}:2', -1)
+            response = self._rate(str(second.pk), -1)
 
         self.assertEqual(response.status_code, 204)
         scored.assert_called_once_with('trace-second', -1)
 
-    def test_a_turn_that_was_not_traced_is_not_scored(self):
-        self._answered(1, '')
+    def test_a_rating_after_a_reload_scores_the_turn_on_screen(self):
+        """The defect, as a test: a reloaded thread used to rate its first answer.
+
+        The console composed `turn_id` from a page-local counter, so the first turn it
+        drew after a reload was always `:1` whatever the reader was looking at. Here the
+        identity comes from the payload the restore path sends — the stored row's own
+        key — so a rating on the last restored turn reaches the last turn's trace.
+        """
+        self._answered(1, 'trace-first')
+        self._answered(3, 'trace-second')
+        self._answered(5, 'trace-third')
+
+        restored = turn_payloads(self.conversation)
 
         with patch('demo.langfuse_scores.score', return_value=True) as scored:
-            self._rate(f'{self.conversation.pk}:1', 1)
+            self._rate(str(restored[-1]['turn_id']), 1)
+
+        scored.assert_called_once_with('trace-third', 1)
+
+    def test_a_rating_naming_a_question_row_is_ignored(self):
+        """Only an answer has a trace. A half-turn is two rows and one identity."""
+        self._answered(1, 'trace-first')
+        asked = self.conversation.turns.get(role=Turn.Role.USER)
+
+        with patch('demo.langfuse_scores.score', return_value=True) as scored:
+            self._rate(str(asked.pk), 1)
+
+        scored.assert_not_called()
+
+    def test_a_rating_naming_another_readers_turn_is_ignored(self):
+        """A score is written into a shared Langfuse project, so the lookup is scoped.
+
+        Nothing in the console can produce this: the ids only ever travel to the reader
+        whose turn they are. A hand-written request can, and a rating is not worth an
+        authorisation hole.
+        """
+        other = User.objects.create_user('someone-else', password='x')
+        theirs = Conversation.objects.create(user=other, patient=self.patient)
+        Turn.objects.create(conversation=theirs, ordinal=1, role=Turn.Role.USER,
+                            question='q')
+        turn = Turn.objects.create(conversation=theirs, ordinal=2,
+                                   role=Turn.Role.AGENT, answer='a',
+                                   langfuse_trace_id='trace-theirs')
+
+        with patch('demo.langfuse_scores.score', return_value=True) as scored:
+            self._rate(str(turn.pk), 1)
+
+        scored.assert_not_called()
+
+    def test_a_turn_that_was_not_traced_is_not_scored(self):
+        untraced = self._answered(1, '')
+
+        with patch('demo.langfuse_scores.score', return_value=True) as scored:
+            self._rate(str(untraced.pk), 1)
 
         scored.assert_not_called()
 
     def test_a_rating_for_a_turn_that_was_never_stored_is_skipped(self):
-        """The client sends `unsaved:1` when the conversation id had not arrived."""
+        """The old counter's names, and a row that does not exist.
+
+        `unsaved:1` is what the console sent before the conversation id had arrived; a
+        bare ordinal is what it sent afterwards. Neither is a row id, and both used to
+        be interpreted as one.
+        """
         with patch('demo.langfuse_scores.score', return_value=True) as scored:
             self._rate('unsaved:1', 1)
+            self._rate('1', 1)
 
         scored.assert_not_called()
 
+    def test_an_unconfigured_service_says_so_rather_than_failing_silently(self):
+        """The production failure of 2026-10-30: a working turn, a dropped rating.
+
+        The site service was deployed without the three Langfuse variables, so `score()`
+        returned False before its `try` and logged nothing — the same 204 a successful
+        rating returns, with no warning anywhere to say the feature was off. It now says
+        which variables are missing, by name, because the fix is always that list.
+        """
+        turn = self._answered(1, 'trace-first')
+
+        with patch.dict(os.environ, {'LANGFUSE_HOST': '', 'LANGFUSE_PUBLIC_KEY': '',
+                                     'LANGFUSE_SECRET_KEY': ''}):
+            with self.assertLogs('demo.langfuse_scores', level='WARNING') as captured:
+                self._rate(str(turn.pk), 1)
+
+        message = ' '.join(captured.output)
+        self.assertIn('LANGFUSE_HOST', message)
+        self.assertIn('LANGFUSE_SECRET_KEY', message)
+
     def test_a_score_that_could_not_be_recorded_still_answers_204(self):
-        self._answered(1, 'trace-first')
+        turn = self._answered(1, 'trace-first')
 
         with patch('demo.langfuse_scores.score', return_value=False):
-            response = self._rate(f'{self.conversation.pk}:1', 1)
+            response = self._rate(str(turn.pk), 1)
 
         self.assertEqual(response.status_code, 204)
 

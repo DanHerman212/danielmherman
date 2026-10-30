@@ -74,11 +74,6 @@
      submission cannot inherit it. */
   var declaredIntent = '';
 
-  /* Turns carry no server id in the browser, so one is minted here: the conversation it
-     belongs to and its ordinal within that conversation. Stable for as long as the
-     thread is on screen, which is as long as a rating can be given. */
-  var turnOrdinal = 0;
-
   /* The thread on screen and the patient it belongs to live in
      `copilot_threads.js`, along with the sidebar that renders them: they are facts
      about the thread rather than about the feed, and the feed asks for them at the
@@ -195,6 +190,9 @@
      what lets the request outlive the page. */
   function postFeedback(turnId, score) {
     if (!feedbackUrl) return;
+    // A turn the server never stored has nothing to attach a rating to. It used to send
+    // `unsaved:1` and be dropped at the other end; the console does not send it at all.
+    if (!turnId) return;
     fetch(feedbackUrl, {
       method: 'POST',
       headers: {
@@ -359,16 +357,17 @@
     var actions = el('div', 'cp-turn-actions');
     actions.hidden = true;
 
-    /* A turn's own id is composed when a rating is sent, not when the turn is built.
+/* The stored answer's own id, set as soon as the payload carrying it arrives.
 
-       The conversation's id arrives with the first answer rather than before it, so a
-       turn that minted its id on creation logged `unsaved:1` — a rating that identifies
-       nothing and cannot be joined to a trace, which is the only thing it is for. */
-    var ordinal = ++turnOrdinal;
+     This is the identity a rating is sent under, and it comes from the server rather
+     than from the page. Until 2026-10-30 the console composed `<conversation>:<n>` from
+     `++turnOrdinal`, a counter that restarts at 1 on every load, so a rating on a
+     restored thread named whichever answer came first in the conversation — and on a
+     thread longer than this page had drawn, named nothing at all. Only the row that
+     stored the answer knows which row stored the answer. */
+    var storedTurnId = '';
     function thisTurnId() {
-      // Read at click time, from the module that owns it: a turn is rated after the
-      // turn that minted its ordinal, and by then the thread may have moved on.
-      return (window.CopilotThreads.conversationId() || 'unsaved') + ':' + ordinal;
+      return storedTurnId;
     }
 
     var answers = window.CopilotAnswer.create({
@@ -449,6 +448,13 @@
 
     function presentFacts(payload) {
       latest = payload;
+      // Both paths arrive here — a live answer through the `answer` frame and a restored
+      // turn through `turn_payloads` — so this is the one place the turn learns which
+      // stored row it is. Read before anything draws, because the rating controls are
+      // built from it.
+      if (payload && payload.turn_id !== null && payload.turn_id !== undefined) {
+        storedTurnId = String(payload.turn_id);
+      }
       facts.present(payload);
     }
 

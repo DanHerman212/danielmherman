@@ -240,6 +240,10 @@ def turn_payloads(conversation):
             'a2ui': envelope,
             'flags': list(row.guardrail_flags or []),
             'ordinal': row.ordinal,
+            # The row's own identity, and the only thing a rating may name. A restored
+            # turn cannot recover it from anywhere else: the console used to send a
+            # counter of its own, which restarts at 1 on every page load.
+            'turn_id': row.pk,
             # Phase 4A-2. Defaulted for every turn stored before these existed, so a
             # thread spanning the change needs no special case anywhere downstream: a
             # turn without them sends an empty list and a null scope, and the console

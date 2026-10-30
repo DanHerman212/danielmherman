@@ -17,7 +17,7 @@ from django.http import HttpResponse
 from django.views.decorators.http import require_POST
 
 from .. import langfuse_scores
-from ..models import Conversation, Turn
+from ..models import Turn
 
 logger = logging.getLogger('demo.views')
 # The logger name is the one this endpoint has always logged under, and it is kept
@@ -54,44 +54,51 @@ def feedback(request):
 
     logger.info('a2ui feedback turn=%s score=%+d at=%s', turn_id or '-', score,
                 body.get('timestamp'))
-    attach_score(turn_id, score)
+    attach_score(turn_id, score, user=request.user)
     return HttpResponse(status=204)
 
 
-def attach_score(turn_id: str, value: int) -> None:
+def attach_score(turn_id, value, *, user=None):
     """Record the rating against the trace behind the turn, when there is one.
 
-    `turn_id` is `"<conversation id>:<n>"`, where `n` counts the turns the console has
-    drawn for that conversation. It is deliberately NOT a row id: the console composes
-    it and a turn is two rows. So the nth drawn turn is the nth stored AGENT row, in
-    ordinal order — matched that way rather than by arithmetic, because `2 * n` would
-    encode an implementation detail (a turn being a user row and an agent row) into a
-    lookup that only needs to agree with what the reader saw.
+    `turn_id` is the stored answer row's own key — sent with the answer by
+    `envelope.for_client` and again with every restored turn by `turn_payloads`. It is
+    the only identity that survives a reload: until 2026-10-30 the console sent
+    `"<conversation id>:<n>"` with `n` counted by `++turnOrdinal`, a page-local counter
+    that restarts at 1 each load. The two numbers agree only while one page draws the
+    conversation from its first answer, which is why production logged
+    `turn=219:12 has no stored answer to score` and then `turn=219:1` for the same
+    conversation four minutes later — one rating dropped, the next aimed at whichever
+    answer came first.
 
-    Everything here is best-effort. A rating for a turn that was never stored (the
-    client sends `unsaved:1` when the conversation id had not arrived) has no trace to
-    point at, and neither has one whose run was not traced at all.
+    `user` scopes the lookup. A rating is telemetry and cannot fail the reader, but it
+    can still be pointed at somebody else's turn by a hand-written request, and a score
+    is written against that turn's trace in a shared project.
+
+    Everything here is best-effort. A rating for a turn that was never stored has no
+    trace to point at, and neither has one whose run was not traced, and an unconfigured
+    Langfuse cannot record anything at all — which is said out loud below, because a
+    feature that is switched off should not answer exactly like one that works.
     """
-    conversation_ref, _, index = (turn_id or '').partition(':')
-    if not (conversation_ref.isdigit() and index.isdigit()):
-        return
-    ordinal = int(index)
-    if ordinal < 1:
+    try:
+        pk = int(str(turn_id or '').strip())
+    except (TypeError, ValueError):
+        logger.info('a2ui feedback turn=%r names no stored turn', turn_id)
         return
 
-    conversation = Conversation.objects.filter(pk=int(conversation_ref)).first()
-    if conversation is None:
+    stored = Turn.objects.filter(pk=pk, role=Turn.Role.AGENT)
+    if user is not None:
+        stored = stored.filter(conversation__user=user)
+    turn = stored.first()
+    if turn is None:
+        logger.info('a2ui feedback turn=%s is not a stored answer', turn_id)
         return
-    answered = list(
-        conversation.turns.filter(role=Turn.Role.AGENT).order_by('ordinal')
-    )
-    if ordinal > len(answered):
-        logger.info('a2ui feedback turn=%s has no stored answer to score', turn_id)
-        return
-    turn = answered[ordinal - 1]
     if not turn.langfuse_trace_id:
         logger.info('a2ui feedback turn=%s was not traced', turn_id)
         return
     if langfuse_scores.score(turn.langfuse_trace_id, value):
         logger.info('a2ui feedback turn=%s attached to trace %s', turn_id,
                     turn.langfuse_trace_id)
+    else:
+        logger.warning('a2ui feedback turn=%s could not be attached to its trace %s',
+                       turn_id, turn.langfuse_trace_id)
