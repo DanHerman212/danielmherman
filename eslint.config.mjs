@@ -51,7 +51,10 @@ export default [
     files: ['static/js/copilot_shell.js', 'static/js/copilot_app.js',
             'static/js/copilot_composer.js', 'static/js/copilot_threads.js',
             'static/js/copilot_tsv.js', 'static/js/copilot_reveal.js',
-            'static/js/copilot_draft.js', 'static/js/copilot_canvas.js'],
+            'static/js/copilot_draft.js', 'static/js/copilot_canvas.js',
+            'static/js/copilot_turn_facts.js', 'static/js/copilot_progress.js',
+            'static/js/copilot_answer.js', 'static/js/copilot_clipboard.js',
+            'static/js/copilot_ask.js'],
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: 'script',

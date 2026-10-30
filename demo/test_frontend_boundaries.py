@@ -31,6 +31,7 @@ STATIC_JS = Path(__file__).resolve().parents[1] / 'static' / 'js'
 TEMPLATE = Path(__file__).resolve().parent / 'templates' / 'demo' / 'a2ui_console.html'
 
 CANVAS = (STATIC_JS / 'copilot_canvas.js').read_text(encoding='utf-8')
+CLIPBOARD = (STATIC_JS / 'copilot_clipboard.js').read_text(encoding='utf-8')
 THREADS = (STATIC_JS / 'copilot_threads.js').read_text(encoding='utf-8')
 TSV = (STATIC_JS / 'copilot_tsv.js').read_text(encoding='utf-8')
 COMPONENTS = (STATIC_JS / 'a2ui_clinical_components.js').read_text(encoding='utf-8')
@@ -84,7 +85,7 @@ class FeedContractTests(SimpleTestCase):
     def test_the_tsv_exporter_is_a_frozen_namespace_with_two_members(self):
         self.assertEqual(_frozen_keys(TSV, 'CopilotTSV'),
                          {'percent', 'structuredRows'})
-        self.assertIn('window.CopilotTSV.structuredRows(', CANVAS)
+        self.assertIn('window.CopilotTSV.structuredRows(', CLIPBOARD)
 
 
 class ShadowBoundaryTests(SimpleTestCase):

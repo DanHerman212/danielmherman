@@ -25,6 +25,8 @@ from django.test import SimpleTestCase
 ROOT = Path(__file__).resolve().parents[1]
 STATIC_JS = ROOT / 'static' / 'js'
 CANVAS = (STATIC_JS / 'copilot_canvas.js').read_text(encoding='utf-8')
+ANSWER = (STATIC_JS / 'copilot_answer.js').read_text(encoding='utf-8')
+FACTS = (STATIC_JS / 'copilot_turn_facts.js').read_text(encoding='utf-8')
 REVEAL = (STATIC_JS / 'copilot_reveal.js').read_text(encoding='utf-8')
 DRAFT = (STATIC_JS / 'copilot_draft.js').read_text(encoding='utf-8')
 COMPONENTS = (STATIC_JS / 'a2ui_clinical_components.js').read_text(encoding='utf-8')
@@ -129,7 +131,7 @@ class SettleOrderTests(SimpleTestCase):
 
     def test_the_draft_is_poured_before_the_surface_is_mounted(self):
         start = _index(CANVAS, 'async function fillTurn')
-        end = _index(CANVAS, 'The frames of one run')
+        end = _index(CANVAS, 'async function send')
         body = CANVAS[start:end]
 
         self.assertLess(_index(body, 'await block.flushProse()'),
@@ -140,7 +142,7 @@ class SettleOrderTests(SimpleTestCase):
         self.assertNotIn("block.answer('')", CANVAS)
 
     def test_the_surface_is_laid_out_before_it_is_faded_in(self):
-        body = _function(CANVAS, 'function settle(surface) {')
+        body = _function(ANSWER, 'function settle(surface) {')
 
         # Both children share one grid cell, so the two answers overlap rather than stack.
         self.assertIn("classList.add('is-settling')", body)
@@ -177,11 +179,12 @@ class IslandWiringTests(SimpleTestCase):
         self.assertIn('firstPaintCap', REVEAL)
 
     def test_the_canvas_uses_the_two_namespaces_and_defines_neither(self):
-        self.assertIn('window.CopilotReveal.create(', CANVAS)
-        self.assertIn('window.CopilotDraft.partition(', CANVAS)
-        self.assertIn('window.CopilotDraft.segments(', CANVAS)
-        self.assertEqual(CANVAS.count('window.CopilotReveal ='), 0)
-        self.assertEqual(CANVAS.count('window.CopilotDraft ='), 0)
+        self.assertIn('window.CopilotReveal.create(', ANSWER)
+        self.assertIn('window.CopilotDraft.partition(', ANSWER)
+        self.assertIn('window.CopilotDraft.segments(', ANSWER)
+        for source in (CANVAS, ANSWER):
+            self.assertEqual(source.count('window.CopilotReveal ='), 0)
+            self.assertEqual(source.count('window.CopilotDraft ='), 0)
 
     def test_the_page_cache_busters_moved_with_the_code(self):
         # A rebuilt bundle behind an unchanged query string is a rebuild nobody sees.
@@ -194,10 +197,10 @@ class IslandWiringTests(SimpleTestCase):
         cannot tell that from the wording — the wording is the record's own — so the
         console says it. Two attempts to infer it from the words shipped wrong answers
         on 2026-10-25."""
-        self.assertIn("askFollowUp(question, buttons, 'follow_up')", CANVAS)
+        self.assertIn("askFollowUp(question, buttons, 'follow_up')", FACTS)
         # The declared value is one the agent's boundary accepts; the vocabulary is the
         # agent's, and `demo/test_wire_contract.py` carries the forwarded value across.
-        self.assertIn("'follow_up'", CANVAS)
+        self.assertIn("'follow_up'", FACTS)
 
 
 class JavascriptGateTests(SimpleTestCase):

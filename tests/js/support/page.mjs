@@ -130,7 +130,12 @@ export function boot(options = {}) {
   };
 
   ['copilot_reveal.js', 'copilot_draft.js', 'copilot_tsv.js',
-   'copilot_threads.js', 'copilot_canvas.js'].forEach((name) => {
+   'copilot_threads.js',
+   /* The five modules a turn is assembled from, in the order the template loads them;
+      `copilot_canvas.js` is the coordinator and boots last. */
+   'copilot_turn_facts.js', 'copilot_progress.js', 'copilot_answer.js',
+   'copilot_clipboard.js', 'copilot_ask.js',
+   'copilot_canvas.js'].forEach((name) => {
     window.eval(source(name));
   });
 

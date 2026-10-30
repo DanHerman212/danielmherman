@@ -325,5 +325,13 @@ of the scroll area while its own answer passes beneath it.
 <script src="{% static 'js/copilot_tsv.js' %}?v=1"></script>
 <script src="{% static 'js/copilot_reveal.js' %}?v=2"></script>
 <script src="{% static 'js/copilot_draft.js' %}?v=1"></script>
+{# The five modules a turn is assembled from, in the order they are created: what the #}
+{# turn says about itself, the run while it runs, the prose, the way it is taken away, #}
+{# and the wire. The canvas is the coordinator and loads last. #}
+<script src="{% static 'js/copilot_turn_facts.js' %}?v=1"></script>
+<script src="{% static 'js/copilot_progress.js' %}?v=1"></script>
+<script src="{% static 'js/copilot_answer.js' %}?v=1"></script>
+<script src="{% static 'js/copilot_clipboard.js' %}?v=1"></script>
+<script src="{% static 'js/copilot_ask.js' %}?v=1"></script>
 <script src="{% static 'js/copilot_canvas.js' %}?v=40"></script>
 {% endblock %}
