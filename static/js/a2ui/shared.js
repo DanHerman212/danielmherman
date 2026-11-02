@@ -117,8 +117,8 @@ const pubmedUrl = (pmid) => `https://pubmed.ncbi.nlm.nih.gov/${pmid}/`;
 //
 // It began as the inline marker's own style, defined inside the narrative's stylesheet. The
 // comparative table now cites the cohort its own figures come from, and a pill there has to
-// be the SAME pill: a reader who has learned that a rounded grey badge opens a source card
-// must not meet a second shape for the same idea one component down.
+// be the SAME pill: a reader who has learned that a rounded badge opens a source card must
+// not meet a second shape for the same idea one component down.
 const CITE_STYLES = css`
   .cite {
     font: inherit;
@@ -127,9 +127,14 @@ const CITE_STYLES = css`
     vertical-align: super;
     margin-left: 1px;
     padding: 1px 5px;
-    /* Editorial, not chunky: a soft slate fill on a hairline border reads as a footnote
-       marker beside the sentence rather than as a control competing with it. It is still
-       a button with a popover, and still focusable — the softening is visual only. */
+    /* A badge, not a block. inline-flex with an intrinsic width is what keeps the pill
+       its own size — the same rule serves the marker inside a sentence and the one in the
+       comparison table's source column, where a stretched button made the cell look like a
+       row of bibliography rather than a record being marked (2026-11-02). No backticks in
+       this block: it is a template literal, and one backtick ends it. */
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
     border: 1px solid #cbd5e1;
     border-radius: 999px;
     background: #f1f5f9;
@@ -149,8 +154,8 @@ const CITE_STYLES = css`
      section is this patient's own record, and a published cohort is somebody else's
      patients. The colour says which, and it is decided on the server — the pill carries a
      kind and this sheet draws it. Muted on purpose: neither channel is an alert. */
-  .cite-chart { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
-  .cite-chart:hover { background: #dbeafe; border-color: #93c5fd; }
+  .cite-note { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
+  .cite-note:hover { background: #dbeafe; border-color: #93c5fd; }
   .cite-literature { background: #ecfdf5; color: #047857; border-color: #a7f3d0; }
   .cite-literature:hover { background: #d1fae5; border-color: #6ee7b7; }
 

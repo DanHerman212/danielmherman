@@ -47,6 +47,7 @@ const ROW = {
     + 'Arthroplasty.',
   authors: 'Creager AE, Kleven AD, Kesimoglu ZN, et al.',
   journal: 'The Journal of Arthroplasty',
+  journal_abbrev: 'J Arthroplasty',
   year: '2022',
   reported_rate: '3.4%',
   cohort_summary: 'Elective primary total knee arthroplasty, single institution, 2015-2019.',
@@ -56,6 +57,7 @@ const ROW = {
   excerpt: 'The 30-day readmission rate was 3.4%.',
   source_index: 5,
   source_label: '5 · The Journal of Arthroplasty · 2022',
+  pill_label: 'J Arthroplasty',
 };
 
 const BASELINE = {
@@ -108,7 +110,11 @@ test('a row with a registered source renders the pill for that source', async ()
   const pill = pillOf(element);
   assert.ok(pill, 'the cohort that the table compares against has no citation pill');
   assert.equal(pill.dataset.cite, '5');
-  assert.equal(pill.textContent, '5 · The Journal of Arthroplasty · 2022');
+  // The journal alone: no reference number, no year. The number belongs to the references
+  // list, and the year is what made this cell a bibliography line in a table column.
+  assert.equal(pill.textContent, 'J Arthroplasty');
+  assert.ok(pill.classList.contains('cite-literature'),
+            'the cohort pill is not drawn in the literature channel colour');
   assert.equal(pill.getAttribute('aria-haspopup'), 'dialog');
   // A native title would draw the browser's own tooltip over the card this opens, which
   // is what a reader reported seeing instead of the card.
@@ -119,8 +125,7 @@ test('the source column is the citation, not the citation plus a raw identifier'
   const { element } = await mount();
 
   const cell = pillOf(element).closest('td');
-  assert.equal(cell.textContent.replace(/\s+/g, ' ').trim(),
-               '5 · The Journal of Arthroplasty · 2022');
+  assert.equal(cell.textContent.replace(/\s+/g, ' ').trim(), 'J Arthroplasty');
   assert.equal(cell.querySelectorAll('a').length, 0,
                'the pill column still repeats a raw PMID link');
 });

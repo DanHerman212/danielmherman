@@ -25,10 +25,11 @@ const tightenedAfterMarker = (text) => text.replace(DETACHED_PUNCTUATION, '$1');
 /**
  * What a pill prints.
  *
- * `pill_label` is resolved on the server: the short section name for a chart source
- * (`HPI`, `Hospital course`, `Discharge dx`), the journal and year for a published one.
- * The browser prints it and does not shorten it — a surface that decides how a citation
- * reads has taken an interpretation decision, and the backend owns those.
+ * `pill_label` is resolved on the server: the section name in Title Case for a note source
+ * (`Brief Hospital Course`, `Discharge Diagnosis`), the compact journal for a published one
+ * (`JAMA Netw Open`, `Spine`) — never the record number and never the year. The browser
+ * prints it and does not shorten it: a surface that decides how a citation reads has taken
+ * an interpretation decision, and the backend owns those.
  *
  * `label` is the references list's line: the same words with the number in front. A pill
  * is a footnote marker inside a sentence, so the number belongs one line below in the
@@ -112,7 +113,7 @@ const CitedNarrativeApi = {
       // What the marker says. Resolved on the server so the clinical vocabulary lives in
       // one module and this layer prints a string rather than composing one.
       pill_label: z.string().optional(),
-      // Which channel the evidence came from — `chart` or `literature` — so the pill can
+      // Which channel the evidence came from — `note` or `literature` — so the pill can
       // be coloured without the browser deciding what kind of source it is looking at.
       kind: z.string().optional(),
       // The line under the title on a published record — `Journal. Year. Authors. · PMID`
@@ -326,7 +327,7 @@ class CitedNarrativeElement extends A2uiLitElement {
     // a published cohort are coloured differently because they are weighed differently,
     // and which one this is has already been decided by the layer that resolved it.
     button.className = citation
-      ? `cite cite-${citation.kind === 'literature' ? 'literature' : 'chart'}`
+      ? `cite cite-${citation.kind === 'literature' ? 'literature' : 'note'}`
       : 'cite missing';
     button.dataset.cite = citation ? String(citation.index) : digits;
     button.textContent = pillText(citation, digits);

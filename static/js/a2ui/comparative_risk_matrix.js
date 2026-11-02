@@ -63,8 +63,13 @@ const _MATRIX_STYLES = css`
   .population { display: block; font-weight: 500; }
   .design { color: #64748b; font-size: 0.72rem; margin-top: 4px; }
   /* The source column holds a citation and nothing else. It used to stack a journal name,
-     a pill and a raw PMID link on one another, which is the same record told three times. */
+     a pill and a raw PMID link on one another, which is the same record told three times.
+     The pill is the compact journal the prose draws, sized to its own content rather than
+     to the column: the numbered journal-and-year line in this cell made the column the
+     widest in the table and read as a bibliography entry instead of a mark on a record.
+     No backticks in this block: it is a template literal, and one backtick ends it. */
   .source { white-space: nowrap; }
+  .source .cite { margin-left: 0; width: fit-content; }
   /* The abstract sits under its cohort rather than in a fifth column, and is clamped to
      three lines. Five text columns do not fit this console: measured at 759px, the excerpt
      column squeezed the cohort summary into eleven lines and the provenance into six,
@@ -135,10 +140,12 @@ const ComparativeRiskMatrixApi = {
       // Optional, and it stays optional: a turn composed before the agent registered
       // benchmarks is still a valid table, and a schema that demanded the number would
       // stop that table drawing at all.
-      // The inline pill beside the cohort. `pill_label` is the journal and the year,
-      // resolved on the server; `source_label` is the same words with the reference number
-      // in front. A table cell has room for the number and a sentence does not, so the row
-      // keeps the numbered form and the prose pill does not.
+      // The inline pill beside the cohort. `pill_label` is the compact journal —
+      // `JAMA Netw Open`, `Spine` — resolved on the server, the same string the prose
+      // pill prints; `source_label` is the numbered form, `4 · Journal · Year`, which
+      // stays on the row for the references list and is no longer drawn in the cell. A
+      // cell carrying the numbered form stretched the column and read as a bibliography
+      // line rather than as a mark on a record (2026-11-02).
       source_index: z.number().optional(),
       source_label: z.string().optional(),
       pill_label: z.string().optional(),
@@ -268,12 +275,12 @@ class ComparativeRiskMatrixElement extends A2uiLitElement {
                   <span class="under">${row.horizon_days || 30}-day</span></td>
                 <td class="source">${row.source_index === undefined
                   ? html`<span class="journal">${row.source}</span>`
-                  : html`<button class="cite" type="button"
+                  : html`<button class="cite cite-literature" type="button"
                                  data-cite=${String(row.source_index)}
                                  aria-haspopup="dialog" aria-expanded="false"
                                  aria-label="Reference ${row.source_index}: ${
-                                   row.title || row.source}">${row.source_label
-                                   || row.source}</button>`}</td>
+                                   row.title || row.source}">${row.pill_label
+                                   || row.journal || row.source}</button>`}</td>
               </tr>
             `)}
           </tbody>

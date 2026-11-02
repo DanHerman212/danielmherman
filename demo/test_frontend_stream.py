@@ -191,7 +191,7 @@ class IslandWiringTests(SimpleTestCase):
 
     def test_the_page_cache_busters_moved_with_the_code(self):
         # A rebuilt bundle behind an unchanged query string is a rebuild nobody sees.
-        self.assertIn("a2ui_clinical.js' %}?v=17", CONSOLE)
+        self.assertIn("a2ui_clinical.js' %}?v=18", CONSOLE)
         self.assertIn("copilot_canvas.js' %}?v=40", CONSOLE)
         self.assertIn("copilot_threads.js' %}?v=2", CONSOLE)
 

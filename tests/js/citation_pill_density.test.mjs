@@ -10,10 +10,10 @@
    pre-resolved data and "never parses or heals malformed citations"; interpretation is the
    backend's). The remediation moved both decisions to the server:
 
-   - `pill_label` arrives resolved (the short section name, or `Journal · Year`);
+   - `pill_label` arrives resolved (the section name in Title Case, or the compact journal);
    - a repeat of one citation inside a paragraph is collapsed in `postprocess/citations.py`
      and flagged on the trace;
-   - `kind` (`chart` / `literature`) arrives with the citation, and this sheet only colours
+   - `kind` (`note` / `literature`) arrives with the citation, and this sheet only colours
      by it.
 
    These tests pin that division: the pill prints what it was sent, colours by the kind it
@@ -49,11 +49,11 @@ const bundle = await import('../../static/js/a2ui_clinical_components.js');
 
 const CHART = {
   index: 1,
-  kind: 'chart',
+  kind: 'note',
   source: 'Discharge note',
   title: 'Brief hospital course',
   label: '1 · Brief hospital course',
-  pill_label: 'Hospital course',
+  pill_label: 'Brief Hospital Course',
 };
 const LITERATURE = {
   index: 4,
@@ -61,7 +61,7 @@ const LITERATURE = {
   source: 'World Neurosurgery. 2024. Proal JD, et al. · PMID 29950074',
   title: 'Readmission after lumbar spine surgery.',
   label: '4 · World Neurosurgery · 2024',
-  pill_label: 'World Neurosurgery · 2024',
+  pill_label: 'World Neurosurg',
   pmid: '29950074',
 };
 
@@ -78,22 +78,22 @@ async function settle(element) {
   await element.updateComplete;
 }
 
-test('the pill prints the server-resolved short label, not the numbered one', async () => {
+test('the pill prints the server-resolved label, not the numbered one', async () => {
   const element = mount('Admitted^[1].', [CHART]);
   await settle(element);
 
   const marker = element.shadowRoot.querySelector('button.cite');
-  assert.equal(marker.textContent, 'Hospital course');
+  assert.equal(marker.textContent, 'Brief Hospital Course');
   // The number is the references list's, and the list still has it.
   assert.equal(CHART.label, '1 · Brief hospital course');
 });
 
-test('a published pill prints its journal and year', async () => {
+test('a published pill prints its journal alone, with no number and no year', async () => {
   const element = mount('The rate was 4.1%^[PMID: 29950074].', [LITERATURE]);
   await settle(element);
 
   const marker = element.shadowRoot.querySelector('button.cite');
-  assert.equal(marker.textContent, 'World Neurosurgery · 2024');
+  assert.equal(marker.textContent, 'World Neurosurg');
 });
 
 test('the pill is coloured by the kind the server sent', async () => {
@@ -102,7 +102,7 @@ test('the pill is coloured by the kind the server sent', async () => {
   const literaturePill = mount('The rate was 4.1%^[PMID: 29950074].', [LITERATURE]);
   await settle(literaturePill);
 
-  assert.ok(chartPill.shadowRoot.querySelector('button.cite.cite-chart'));
+  assert.ok(chartPill.shadowRoot.querySelector('button.cite.cite-note'));
   assert.ok(literaturePill.shadowRoot.querySelector('button.cite.cite-literature'));
 });
 
@@ -125,7 +125,7 @@ test('a payload from an agent that predates the field still draws a pill', async
 
   const marker = element.shadowRoot.querySelector('button.cite');
   assert.equal(marker.textContent, '2 · Discharge diagnosis');
-  // No kind on the payload: the chart colour is the safe default, because an unlabelled
+  // No kind on the payload: the note colour is the safe default, because an unlabelled
   // source in this product is a note section.
-  assert.ok(marker.classList.contains('cite-chart'));
+  assert.ok(marker.classList.contains('cite-note'));
 });
