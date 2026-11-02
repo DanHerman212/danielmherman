@@ -87,6 +87,17 @@ const BLOCK_SETTLE = css`
   @media (prefers-reduced-motion: reduce) {
     :host { animation: none; }
   }
+
+  /* Printing (UX gap 1, 2026-11-02).
+
+     A composed block is one idea — a score and its bars, a cohort and its rate — and a
+     page break through the middle of one turns it into two half-statements. The settle
+     animation is also dropped: a printed page has no time axis, and an element caught
+     mid-fade prints at partial opacity. */
+  @media print {
+    :host { animation: none !important; break-inside: avoid; page-break-inside: avoid; }
+    :host(:not(:first-child)) { margin-top: 12pt; }
+  }
 `;
 
 // `^[2]` is the instructed form; `^[PMID: 35186616]` is the form the model reaches for

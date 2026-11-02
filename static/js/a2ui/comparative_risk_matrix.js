@@ -22,6 +22,16 @@ const _MATRIX_STYLES = css`
      browser sizes them from their longest word and the slack goes where it is useful. */
   .wrap { overflow-x: auto; }
   table { border-collapse: collapse; width: 100%; font-size: 0.82rem; }
+  /* Printing (UX gap 1, 2026-11-02). The table is a comparison, so it goes on one page or
+     it does not read as one: the horizontal scroller is released (a printed page cannot be
+     scrolled, so an overflowing table would lose its last column), and rows avoid the page
+     break while the table itself is allowed to break between them — a long cohort table
+     that cannot split would be pushed whole onto a page and leave the one before it empty. */
+  @media print {
+    .wrap { overflow: visible; }
+    table { break-inside: auto; page-break-inside: auto; }
+    tr, thead { break-inside: avoid; page-break-inside: avoid; }
+  }
   /* The pill beside a cohort, sized for a table cell rather than for a sentence. The
      shared sheet sets it as a superscript inside prose; here it sits on the baseline next
      to the journal, because a row has no sentence to hang it off. This sheet is parsed

@@ -1010,3 +1010,155 @@ button.cp-menu-item {
    at 300px — nine pixels of input is not a narrow layout, it is a broken one. */
 .cp-ask { flex-wrap: wrap; }
 .cp-ask-input { min-width: 140px; }
+
+/* ------------------------------------------------------------------
+   Printing a turn (UX gap 1, 2026-11-02).
+
+   Measured by printing `/demo/a2ui/` to PDF: one page, the answer clipped at the
+   viewport's edge, the sidebar down its left side and the composer laid across the
+   bottom of the text. The cause is the shell's own design — `.cp-app` is `100dvh` with
+   `overflow: hidden` and `.cp-feed` is the only thing that scrolls — which is exactly
+   right on screen and exactly wrong on paper, where there is no scrollport and whatever
+   it holds back is simply gone.
+
+   A printed turn is a document, so under `@media print` the shell stops being an
+   application: the chrome is removed, every height and overflow clamp is released so the
+   browser paginates the whole conversation, and the blocks that carry clinical meaning are
+   kept from splitting across a page break.
+
+   One thing CSS cannot do from here: the A2UI surface is drawn into shadow roots, so the
+   component-level print rules live in the components' own stylesheets
+   (`static/js/a2ui/shared.js`, `cited_narrative.js`, `comparative_risk_matrix.js`). This
+   block owns the page around them.
+   ------------------------------------------------------------------ */
+@media print {
+  /* ---- 1. Chrome that is an affordance, not a fact -----------------------------
+     None of it survives the page: a sidebar cannot be opened on paper, a composer cannot
+     be typed into, a rating control cannot be clicked. The turn's own content — the
+     question, the answer, the tables, the references, the follow-up questions — is kept,
+     because that is what a printed clinical note is. */
+  .cp-side,
+  .cp-head,
+  .cp-top,
+  .cp-context,
+  .cp-ask,
+  .cp-scrim,
+  .cp-status,
+  .cp-turn-actions,
+  #cp-side-toggle,
+  .cp-icon-btn,
+  .cp-btn,
+  .cp-menu {
+    display: none !important;
+  }
+
+  /* ---- 2. Release the viewport clamps -----------------------------------------
+     Every element from `html` down to the answer is told to size itself to its content.
+     Without this the browser prints one viewport-height of the FIRST page and stops,
+     which is the `1/1` page count that was reported. */
+  html,
+  body,
+  .cp,
+  .cp-app,
+  .cp-app-main,
+  .cp-feed,
+  .cp-answer,
+  .cp-turn,
+  .cp-turn-body,
+  .cp-turn-foot,
+  .cp-turn-trail,
+  .cp-references,
+  .cp-references > ol {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    position: static !important;
+    display: block !important;
+    float: none !important;
+  }
+
+  /* The shell is a row on screen and a column on paper: the sidebar is gone and the
+     surface takes the page width. */
+  .cp-app { flex-direction: column !important; }
+
+  /* The reading column keeps a measure, but a paper one: the page's own margins do the
+     centring, and a 960px cap would leave a turn narrower than the page it prints on. */
+  .cp-turn,
+  .cp-answer,
+  .cp-feed {
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: auto !important;
+  }
+
+  /* A pinned question becomes an ordinary heading on its own line — sticky positioning
+     and a backdrop blur have no meaning on a page, and the blur prints as a grey band. */
+  .cp-turn-head {
+    position: static !important;
+    margin: 0 0 6pt !important;
+    padding: 0 !important;
+    background: none !important;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  /* ---- 3. The references, which are the bibliography of the page -----------------
+     The drawer is a `<details>`: on screen a reader opens or closes it, and in print the
+     state they left it in would decide whether the bibliography exists. It is forced open
+     and its summary — a control — is removed, so the list always prints. Same reasoning
+     for a note row's clamped passage: two lines is a screen affordance, the whole passage
+     is the paper content, because there is nothing to click. */
+  .cp-references {
+    display: block !important;
+    border-top: 1px solid #e2e8f0;
+    margin-top: 10pt;
+  }
+  .cp-references > summary { display: none !important; }
+  .cp-references[open] > * { display: block !important; }
+  .cp-reference-list { display: block !important; }
+  .cp-reference-excerpt,
+  .cp-reference-item.is-open .cp-reference-excerpt {
+    -webkit-line-clamp: unset !important;
+    line-clamp: unset !important;
+    display: block !important;
+    overflow: visible !important;
+  }
+  .cp-reference-head { cursor: auto; }
+
+  /* ---- 4. Blocks that must not be split ---------------------------------------- */
+  .cp-reference-item,
+  .cp-follow-up,
+  .cp-turn-body > *,
+  .cp-canvas > * {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* The follow-up row asks the next question rather than answering this one, and a
+     printed clinical note of this kind carries it. Kept deliberately. */
+  .cp-follow-ups {
+    display: block !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* ---- 5. Type on paper --------------------------------------------------------
+     Ink is denser than a screen, so body text is set a shade larger; links lose their
+     colour so a printed answer survives a photocopy. `print-color-adjust` keeps a table's
+     tinted baseline row from being dropped by an ink-saving default, which would make the
+     patient's own row indistinguishable from the cohorts beside it. */
+  body { font-size: 11pt; color: #000; background: #fff; }
+  a { color: #000; text-decoration: none; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+
+/* The page itself. Margins are stated here rather than left to the browser's default so
+   a two-sided print has a usable gutter and the clinical table is not clipped by the
+   page edge. */
+@page {
+  size: auto;
+  margin: 14mm 12mm 16mm;
+}
