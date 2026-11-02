@@ -23,25 +23,20 @@ const DETACHED_PUNCTUATION = /^[ \t\u00a0]+([.,;:!?])/;
 const tightenedAfterMarker = (text) => text.replace(DETACHED_PUNCTUATION, '$1');
 
 /**
- * What a pill prints, when the label the server resolved is long.
+ * What a pill prints.
  *
- * The complaint this answers is a printed `/ehr` paragraph carrying `2 · Brief hospital
- * course` three times: the chart labels are the long ones, because a section name is a
- * phrase. A published record's label is already bounded where it is built — the agent
- * cuts the journal part to 25 characters and closes the pill with the year — so it is
- * left exactly as it arrives, and `1 · World Neurosurgery · 2024` still prints whole.
+ * `pill_label` is resolved on the server: the short section name for a chart source
+ * (`HPI`, `Hospital course`, `Discharge dx`), the journal and year for a published one.
+ * The browser prints it and does not shorten it — a surface that decides how a citation
+ * reads has taken an interpretation decision, and the backend owns those.
  *
- * The budget is 26 characters, which is what `2 · Brief hospital course` measures and what
- * a pill can occupy mid-sentence without pushing the line it sits in. A cut is marked: an
- * unmarked cut reads as the whole label, while `2 · Brief hospital co…` reads as one that
- * continues. The full label stays in the pill's accessible name and in the card it opens.
+ * `label` is the references list's line: the same words with the number in front. A pill
+ * is a footnote marker inside a sentence, so the number belongs one line below in the
+ * bibliography rather than beside every marker.
  */
-const LABEL_BUDGET = 26;
-const shortLabel = (label, citation) => {
-  const text = String(label ?? '');
-  if (citation?.pmid) return text;
-  if (text.length <= LABEL_BUDGET) return text;
-  return text.slice(0, LABEL_BUDGET - 1).trimEnd() + '\u2026';
+const pillText = (citation, digits) => {
+  if (!citation) return String(digits ?? '');
+  return String(citation.pill_label || citation.label || citation.pmid || digits);
 };
 
 
@@ -114,6 +109,12 @@ const CitedNarrativeApi = {
       // What the pill reads. Resolved on the server so the clinical and the bibliographic
       // vocabulary both live in one module; a payload without it falls back to the number.
       label: z.string().optional(),
+      // What the marker says. Resolved on the server so the clinical vocabulary lives in
+      // one module and this layer prints a string rather than composing one.
+      pill_label: z.string().optional(),
+      // Which channel the evidence came from — `chart` or `literature` — so the pill can
+      // be coloured without the browser deciding what kind of source it is looking at.
+      kind: z.string().optional(),
       // The line under the title on a published record — `Journal. Year. Authors. · PMID`
       // — so the card can be read as a citation rather than as a headline.
       subtitle: z.string().optional(),
@@ -239,18 +240,14 @@ class CitedNarrativeElement extends A2uiLitElement {
    * a marker sits mid-sentence: splitting the source would hand the renderer two
    * half-paragraphs and it would close each of them.
    *
-   * Two clean-ups happen here, both reported from a printed `/ehr` on 2026-11-02
-   * (UX gap 2), where one paragraph carried `2 · Brief hospital course` three times:
-   *
-   * - **A repeated source inside one block is drawn once.** A paragraph written from a
-   *   single section had a marker on every sentence, so the pills — not the prose — were
-   *   what the paragraph looked like. The repeat is dropped only when it names the SAME
-   *   single citation as the marker immediately before it in the same paragraph, which is
-   *   the narrowest reading of "the paragraph is from that section": a paragraph that
-   *   alternates two sources keeps every marker, and one that cites a second source and
-   *   returns to the first keeps the return.
-   * - **The pill prints a short form.** The full label stays in the accessible name and
-   *   in the card the pill opens, so nothing is lost but width.
+   * What this does NOT do, any more, is decide anything about the citation. An earlier
+   * revision suppressed a marker that repeated the previous one and cut a long label to a
+   * budget, and both were citation decisions taken in the browser — which the client
+   * architecture forbids (`01-client.md`: the browser "never parses or heals malformed
+   * citations"; presentation owns rendering, the backend owns interpretation). The
+   * repeat-collapse now lives in `postprocess/citations.py`, where it is flagged on the
+   * trace, and the short label arrives on the payload as `pill_label`. This file draws
+   * what it was sent.
    */
   _decorate() {
     const prose = this.renderRoot.querySelector('.prose');
@@ -258,9 +255,6 @@ class CitedNarrativeElement extends A2uiLitElement {
 
     const props = this.controller?.props || {};
     const citations = props.citations || [];
-    // The marker that was drawn last, per block: a paragraph, a list item, a heading.
-    // Keyed by the element so a paragraph split across several text nodes is one block.
-    const lastInBlock = new Map();
 
     const walker = document.createTreeWalker(prose, NodeFilter.SHOW_TEXT);
     const targets = [];
@@ -273,27 +267,10 @@ class CitedNarrativeElement extends A2uiLitElement {
       // consumed. Slicing while stepping through the same regex let `lastIndex`
       // drift ahead of the text it was indexing, so a marker went missing.
       const matches = [...node.data.matchAll(new RegExp(MARKER.source, MARKER.flags))];
-      const block = node.parentElement
-        ? node.parentElement.closest('p, li, h1, h2, h3, h4, blockquote')
-        : null;
       const fragment = document.createDocumentFragment();
       let cursor = 0;
       let afterMarker = false;
       for (const match of matches) {
-        const citation = this._citationFor(match[1], citations);
-        const key = citation ? String(citation.index) : null;
-        if (key !== null && block && lastInBlock.get(block) === key) {
-          // Already said in this paragraph, by the pill immediately before it. The marker
-          // and the space that carried it both go — and nothing else does: the gap here
-          // holds the prose written between the two markers, which is the paragraph.
-          const between = node.data.slice(cursor, match.index)
-            .replace(/[ \t\u00a0]+$/, '');
-          fragment.appendChild(
-            document.createTextNode(afterMarker ? tightenedAfterMarker(between) : between));
-          cursor = match.index + match[0].length;
-          afterMarker = true;
-          continue;
-        }
         // The gap before this marker belongs to the marker before it, so it is tightened
         // only when something was just replaced; the gap that opens the text node is
         // ordinary word spacing and is left as it was written.
@@ -301,7 +278,6 @@ class CitedNarrativeElement extends A2uiLitElement {
         fragment.appendChild(
           document.createTextNode(afterMarker ? tightenedAfterMarker(gap) : gap));
         fragment.appendChild(this._marker(match[1], citations));
-        if (key !== null && block) lastInBlock.set(block, key);
         cursor = match.index + match[0].length;
         afterMarker = true;
       }
@@ -331,12 +307,6 @@ class CitedNarrativeElement extends A2uiLitElement {
     // instead — by PMID. Position is tried first: it is the instructed form, and an index
     // is far too small to be mistaken for an eight-digit identifier.
     const citation = this._citationFor(digits, citations);
-    // What the marker says, resolved by the server so the clinical vocabulary lives in one
-    // module: `1 · Hospital Course` on a note turn, `1 · World neurosurgery · 2024` on a
-    // literature turn. The fallbacks are for a payload from an agent that predates the
-    // label — a bare number still answers its popover, so nothing breaks, it just reads
-    // the way it used to.
-    const label = citation?.label || citation?.pmid || digits;
 
     /* One control, whatever the citation is a citation to (Phase F, 2026-10-26).
      *
@@ -352,13 +322,14 @@ class CitedNarrativeElement extends A2uiLitElement {
      * its identifier so the gesture is still discoverable as "open this source". */
     const button = document.createElement('button');
     button.type = 'button';
-    button.className = citation ? 'cite' : 'cite missing';
+    // The channel the evidence came from, also resolved on the server. A chart source and
+    // a published cohort are coloured differently because they are weighed differently,
+    // and which one this is has already been decided by the layer that resolved it.
+    button.className = citation
+      ? `cite cite-${citation.kind === 'literature' ? 'literature' : 'chart'}`
+      : 'cite missing';
     button.dataset.cite = citation ? String(citation.index) : digits;
-    // A pill is set inside a sentence, so it prints the short form of the label and keeps
-    // the whole of it in its accessible name. `2 · Brief hospital course` beside every
-    // clause pulled the eye off the prose it was annotating; on a literature turn the
-    // label's own budget already holds, and this leaves it alone.
-    button.textContent = shortLabel(label, citation);
+    button.textContent = pillText(citation, digits);
     if (citation) {
       button.setAttribute('aria-haspopup', 'dialog');
       button.setAttribute('aria-expanded', 'false');

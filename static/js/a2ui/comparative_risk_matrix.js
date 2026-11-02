@@ -46,6 +46,13 @@ const _MATRIX_STYLES = css`
   tr.baseline td { background: rgba(37, 99, 235, 0.06); }
   tr.baseline td:first-child { box-shadow: inset 3px 0 0 #2563eb; }
   .rate { font-weight: 600; white-space: nowrap; }
+  /* The sentence explaining an empty cohort column. A muted footer row rather than a
+     coloured alert: nothing is wrong — the literature stated no 30-day rate for this
+     condition — and the reader is owed the reason, not a warning. */
+  .note-row td {
+    padding-top: 10px; color: #475569; font-size: 0.78rem; line-height: 1.45;
+    border-bottom: 0; white-space: normal;
+  }
   .under { display: block; font-weight: 400; font-size: 0.72rem; color: #475569;
            margin-top: 2px; }
   .pills { display: flex; flex-wrap: wrap; gap: 4px; }
@@ -97,9 +104,18 @@ const ComparativeRiskMatrixApi = {
       pmid: z.string(),
       source: z.string(),
       reported_rate: z.string(),
+      // How the figure reads: one value, a range, or two arms. Declared because the agent
+      // sends it and this schema is strict — an undeclared key fails the whole table
+      // rather than dropping one property.
+      rate_kind: z.string().optional(),
       cohort_summary: z.string(),
       evidence_tier: z.string(),
-      horizon_days: z.number(),
+      // The horizon the rate was verified at. Optional with a default at the RENDER rather
+      // than required here: a payload that predates the field still draws, and the cell
+      // says `30-day` because that is the only horizon this table is defined over. It was
+      // dropped from the agent's own row shape, and the column printed `-day` under every
+      // cohort — a table with a hole where the number belonged.
+      horizon_days: z.number().optional().default(30),
       url: z.string(),
       excerpt: z.string(),
       // The paper itself, carried beside the journal line. Optional, because a compact
@@ -119,8 +135,13 @@ const ComparativeRiskMatrixApi = {
       // Optional, and it stays optional: a turn composed before the agent registered
       // benchmarks is still a valid table, and a schema that demanded the number would
       // stop that table drawing at all.
+      // The inline pill beside the cohort. `pill_label` is the journal and the year,
+      // resolved on the server; `source_label` is the same words with the reference number
+      // in front. A table cell has room for the number and a sentence does not, so the row
+      // keeps the numbered form and the prose pill does not.
       source_index: z.number().optional(),
       source_label: z.string().optional(),
+      pill_label: z.string().optional(),
     })).default([]),
   }).strict(),
 };
@@ -190,10 +211,23 @@ class ComparativeRiskMatrixElement extends A2uiLitElement {
     if (!props) return nothing;
     const baseline = props.baseline;
     const rows = props.rows || [];
-    const horizon = rows.length ? `${rows[0].horizon_days}-day` : '';
+    // The horizon the cohorts were verified at. Read from the rows, and 30 when there are
+    // none to read it from: this table exists for the 30-day comparison, and a heading
+    // that said "Published  readmission rates" was the hole a reader reported.
+    const horizon = `${(rows[0] && rows[0].horizon_days) || 30}-day`;
+    // Where the table has to explain itself, if it does.
+    //
+    // `baseline_note` says which of the two empty cases this is: no cohort for this
+    // condition, or no estimate for this turn. It was drawn only when there was no
+    // baseline at all, so the common case — an estimate drawn alone because verification
+    // found no cohort — printed half a table with a blank where the cohorts go and no
+    // sentence saying why. It is a footer row when the baseline is on screen, and the
+    // caption above the table when it is not.
+    const aboveNote = baseline ? '' : (props.baseline_note || '');
+    const footerNote = rows.length || !baseline ? '' : (props.baseline_note || '');
 
     return html`
-      ${baseline ? nothing : html`<div class="note">${props.baseline_note}</div>`}
+      ${aboveNote ? html`<div class="note">${aboveNote}</div>` : nothing}
       <div class="wrap">
         <table aria-label=${baseline
           ? `This patient and published ${horizon} readmission rates`
@@ -231,7 +265,7 @@ class ComparativeRiskMatrixElement extends A2uiLitElement {
                   <div class="excerpt">${row.excerpt}</div>
                 </td>
                 <td class="rate">${row.reported_rate}
-                  <span class="under">${row.horizon_days}-day</span></td>
+                  <span class="under">${row.horizon_days || 30}-day</span></td>
                 <td class="source">${row.source_index === undefined
                   ? html`<span class="journal">${row.source}</span>`
                   : html`<button class="cite" type="button"
@@ -243,6 +277,13 @@ class ComparativeRiskMatrixElement extends A2uiLitElement {
               </tr>
             `)}
           </tbody>
+          ${footerNote ? html`
+            <tfoot>
+              <tr class="note-row">
+                <td colspan="3">${footerNote}</td>
+              </tr>
+            </tfoot>
+          ` : nothing}
         </table>
       </div>
       <citation-popover></citation-popover>

@@ -144,6 +144,16 @@ const CITE_STYLES = css`
   }
   .cite:hover { background: #e2e8f0; border-color: #94a3b8; }
   .cite:focus-visible { outline: 2px solid #1f2937; outline-offset: 1px; }
+
+  /* The two channels a citation can come from, which a reader weighs differently: a note
+     section is this patient's own record, and a published cohort is somebody else's
+     patients. The colour says which, and it is decided on the server — the pill carries a
+     kind and this sheet draws it. Muted on purpose: neither channel is an alert. */
+  .cite-chart { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
+  .cite-chart:hover { background: #dbeafe; border-color: #93c5fd; }
+  .cite-literature { background: #ecfdf5; color: #047857; border-color: #a7f3d0; }
+  .cite-literature:hover { background: #d1fae5; border-color: #6ee7b7; }
+
   /* The marker a drawer row has just opened, set by revealCitation. It lives here
      because this stylesheet already owns the marker's outline colour — the page used
      to write the same colour inline into a shadow node, at a different offset, which
