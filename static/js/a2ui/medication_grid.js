@@ -27,9 +27,11 @@ const _MEDS_STYLES = css`
      absence and leaves the drug names and the stated values to be scanned. */
   .missing { font-size: 0.75rem; color: #94a3b8; }
   /* The route, form or stated indication ("IV", "oral", "Dosepak", "for pain") when
-     the record gives one. It qualifies the drug, so it sits beside the name rather than
-     taking a column of its own. */
-  .context { font-size: 0.75rem; font-weight: 400; color: #64748b; margin-left: 6px; }
+     the record gives one. It is a regimen detail, so it belongs in the regimen columns:
+     beside the drug when a frequency is already there, and in the frequency column when
+     that is the only regimen the note states. */
+  .context { font-size: 0.75rem; font-weight: 400; color: #64748b; }
+  .medication .context { margin-left: 6px; }
   .incomplete { font-size: 0.75rem; color: #64748b; margin-top: 8px; }
 `;
 
@@ -68,6 +70,16 @@ class MedicationGridElement extends A2uiLitElement {
     if (rows.length === 0) return nothing;
 
     const dropped = Number(props.dropped_count) || 0;
+    // A field the note does not state. One mark rather than blank space, which reads as a
+    // rendering fault, and rather than a repeated phrase, which reads as a finding.
+    const absent = () => html`<span class="missing">—</span>`;
+    // The regimen column's value: the stated frequency, else the stated route or
+    // indication, else the mark. A narrative note writes "send her home with Medrol" and a
+    // ward note writes "IV morphine" — in both the route IS the regimen the record has,
+    // and a column that prints an em dash beside it says the record states nothing when it
+    // states something (2026-11-08).
+    const regimen = (row) => row.frequency
+      || (row.context ? html`<span class="context">${row.context}</span>` : absent());
     return html`
       <div class="grid">
         <table>
@@ -81,13 +93,11 @@ class MedicationGridElement extends A2uiLitElement {
           <tbody>
             ${rows.map((row) => html`
               <tr>
-                <td class="medication">${row.medication}${row.context
+                <td class="medication">${row.medication}${row.context && row.frequency
                   ? html`<span class="context">${row.context}</span>`
                   : nothing}</td>
-                <td class="dosage">${row.dosage
-                  || html`<span class="missing">—</span>`}</td>
-                <td class="frequency">${row.frequency
-                  || html`<span class="missing">—</span>`}</td>
+                <td class="dosage">${row.dosage || absent()}</td>
+                <td class="frequency">${regimen(row)}</td>
               </tr>
             `)}
           </tbody>

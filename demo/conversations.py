@@ -97,10 +97,33 @@ def record_answer(conversation, result, asked=''):
             langfuse_trace_id=_stored_trace_id(result.get('langfuse_trace_id')),
             citations=_stored_citations(result.get('sources')),
             presentation=_stored_presentation(result),
+            citation_map=_stored_citation_map(result.get('citation_map')),
             tool_calls=_stored_calls(result.get('tool_calls')),
             guardrail_flags=_stored_flags(result.get('guardrail_flags')),
         )
     return turn
+
+
+def _stored_citation_map(value):
+    """The answer's display-number → array-position map, as it will be replayed.
+
+    Keys are strings and values are integers, negative included: a turn that cites a
+    passage an EARLIER turn retrieved has a position below its own first unit, and that
+    is exactly the case the map exists to describe. Coercing or dropping those would
+    move a marker onto whatever evidence happened to hold position 1.
+
+    Anything that is not that shape is dropped rather than stored. The map is read back
+    as arithmetic on a citation's position, so a string value here would not be a wrong
+    number, it would be a turn the replay cannot compute.
+    """
+    if not isinstance(value, dict):
+        return {}
+    cleaned = {}
+    for key, position in value.items():
+        if isinstance(position, bool) or not isinstance(position, int):
+            continue
+        cleaned[str(key)] = position
+    return cleaned
 
 
 def _stored_flags(flags):
@@ -365,6 +388,12 @@ def replay_turns(conversation):
             'question': asked,
             'answer': _clamp(row.answer),
             'tool_calls': _replay_calls(row.tool_calls),
+            # The map this turn shipped with, so `restore_global_markers` can put the
+            # answer's `^[n]` back on the positions the evidence array gave its passages.
+            # Omitted for a turn stored before the column existed — a missing key and an
+            # empty map mean the same thing to the agent, and both fall back to the old
+            # behaviour of dropping numbers that no longer mean anything.
+            'citation_map': _stored_citation_map(row.citation_map),
         })
         asked = ''
 

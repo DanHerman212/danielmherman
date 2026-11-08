@@ -359,6 +359,22 @@ class Turn(models.Model):
     # draw has no presentation, and a turn stored before this column existed has none
     # either. Both render as prose, which is what the answer column holds.
     presentation = models.JSONField(default=dict, blank=True)
+    # {display number: array position}, turn-local — the agent's `citation_map`. The answer
+    # column holds the prose a reader saw, and its `^[n]` markers are the PAGE's numbering:
+    # settlement compacts them to `1..K` per turn so a reader is not shown a document with
+    # holes in it. The array they point into keeps its own cumulative numbering, so the two
+    # can only be reconciled by this map.
+    #
+    # Stored because it was not, and the cost was the whole thread: `replay_messages` hands
+    # `restore_global_markers` the map, and with `None` it falls back to deleting every
+    # numeric marker from the earlier answers. A follow-up was then written against a
+    # transcript whose earlier turns cited nothing, so it cited nothing either, and the
+    # model was never shown the pattern it was meant to imitate (2026-11-08).
+    #
+    # Empty is a real state: an answer that cites nothing has no map, and a turn stored
+    # before this column existed has none either. Both read as "no numbers to translate",
+    # which is what the replay did before the column existed.
+    citation_map = models.JSONField(default=dict, blank=True)
     # [{'name': 'predict_readmission', 'args': {…}, 'payload': {…}}]. The payload
     # is kept only where it cannot be re-derived; retrieval results are left out
     # and resolved again on replay.
