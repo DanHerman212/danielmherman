@@ -22,7 +22,14 @@ const _MEDS_STYLES = css`
      the digits line up, and no wrapping so a dose never breaks mid-value. */
   .dosage, .frequency { font-variant-numeric: tabular-nums; white-space: nowrap;
                         color: #334155; }
+  /* A field the note does not state: one mark, not the same three words on every row.
+     "not stated" repeated down a column reads as six findings; an em dash reads as an
+     absence and leaves the drug names and the stated values to be scanned. */
   .missing { font-size: 0.75rem; color: #94a3b8; }
+  /* The route, form or stated indication ("IV", "oral", "Dosepak", "for pain") when
+     the record gives one. It qualifies the drug, so it sits beside the name rather than
+     taking a column of its own. */
+  .context { font-size: 0.75rem; font-weight: 400; color: #64748b; margin-left: 6px; }
   .incomplete { font-size: 0.75rem; color: #64748b; margin-top: 8px; }
 `;
 
@@ -33,6 +40,10 @@ const MedicationGridApi = {
       medication: z.string(),
       dosage: z.string(),
       frequency: z.string(),
+      // The route, form or stated indication. Declared because the schema is strict: an
+      // undeclared key fails the whole component, and the agent sends this one on every
+      // row since 2026-11-08.
+      context: z.string().default(''),
     })).default([]),
     dropped_count: z.number().default(0),
     returned_passages: z.number().default(0),
@@ -70,11 +81,13 @@ class MedicationGridElement extends A2uiLitElement {
           <tbody>
             ${rows.map((row) => html`
               <tr>
-                <td class="medication">${row.medication}</td>
+                <td class="medication">${row.medication}${row.context
+                  ? html`<span class="context">${row.context}</span>`
+                  : nothing}</td>
                 <td class="dosage">${row.dosage
-                  || html`<span class="missing">not stated</span>`}</td>
+                  || html`<span class="missing">—</span>`}</td>
                 <td class="frequency">${row.frequency
-                  || html`<span class="missing">not stated</span>`}</td>
+                  || html`<span class="missing">—</span>`}</td>
               </tr>
             `)}
           </tbody>
