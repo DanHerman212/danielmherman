@@ -32,33 +32,37 @@
 </head>
 <body>
     <!-- Navigation-->
-     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark border-bottom border-secondary border-opacity-25">
         <div class="container">
-            <a class="navbar-brand" href="{% url 'home' %}">Dan Herman</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+            <a class="navbar-brand fw-semibold" href="{% url 'home' %}">
+                Dan Herman
+                <span class="badge bg-secondary bg-opacity-25 text-light fw-normal ms-2" style="font-size: 0.7rem; vertical-align: middle;">
+                    AI Systems Architect
+                </span>
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
                 <span class="navbar-toggler-icon"></span>
-        </button>
-        <div class="collapse navbar-collapse" id="navbarNav">
-            <ul class="navbar-nav ms-auto">
-                <li class="nav-item">
-                    <a class="nav-link" href="{% url 'home' %}">Home</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="{% url 'articles' %}">Articles</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="{% url 'resume' %}">Resume</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="{% url 'projects' %}">Projects</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="{% url 'contact' %}">Contact</a>
-                </li>
-            </ul>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto align-items-lg-center gap-lg-2">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'home' %}">Overview</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/projects/enterprise-clinical-copilot/">System Architecture</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'resume' %}">Bio &amp; Resume</a>
+                    </li>
+                    <li class="nav-item ms-lg-2 mt-2 mt-lg-0">
+                        <a class="btn btn-primary btn-sm px-3 fw-medium" href="/demo/">
+                            <i class="fas fa-terminal me-1"></i> Launch Live Demo
+                        </a>
+                    </li>
+                </ul>
+            </div>
         </div>
-    </div>
-</nav>  
+    </nav>
 
 <!-- Messags-->
 {% if messages %}
@@ -78,18 +82,26 @@
  </main>
 
  <!-- Footer -->
-<footer class="bg-dark text-white mt-5 py-4">
+<footer class="bg-dark text-white mt-5 py-5 border-top border-secondary border-opacity-25">
     <div class="container text-center">
-        <p>&copy; 2026 Dan Herman. All rights reserved.</p>
-        <p>
-            Developed in house with
-            <img src="https://static.djangoproject.com/img/logos/django-logo-negative.svg" alt="Django" height="25" style="vertical-align: bottom;">
-        </p>
-        <div class="social-links">
-            <a href="https://www.linkedin.com/in/danherman/" class="text-white me-3"><i class="fab fa-linkedin fa-2x"></i></a>
-            <a href="https://github.com/DanHerman212" class="text-white me-3"><i class="fab fa-github fa-2x"></i></a>
-            <a href="https://news.ycombinator.com/user?id=lazarus01" class="text-white me-3"><i class="fab fa-hacker-news fa-2x"></i></a>
+        <div class="mb-3">
+            <span class="text-secondary small text-uppercase fw-semibold d-block mb-1" style="letter-spacing: 0.08em;">
+                Direct Contact &amp; Demo Access
+            </span>
+            <a href="mailto:dan@danielmherman.com" class="text-white text-decoration-none fw-medium fs-5">
+                <i class="far fa-envelope me-2 text-primary"></i>dan@danielmherman.com
+            </a>
         </div>
+        <div class="social-links my-3">
+            <a href="https://www.linkedin.com/in/danherman/" class="text-white me-3" target="_blank" rel="noopener"><i class="fab fa-linkedin fa-2x"></i></a>
+            <a href="https://github.com/DanHerman212" class="text-white me-3" target="_blank" rel="noopener"><i class="fab fa-github fa-2x"></i></a>
+            <a href="https://news.ycombinator.com/user?id=lazarus01" class="text-white me-3" target="_blank" rel="noopener"><i class="fab fa-hacker-news fa-2x"></i></a>
+        </div>
+        <p class="text-secondary small mb-1">&copy; 2026 Dan Herman. All rights reserved.</p>
+        <p class="text-secondary small mb-0">
+            Developed in house with
+            <img src="https://static.djangoproject.com/img/logos/django-logo-negative.svg" alt="Django" height="22" style="vertical-align: bottom;">
+        </p>
     </div>
 </footer>
 

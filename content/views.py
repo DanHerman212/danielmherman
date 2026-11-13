@@ -42,14 +42,28 @@ def _article_categories():
     return Category.objects.filter(
         name__in=ARTICLE_CATEGORY_NAMES, is_active=True).order_by("order")
 
+
+FLAGSHIP_PROJECT_SLUG = "enterprise-clinical-copilot"
+
+
 class HomeView(TemplateView):
-    """Homepage View"""
+    """Homepage View — Command Center entry point."""
     template_name = 'content/home.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['categories'] = Category.objects.filter(is_active=True)
         context['featured_articles'] = Article.objects.filter(is_published=True)[:3]
+
+        flagship = Project.objects.filter(
+            slug=FLAGSHIP_PROJECT_SLUG, is_active=True
+        ).first()
+        context['flagship_project'] = flagship
+        if flagship and flagship.drilldown:
+            context['flagship_sections'] = decorate_sections(flagship.content)
+        else:
+            context['flagship_sections'] = []
+
         return context
     
 class CategoryView(ListView):
@@ -179,10 +193,20 @@ class ResumeView(TemplateView):
         return context
 
 class ProjectListView(ListView):
-    """Projects page"""
+    """Projects page.
+
+    Redirects directly to the flagship project detail page when active in the
+    database so visitors bypass placeholder cards. Falls back to the standard
+    list view when the flagship slug is absent (e.g., unit test fixtures).
+    """
     model = Project
     template_name = 'content/project_list.html'
     context_object_name = 'projects'
+
+    def get(self, request, *args, **kwargs):
+        if Project.objects.filter(slug=FLAGSHIP_PROJECT_SLUG, is_active=True).exists():
+            return redirect(f'/projects/{FLAGSHIP_PROJECT_SLUG}/')
+        return super().get(request, *args, **kwargs)
 
     def get_queryset(self):
         return Project.objects.filter(is_active=True)

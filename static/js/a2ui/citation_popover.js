@@ -4,6 +4,7 @@ import { html, css, nothing, LitElement } from 'lit';
 import { unsafeHTML } from 'lit/directives/unsafe-html.js';
 
 import { pubmedUrl } from './shared.js';
+import { formatCitationPreview } from './citation_preview.js';
 
 const POPOVER_STYLES = css`
   :host {
@@ -12,7 +13,8 @@ const POPOVER_STYLES = css`
     left: 0;
     z-index: 60;
     display: block;
-    width: min(340px, calc(100vw - 24px));
+    /* Wide enough to read a statistic, never wide enough to leave the window. */
+    width: min(400px, calc(100vw - 32px));
   }
   /* :host sets display, which would otherwise beat the user agent's [hidden]
      rule and leave a closed popover sitting on the page. */
@@ -23,9 +25,11 @@ const POPOVER_STYLES = css`
     border: 1px solid rgba(17, 24, 39, 0.18);
     border-radius: 10px;
     box-shadow: 0 14px 34px rgba(17, 24, 39, 0.18);
-    /* The card is a header rule and a body, so the padding has moved into them; the
-       overflow keeps the header's rule inside the rounded corner. */
-    overflow: hidden;
+    /* Capped to the window, and scrollable only when the reader has zoomed: the
+       preview is sized to fit, so the scroll is an accessibility fallback rather than
+       the way the card is normally read. */
+    max-height: min(360px, calc(100vh - 32px));
+    overflow: hidden auto;
     padding: 0;
     font-size: 0.85rem;
     line-height: 1.45;
@@ -37,6 +41,11 @@ const POPOVER_STYLES = css`
     gap: 6px;
     padding: 9px 10px 8px 14px;
     border-bottom: 1px solid #eef2f7;
+    /* The card can scroll when it is height-capped, and the way to the full list has
+       to stay reachable while it does. */
+    position: sticky;
+    top: 0;
+    background: #ffffff;
   }
   /* The eyebrow says what the card is, quietly, because the marker already said which
      reference it opens. */
@@ -74,6 +83,30 @@ const POPOVER_STYLES = css`
      one line, and truncating them would leave the reader unable to cite the paper. */
   .subtitle { margin: 3px 0 0; font-size: 0.76rem; color: #64748b; line-height: 1.4; }
   .excerpt { margin: 8px 0 0; color: #334155; }
+  /* A structured abstract is two labelled blocks: what the authors found, and what they
+     concluded from it. The labels are small and quiet because the text is the point. */
+  .block { margin: 9px 0 0; }
+  .block-label {
+    margin: 0 0 1px;
+    font-size: 0.68rem;
+    font-weight: 650;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: #64748b;
+  }
+  .block-text { margin: 0; color: #334155; }
+  /* A numbered clinical list reads as a list or not at all. */
+  .items { margin: 8px 0 0; padding-left: 1.15rem; color: #334155; }
+  .items li { margin: 0 0 3px; }
+  .items li.more {
+    list-style: none;
+    margin-left: -1.15rem;
+    font-size: 0.76rem;
+    color: #94a3b8;
+  }
+  /* The caveat that the card is showing less than the record holds. Muted, because it
+     is a hand-off rather than a warning. */
+  .disclosure { margin: 10px 0 0; font-size: 0.72rem; font-style: italic; color: #94a3b8; }
   .link { display: inline-block; margin-top: 8px; color: #1d4ed8; }
 `;
 
@@ -262,13 +295,23 @@ class CitationPopoverElement extends LitElement {
     const anchor = this._anchor.getBoundingClientRect();
     const box = this.getBoundingClientRect();
     const gap = 8;
+    //: The distance the card keeps from every window edge. Sixteen pixels is enough that
+    //: the shadow and the rounded corner are still off the edge, which is what makes the
+    //: card read as floating above the page rather than clipped by it.
+    const margin = 16;
     const height = box.height || 0;
-    // Below the marker when it fits, above it when it does not, clamped to the
-    // viewport either way.
-    const top = anchor.bottom + gap + height > window.innerHeight - gap
-      ? Math.max(gap, anchor.top - gap - height)
-      : anchor.bottom + gap;
-    const left = Math.max(gap, Math.min(anchor.left, window.innerWidth - box.width - gap));
+    const width = box.width || 0;
+    // Below the marker when the card fits there, above it when it does not, and then
+    // clamped into the window either way. The clamp is the part that failed: a card
+    // taller than the space under its marker kept its top and hung its last lines — a
+    // conclusion sentence, often — off the bottom of the window.
+    let top = anchor.bottom + gap;
+    if (top + height > window.innerHeight - margin) {
+      top = anchor.top - gap - height;
+    }
+    top = Math.max(margin, Math.min(top, window.innerHeight - height - margin));
+    const left = Math.max(margin,
+      Math.min(anchor.left, window.innerWidth - width - margin));
     this.style.top = `${Math.round(top)}px`;
     this.style.left = `${Math.round(left)}px`;
   }
@@ -389,6 +432,11 @@ class CitationPopoverElement extends LitElement {
     const citation = this.citation;
     if (!citation) return nothing;
 
+    // What a glance contains, decided by a pure function so the rule can be tested
+    // without a browser. The card is a preview; the reference list at the foot of the
+    // answer still carries the whole passage.
+    const preview = formatCitationPreview(citation.excerpt);
+
     return html`
       <div class="popover" tabindex="-1" role="dialog"
            aria-label="Citation ${citation.index}"
@@ -407,10 +455,36 @@ class CitationPopoverElement extends LitElement {
                      rel="noopener noreferrer">${citation.title}</a>`
             : citation.title}</p>
           <p class="subtitle">${citation.source}</p>
-          ${citation.excerpt ? html`<p class="excerpt">${citation.excerpt}</p>` : nothing}
+          ${this._previewBody(preview)}
+          ${preview.disclosure ? html`<p class="disclosure">Excerpt shown — click
+            “See all references” for full text</p>` : nothing}
         </div>
       </div>
     `;
+  }
+
+  /** The passage, drawn in whichever of the three shapes the formatter chose. */
+  _previewBody(preview) {
+    if (preview.layout === 'structured') {
+      return preview.blocks.map((block) => html`
+        <div class="block">
+          <p class="block-label">${block.label}</p>
+          <p class="block-text">${block.text}</p>
+        </div>
+      `);
+    }
+    if (preview.layout === 'list') {
+      return html`
+        <ol class="items">
+          ${preview.items.map((item) => html`<li>${item}</li>`)}
+          ${preview.moreCount > 0
+            ? html`<li class="more">+ ${preview.moreCount} more in References</li>`
+            : nothing}
+        </ol>
+      `;
+    }
+    const text = preview.blocks[0]?.text;
+    return text ? html`<p class="excerpt">${text}</p>` : nothing;
   }
 }
 

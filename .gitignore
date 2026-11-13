@@ -8,12 +8,16 @@ env/
 venv/
 .env
 .venv/
+.github/
 
 # Django
 db.sqlite3
 local_settings.py
 staticfiles/
 media/
+
+# software architecture alignment
+docs/architecture_alignment
 
 # Node dependencies — installed by `npm ci`, never committed.
 node_modules/
