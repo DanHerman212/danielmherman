@@ -17,8 +17,13 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { boot, settle } from './support/page.mjs';
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 const encoder = new TextEncoder();
 
@@ -128,6 +133,44 @@ test('the passage behind a claim is on screen, clamped, and the click opens it',
 
   assert.equal(row.classList.contains('is-open'), true);
   assert.equal(head.getAttribute('aria-expanded'), 'true');
+});
+
+test('opening a passage in the shelf does not send the reader back to the prose', async () => {
+  /* Reported live: a reader opened a citation's card, took its link to the shelf, and
+     the passage they clicked to expand threw the viewport back up to the sentence in the
+     answer. The row used to call the prose reveal as well as opening itself, and the
+     reveal scrolls its marker into the middle of the window — so the click that asked to
+     read a passage moved the reader away from it (2026-11-20).
+
+     Nothing here may move the viewport: the reader is already looking at the row. */
+  const { window, turn } = await draw([NOTE_ROW]);
+
+  const row = turn().querySelector('.cp-reference-item');
+  const head = row.querySelector('.cp-reference-head');
+
+  const scrolled = [];
+  window.Element.prototype.scrollIntoView = function scrollIntoView() {
+    scrolled.push(this);
+  };
+
+  head.click();
+
+  assert.equal(row.classList.contains('is-open'), true,
+               'the passage did not open');
+  assert.deepEqual(scrolled, [],
+                   'opening a passage scrolled the page, taking the reader off the row');
+});
+
+test('the row no longer reaches for the prose marker at all', async () => {
+  /* The behavioural test above is the property; this is the wiring. A drawer row exists
+     on turns whose prose holds no marker — a settled answer with `a2ui: null` has no
+     narrative to reveal — so there the call used to be a silent no-op and a DOM test
+     could not see it. Reading the source is how a call that has no effect on THIS page
+     still cannot come back. */
+  const source = readFileSync(join(ROOT, 'static/js/copilot_turn_facts.js'), 'utf8');
+
+  assert.equal(/revealMarker/.test(source), false,
+               'the drawer still calls the prose reveal, which scrolls the answer');
 });
 
 test('a literature turn lists its records in the drawer too', async () => {
@@ -245,6 +288,12 @@ test('the card\'s request for the full list opens it AT THE ROW IT NAMED', async
   assert.equal(row.classList.contains('is-target'), true,
                'the row the scroll landed on is not marked');
   assert.equal(focused, 1, 'the reader was sent to a row that did not take the caret');
+  // The reader lands on the PASSAGE: a jump that stopped at a two-line clamp left them one
+  // click short, and that click used to throw them back to the prose (2026-11-20).
+  assert.equal(row.classList.contains('is-open'), true,
+               'the jump landed on a clamped passage');
+  assert.equal(row.querySelector('.cp-reference-head').getAttribute('aria-expanded'),
+               'true');
 });
 
 test('a request with no index in it opens the list and stops at the list', async () => {

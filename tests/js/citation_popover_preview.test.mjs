@@ -96,7 +96,11 @@ test('the card hands off to the reference list when it withheld something', asyn
   const cue = popover.renderRoot.querySelector('.disclosure');
 
   assert.ok(cue, 'a card that dropped sections has to say so');
-  assert.match(cue.textContent, /See all references/);
+  // The cue names the omission and the destination. It used to name the button to press
+  // — "click ‘See all references’" — which is an instruction where the control belongs;
+  // the footer is now the control itself (2026-11-20).
+  assert.match(cue.textContent, /Excerpt shown/);
+  assert.match(cue.textContent, /full passage/);
 });
 
 test('a passage that was shown whole carries no hand-off cue', async () => {

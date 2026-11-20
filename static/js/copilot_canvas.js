@@ -387,7 +387,6 @@
       references: references,
       followUps: followUps,
       askFollowUp: askFollowUp,
-      revealMarker: answers.revealMarker,
       centreIntoView: centreIntoView,
     });
 

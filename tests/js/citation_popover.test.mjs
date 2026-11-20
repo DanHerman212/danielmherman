@@ -77,8 +77,8 @@ const AFTER_DELAY = 220;
 /** The rendered card, or null while the popover holds no citation. */
 const cardOf = (popover) => popover.renderRoot.querySelector('.popover');
 
-async function opened(text = 'Admitted^[1] and treated^[2]') {
-  const element = mount(text);
+async function opened(text = 'Admitted^[1] and treated^[2]', citations = CITATIONS) {
+  const element = mount(text, citations);
   await settle(element);
   const marker = element.shadowRoot.querySelector('button.cite[data-cite="1"]');
   const popover = element.shadowRoot.querySelector('citation-popover');
@@ -182,6 +182,60 @@ test('the card hands the reader to the full list and gets out of the way', async
   assert.equal(seen[0].bubbles, true);
   assert.equal(seen[0].composed, true);
   assert.equal(card(), null, 'the card stayed open on top of the list it was sent to');
+});
+
+/* A passage long enough that the card is showing less than the record holds, which is the
+   only case the foot of the card has anything to say. */
+const LONG_EXCERPT = 'The patient was admitted with decompensated heart failure and '
+  + 'diuresed to a net negative of four litres over three days, with conversion to oral '
+  + 'diuretic therapy before discharge. Renal function remained stable throughout and '
+  + 'potassium was repleted twice, the second time on the morning of discharge after a '
+  + 'level of 3.1. She walked the length of the corridor unaided on the final day, was '
+  + 'tolerating a regular diet, and was discharged home with a daily weight chart and a '
+  + 'follow-up appointment in the heart failure clinic two weeks later.';
+
+test('the foot of the card is the way to the full passage, not an instruction to find one',
+     async () => {
+       /* The footer used to be an italic sentence — "Excerpt shown — click ‘See all
+          references’ for full text" — which tells the reader where the button is instead
+          of being it. The card already knows the reader wants the rest of the passage, so
+          the footer is now the control that takes them to it, and it lands on the row
+          already open (2026-11-20). */
+       const { element, marker, popover, card } = await opened('Admitted^[1]', [{
+         index: 1,
+         source: 'Discharge note',
+         title: 'Hospital course',
+         excerpt: LONG_EXCERPT,
+       }]);
+
+       fire(marker, 'focusin');
+       await wait(20);
+
+       const seen = [];
+       element.addEventListener('citation-see-all', (event) => seen.push(event));
+
+       const footer = card().querySelector('.disclosure');
+       assert.ok(footer, 'a card showing an excerpt carried no way to the full passage');
+       assert.equal(footer.tagName, 'BUTTON',
+                    'the footer is a sentence where the action belongs');
+       assert.match(footer.textContent, /full passage/i);
+
+       footer.click();
+       await popover.updateComplete;
+
+       assert.equal(seen.length, 1, 'the footer did not announce the request');
+       assert.equal(seen[0].detail.index, 1, 'the request named no citation');
+       assert.equal(card(), null, 'the card stayed open on top of the list it was sent to');
+     });
+
+test('a passage shown whole carries no cue about truncation', async () => {
+  const { marker, card } = await opened();
+
+  fire(marker, 'focusin');
+  await wait(20);
+
+  assert.equal(card().querySelector('.disclosure'), null,
+               'a caveat about truncation was shown over text that was never truncated');
 });
 
 test('a marker that arrived detached from its full stop is set back against it', async () => {

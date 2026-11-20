@@ -584,6 +584,10 @@ button.cp-menu-item {
 .cp-reference-item {
   display: grid; grid-template-columns: 28px 1fr; align-items: start;
   padding-left: 0; border-left: 0;
+  /* A jump from the card centres this row AFTER opening its passage, so the row is at
+     its tallest when the scroll lands. The margin keeps the head clear of the drawer's
+     edge on a short viewport rather than tucking it under the fold. */
+  scroll-margin-block: 12px;
 }
 .cp-reference-index {
   padding-top: 1px; color: #94a3b8; font-size: 0.8rem; line-height: 1.5;
@@ -608,6 +612,15 @@ button.cp-menu-item {
 }
 .cp-reference-title { min-width: 0; }
 .cp-reference-head:hover .cp-reference-title { text-decoration: underline; }
+/* A row that toggles says so, and says which way. The caret is drawn from
+   `aria-expanded` rather than from a class the page would have to keep in step with it,
+   so the control's state and the control's appearance cannot disagree. A published
+   record's head is a link out and carries no attribute, so it gets no caret. */
+.cp-reference-head[aria-expanded]::after {
+  content: '\25BE'; flex: none; color: #64748b; font-size: 0.72rem;
+  line-height: 1; transition: transform 120ms ease-out;
+}
+.cp-reference-head[aria-expanded="true"]::after { content: '\25B4'; }
 .cp-reference-tag {
   flex: none; padding: 1px 8px; border: 1px solid #e2e8f0; border-radius: 999px;
   background: #f1f5f9; color: #64748b; font-size: 0.7rem; font-weight: 500;
@@ -1127,6 +1140,9 @@ button.cp-menu-item {
     overflow: visible !important;
   }
   .cp-reference-head { cursor: auto; }
+  /* A printed passage is always whole, so there is nothing to toggle and nothing to say
+     about toggling. The caret is a screen affordance. */
+  .cp-reference-head[aria-expanded]::after { content: none; }
 
   /* ---- 4. Blocks that must not be split ---------------------------------------- */
   .cp-reference-item,

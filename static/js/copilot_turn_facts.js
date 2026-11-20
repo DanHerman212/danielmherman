@@ -23,7 +23,6 @@
     var references = options.references;
     var followUps = options.followUps;
     var askFollowUp = options.askFollowUp;
-    var revealMarker = options.revealMarker;
     var centreIntoView = options.centreIntoView;
 
     var referenceMarkerTimer = null;
@@ -70,6 +69,11 @@
        that is the row to land on: a reader who asked about `5 · The Journal of
        Arthroplasty` wants row 5, not the top of a drawer holding five rows.
 
+       The reader lands on the PASSAGE, not on a clamp of it. The row opens before the
+       view moves, because a reader who asked to see the evidence for a claim and arrived
+       at two lines of it had one more click to make — and that click used to send them
+       back up to the prose (2026-11-20).
+
        The row is marked for a moment afterwards, because a smooth scroll ends somewhere
        and the reader has to be able to tell which of the rows it ended at. */
     function showReference(index) {
@@ -80,6 +84,10 @@
         target = references.querySelector(
           '[data-reference-index="' + Number(index) + '"]');
       }
+      // Only a note row opens: a published record's head is a link out of the page and
+      // carries no `aria-expanded` to set.
+      var openControl = target && target.querySelector('.cp-reference-head[aria-expanded]');
+      if (openControl) setOpen(target, openControl, true);
       centreIntoView(target || references);
       if (!target) return true;
       target.classList.add('is-target');
@@ -89,7 +97,8 @@
       }, 1600);
       // The caret travels with the view, so a keyboard reader arrives where the scroll
       // took them. The row's own control is focused rather than the drawer: the drawer's
-      // summary would put them back above the row they just asked for.
+      // summary would put them back above the row they just asked for. A published
+      // record's head is a link, which takes the caret the same way.
       var control = target.querySelector('.cp-reference-head');
       if (control) control.focus({ preventScroll: true });
       return true;
@@ -105,9 +114,8 @@
 
        A note passage cannot be a destination, because the passage is already in hand —
        the agent sent the text itself. So the row opens instead, showing the passage the
-       answer was drawn from and pointing at the sentence it supports. A row that only
-       named the section would be an audit trail that lists claims to go and check
-       somewhere else, which is not an audit trail. */
+       answer was drawn from. A row that only named the section would be an audit trail
+       that lists claims to go and check somewhere else, which is not an audit trail. */
     function referenceRow(row) {
       var item = el('li', 'cp-reference-item');
       var published = !!(row.url || row.pmid);
@@ -173,19 +181,29 @@
         // the click on that row already has a destination.
         if (!published) {
           // The passage is on screen already, clamped to two lines. The click is what
-          // unclamps it — and, as before, it is also what points at the sentence the
-          // passage supports, so the row reads as provenance rather than as a menu item.
+          // unclamps it, and that is all it does: it used to also scroll the prose back
+          // into view to point at the sentence the passage supports, which took the
+          // reader away from the passage they had just opened. A reader who wants the
+          // sentence has the number in the gutter and the marker in the answer, and a
+          // jump from the card lands on the row already open (2026-11-20).
           head.addEventListener('click', function () {
-            var opening = !item.classList.contains('is-open');
-            item.classList.toggle('is-open', opening);
-            head.setAttribute('aria-expanded', String(opening));
-            if (opening) revealMarker(row.index);
+            setOpen(item, head, !item.classList.contains('is-open'));
           });
         }
       }
 
       item.append(mark, main);
       return item;
+    }
+
+    /* Open or close one row's passage, in place.
+
+       One place, because two paths set it: the row's own click, and a citation's jump onto
+       the row it named. The caret and the stylesheet both read `is-open` and
+       `aria-expanded`, so a second copy of this pair is a second answer to "is it open". */
+    function setOpen(item, head, opening) {
+      item.classList.toggle('is-open', opening);
+      head.setAttribute('aria-expanded', String(opening));
     }
 
     function presentReferences(rows) {

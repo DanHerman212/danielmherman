@@ -104,9 +104,27 @@ const POPOVER_STYLES = css`
     font-size: 0.76rem;
     color: #94a3b8;
   }
-  /* The caveat that the card is showing less than the record holds. Muted, because it
-     is a hand-off rather than a warning. */
-  .disclosure { margin: 10px 0 0; font-size: 0.72rem; font-style: italic; color: #94a3b8; }
+  /* The caveat that the card is showing less than the record holds, and the control that
+     fixes it. It used to be an italic sentence TELLING the reader to click a button —
+     "Excerpt shown — click ‘See all references’ for full text" — which is an instruction
+     where the action belongs. The footer is now the action: the passage is one click
+     away, and it lands already open in the shelf. */
+  .disclosure {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin: 10px 0 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #1d4ed8;
+    text-align: left;
+    cursor: pointer;
+  }
+  .disclosure:hover { text-decoration: underline; }
   .link { display: inline-block; margin-top: 8px; color: #1d4ed8; }
 `;
 
@@ -456,8 +474,9 @@ class CitationPopoverElement extends LitElement {
             : citation.title}</p>
           <p class="subtitle">${citation.source}</p>
           ${this._previewBody(preview)}
-          ${preview.disclosure ? html`<p class="disclosure">Excerpt shown — click
-            “See all references” for full text</p>` : nothing}
+          ${preview.disclosure ? html`<button class="disclosure" type="button"
+                  @click=${(event) => this.seeAll(event)}
+                  >Excerpt shown — open the full passage ↓</button>` : nothing}
         </div>
       </div>
     `;
