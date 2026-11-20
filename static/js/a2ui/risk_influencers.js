@@ -95,12 +95,31 @@ const RiskInfluencersApi = {
 
 /* The question a clicked driver asks.
 
-   Composed here because this is the only place that knows the factor's name. It asks
-   what supports the driver rather than restating it: the bar already shows how much the
-   factor moved the estimate, and a question built from that number would be arithmetic
-   the reader did not ask for. */
+   One question for both driver affordances: the chip the service proposes under an answer
+   composes the same words from `shared.labels.driver_question`, so a reader who clicks the
+   bar and a reader who clicks the chip ask the same thing of the same evidence. They used
+   to differ — this one asked what the chart explains, the chip asked why the model weighed
+   it — and the two produced different shapes of answer (2026-11-20).
+
+   The verb agrees with the label. `PLURAL_LABELS` mirrors the set in `shared/labels.py`,
+   which is where the labels themselves come from: the widget is given the label and never
+   the feature key, so this is the only side that can agree with it. */
+const PLURAL_LABELS = new Set([
+  'procedures',
+  'prior inpatient days',
+  'prior admissions',
+  'recent ED visits',
+]);
+
+function labelIsPlural(label) {
+  return PLURAL_LABELS.has(String(label || '').trim());
+}
+
 function driverQuestion(label) {
-  return `What in this patient's chart explains ${label} as a readmission risk driver?`;
+  const text = String(label || '').trim();
+  if (!text) return '';
+  return `How ${labelIsPlural(text) ? 'do' : 'does'} ${text} affect this patient's `
+    + 'readmission risk?';
 }
 
 class RiskInfluencersElement extends A2uiLitElement {
@@ -164,7 +183,7 @@ class RiskInfluencersElement extends A2uiLitElement {
           ? html`<div class="empty">None.</div>`
           : rows.map((row) => html`
               <div class="factor" role="button" tabindex="0"
-                   title="Ask what supports ${row.label} as a driver"
+                   title="${driverQuestion(row.label)}"
                    @click=${() => ask(row)}
                    @keydown=${(event) => {
                      if (event.key === 'Enter' || event.key === ' ') {
