@@ -638,13 +638,13 @@
       question: typed,
       asked: heading,
     }, {
-      stage: function (label) {
-        // A stage that arrives after this turn has already drawn prose is the run going
-        // back for evidence: the model spoke, was sent to a tool or told to retrieve, and
-        // will answer again. What is on screen belongs to the first pass and is not the
-        // answer, so it is dropped here, at the frame that says so — the reader watches the
-        // run move on rather than watching a sentence arrive and be taken away.
-        if (block.hasProse()) block.abandonDraft();
+      stage: function (label, stageName) {
+        // A stage that arrives after this turn has already drawn prose is usually the run
+        // going back for evidence (e.g. a tool round). `verify` is the one exception: the
+        // model has finished speaking and the server is running post-hoc guardrails before
+        // `settle()` cross-fades the surface over the draft, so keeping the draft prevents
+        // the prose from vanishing between streaming and settlement.
+        if (block.hasProse() && stageName !== 'verify') block.abandonDraft();
         block.stage(label);
       },
       prose: function (text) { block.appendProse(text); },

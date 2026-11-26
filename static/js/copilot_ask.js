@@ -97,7 +97,7 @@
       // arrives after this turn has already drawn prose is the run going back for
       // evidence, and the turn decides what to do about that.
       var label = payload.label || payload.stage || name;
-      if (label) handlers.stage(label);
+      if (label) handlers.stage(label, payload.stage || name);
     }
 
     for (;;) {

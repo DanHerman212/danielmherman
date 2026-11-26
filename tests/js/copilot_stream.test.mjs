@@ -201,3 +201,23 @@ test('a clicked chip declares itself, because the agent cannot tell by reading i
   assert.equal(body.intent, 'follow_up');
   assert.equal(body.question, chip);
 });
+
+test('verify after streamed prose keeps the draft intact until settle', async () => {
+  const served = 'Acute decompensated heart failure was treated with IV diuretics.';
+  const { errors, draft, snapshots } = await drive([
+    frame('planning', { stage: 'planning', label: 'Planning the search' }),
+    frame('answer_delta', { stage: 'answer_delta', text: 'Acute decompensated heart failure ' }),
+    frame('answer_delta', { stage: 'answer_delta', text: 'was treated with IV diuretics.' }),
+    frame('verify', { stage: 'verify', label: 'Checking the answer against the record' }),
+    frame('answer', { answer: served, scope: 'patient_chart', verified: true,
+                      references: [], follow_ups: [] }),
+  ]);
+
+  assert.deepEqual(errors, []);
+  assert.equal(draft().textContent, served);
+
+  const firstDrawn = snapshots.findIndex((text) => text.includes('Acute decompensated'));
+  assert.notEqual(firstDrawn, -1, 'streamed prose never reached the DOM');
+  const clearedAfterDraw = snapshots.slice(firstDrawn).some((text) => text === '');
+  assert.equal(clearedAfterDraw, false, 'verify wiped the streamed draft before settlement');
+});
