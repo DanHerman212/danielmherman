@@ -466,6 +466,7 @@
       restore: progress.restore,
       say: progress.say,
       appendProse: answers.appendProse,
+      setCiteLabels: answers.setCiteLabels,
       hasProse: answers.hasProse,
       abandonDraft: answers.abandonDraft,
       flushProse: answers.flushProse,
@@ -638,7 +639,8 @@
       question: typed,
       asked: heading,
     }, {
-      stage: function (label, stageName) {
+      stage: function (label, stageName, citeLabels) {
+        if (citeLabels) block.setCiteLabels(citeLabels);
         // A stage that arrives after this turn has already drawn prose is usually the run
         // going back for evidence (e.g. a tool round). `verify` is the one exception: the
         // model has finished speaking and the server is running post-hoc guardrails before

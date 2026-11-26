@@ -127,6 +127,7 @@
     var streamed = '';   // every character released, for the block renderer
     var committed = 0;   // how many blocks have been rendered, so each is rendered once
     var tail = null;     // the element holding the unfinished block
+    var citeLabels = {}; // key ('1', '7', '39165878') -> pill label while streaming
 
     /* Which composed narrative this turn is drawing, once it exists.
 
@@ -219,12 +220,21 @@
 
     /* A citation marker during the draft. Not a control: there is nothing to open until
        the answer settles, and a button that opens nothing is worse than a marker that
-       plainly is not one. */
+       plainly is not one. Uses the server's pre-resolved pill label when available so
+       real section/journal tags stream in without `[1]`/`[7]` placeholders. */
     function markerPill(label) {
       var pill = el('span', 'cp-cite');
       pill.setAttribute('aria-hidden', 'true');
-      pill.textContent = label;
+      var key = String(label || '');
+      pill.textContent = citeLabels[key] || key;
       return pill;
+    }
+
+    function setCiteLabels(map) {
+      if (!map || typeof map !== 'object') return;
+      Object.keys(map).forEach(function (key) {
+        if (map[key]) citeLabels[String(key)] = String(map[key]);
+      });
     }
 
     /* Citation markers inside a finished block, as inert pills.
@@ -367,6 +377,7 @@
     return {
       prose: prose,
       appendProse: appendProse,
+      setCiteLabels: setCiteLabels,
       hasProse: hasProse,
       flushProse: flushProse,
       abandonDraft: abandonDraft,

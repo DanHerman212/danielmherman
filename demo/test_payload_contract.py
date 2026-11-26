@@ -67,7 +67,7 @@ PUBLISHED_ENVELOPE_KEYS = frozenset({
 
 #: Keys that ride on an SSE frame body rather than on the answer envelope. `error` is
 #: both: it is a terminal frame's name and the key a failed JSON response carries.
-FRAME_KEYS = frozenset({'text', 'swap', 'label', 'stage', 'error'})
+FRAME_KEYS = frozenset({'text', 'swap', 'label', 'stage', 'error', 'cite_labels'})
 
 #: The other three payloads the console reads, each with its own shape. They are named
 #: apart from the answer envelope rather than folded into it: a history row has no

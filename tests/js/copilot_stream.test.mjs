@@ -221,3 +221,35 @@ test('verify after streamed prose keeps the draft intact until settle', async ()
   const clearedAfterDraw = snapshots.slice(firstDrawn).some((text) => text === '');
   assert.equal(clearedAfterDraw, false, 'verify wiped the streamed draft before settlement');
 });
+
+test('reviewing cite_labels renders real section pills immediately while streaming', async () => {
+  const served = 'Ambulate as tolerated with posterior hip precautions.';
+  const { window, errors, draft, snapshots } = await drive([
+    frame('reviewing', {
+      stage: 'reviewing',
+      label: 'Reviewing the evidence',
+      cite_labels: { '7': 'Discharge Instructions' },
+    }),
+    frame('answer_delta', {
+      stage: 'answer_delta',
+      text: 'Ambulate as tolerated with posterior hip precautions ^[7].',
+    }),
+    frame('verify', { stage: 'verify', label: 'Checking the answer against the record' }),
+    frame('answer', { answer: served, scope: 'patient_chart', verified: true,
+                      references: [], follow_ups: [] }),
+  ]);
+
+  assert.deepEqual(errors, []);
+  assert.equal(draft().textContent, served);
+  assert.equal(
+    snapshots.some((text) => text.includes('Discharge Instructions')),
+    true,
+    'expected real section label pill in streamed draft',
+  );
+  assert.equal(
+    snapshots.some((text) => /\b7\b/.test(text)),
+    false,
+    `bare numeric placeholder leaked into streamed draft: ${JSON.stringify(snapshots)}`,
+  );
+  void window;
+});
