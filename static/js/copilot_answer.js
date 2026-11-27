@@ -233,14 +233,15 @@
     }
 
     /* A citation marker during the draft. Not a control: there is nothing to open until
-       the answer settles, and a button that opens nothing is worse than a marker that
-       plainly is not one. Uses the server's pre-resolved pill label when available so
-       real section/journal tags stream in without `[1]`/`[7]` placeholders. */
+       the answer settles. Uses compact numeric micro-pills so the draft matches the
+       settled micro-pill geometry without reflow, preserving resolved label metadata on
+       dataset.citeLabel when available. */
     function markerPill(label) {
       var pill = el('span', 'cp-cite');
       pill.setAttribute('aria-hidden', 'true');
       var key = String(label || '');
-      pill.textContent = citeLabels[key] || key;
+      if (citeLabels[key]) pill.dataset.citeLabel = citeLabels[key];
+      pill.textContent = key.length > 4 ? '·' : key;
       return pill;
     }
 
@@ -251,32 +252,68 @@
       });
     }
 
-    /* Citation markers inside a finished block, as inert pills.
-
-       The substitution the component makes once the answer settles, minus the
-       interaction. Done on the rendered DOM rather than on the markdown source, because a
-       marker sits mid-sentence: splitting the source would hand the renderer two
-       half-paragraphs and it would close each of them. */
+    /* Citation markers inside a finished block, as inert micro-pills grouped after
+       punctuation and deduplicated per paragraph block to match the settled view. */
     function decorateInert(host) {
-      var pattern = new RegExp(window.CopilotDraft.marker, 'gi');
+      var markerRe = new RegExp(window.CopilotDraft.marker, 'gi');
+      var clusterRe = new RegExp(
+        '([ \\t\\u00a0]*)(' + window.CopilotDraft.marker
+        + '(?:[ \\t\\u00a0,]*' + window.CopilotDraft.marker + ')*)'
+        + '([ \\t\\u00a0]*([.,;:!?]))?',
+        'gi',
+      );
       var walker = document.createTreeWalker(host, window.NodeFilter.SHOW_TEXT);
       var targets = [];
       while (walker.nextNode()) {
         if (walker.currentNode.data.indexOf('^[') !== -1) targets.push(walker.currentNode);
       }
+      var seenByBlock = new WeakMap();
       targets.forEach(function (node) {
+        var block = (node.parentElement && node.parentElement.closest('p, li, blockquote, dd'))
+          || host;
+        var seen = seenByBlock.get(block);
+        if (!seen) {
+          seen = new Set();
+          seenByBlock.set(block, seen);
+        }
         var found = [];
         var match;
-        pattern.lastIndex = 0;
-        while ((match = pattern.exec(node.data)) !== null) found.push(match);
+        clusterRe.lastIndex = 0;
+        while ((match = clusterRe.exec(node.data)) !== null) found.push(match);
         if (!found.length) return;
         var fragment = document.createDocumentFragment();
         var cursor = 0;
-        found.forEach(function (marker) {
+        found.forEach(function (cluster) {
           fragment.appendChild(
-            document.createTextNode(node.data.slice(cursor, marker.index)));
-          fragment.appendChild(markerPill(marker[1]));
-          cursor = marker.index + marker[0].length;
+            document.createTextNode(node.data.slice(cursor, cluster.index)));
+          var kept = [];
+          var inner;
+          markerRe.lastIndex = 0;
+          while ((inner = markerRe.exec(cluster[2])) !== null) {
+            var key = String(inner[1]);
+            if (seen.has(key)) continue;
+            seen.add(key);
+            kept.push(key);
+          }
+          var leadingSpace = cluster[1] || '';
+          var punct = cluster[4] || '';
+          var rest = node.data.slice(cluster.index + cluster[0].length);
+          var restStartsSpace = /^[ \t\u00a0]/.test(rest);
+          if (punct) {
+            fragment.appendChild(document.createTextNode(punct));
+            if (kept.length > 0) {
+              var pGroup = el('span', 'cp-cite-group');
+              kept.forEach(function (key) { pGroup.appendChild(markerPill(key)); });
+              fragment.appendChild(pGroup);
+            }
+          } else if (kept.length > 0) {
+            var iGroup = el('span', 'cp-cite-group');
+            kept.forEach(function (key) { iGroup.appendChild(markerPill(key)); });
+            fragment.appendChild(iGroup);
+          } else if (leadingSpace && !restStartsSpace) {
+            fragment.appendChild(document.createTextNode(leadingSpace));
+          }
+          cursor = cluster.index + cluster[0].length;
         });
         fragment.appendChild(document.createTextNode(node.data.slice(cursor)));
         node.parentNode.replaceChild(fragment, node);

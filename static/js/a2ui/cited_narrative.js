@@ -8,36 +8,21 @@ import z from 'zod';
 
 import { CITE_STYLES, MARKER, bindCitationMarkers } from './shared.js';
 
-/**
- * The whitespace a marker leaves behind, tightened.
- *
- * A marker is set inside a sentence, and a gap between the pill and the punctuation that
- * ends its clause reads as a space that has drifted: `… discontinued [1 · Course] .`
- * rather than `… discontinued [1 · Course].` The prose is written by a model, so the gap
- * is the model's; this seam is the only place that can close it without asking the model
- * to be careful about spacing it cannot see. Only the whitespace immediately following a
- * marker is touched — between two words it is the word gap, and it is left alone.
- */
-const DETACHED_PUNCTUATION = /^[ \t\u00a0]+([.,;:!?])/;
-
-const tightenedAfterMarker = (text) => text.replace(DETACHED_PUNCTUATION, '$1');
+const CLUSTER = new RegExp(
+  '([ \\t\\u00a0]*)(\\^\\[\\s*(?:PMID\\s*[:#]?\\s*)?\\d+\\s*\\]'
+  + '(?:[ \\t\\u00a0,]*\\^\\[\\s*(?:PMID\\s*[:#]?\\s*)?\\d+\\s*\\])*)'
+  + '([ \\t\\u00a0]*([.,;:!?]))?',
+  'gi',
+);
 
 /**
- * What a pill prints.
- *
- * `pill_label` is resolved on the server: the section name in Title Case for a note source
- * (`Brief Hospital Course`, `Discharge Diagnosis`), the compact journal for a published one
- * (`JAMA Netw Open`, `Spine`) — never the record number and never the year. The browser
- * prints it and does not shorten it: a surface that decides how a citation reads has taken
- * an interpretation decision, and the backend owns those.
- *
- * `label` is the references list's line: the same words with the number in front. A pill
- * is a footnote marker inside a sentence, so the number belongs one line below in the
- * bibliography rather than beside every marker.
+ * What an inline narrative pill prints: the compact numeric reference index matching the
+ * REFERENCES footer list, keeping clinical prose uncluttered while full details live in
+ * the hover popover and footer.
  */
 const pillText = (citation, digits) => {
   if (!citation) return String(digits ?? '');
-  return String(citation.pill_label || citation.label || citation.pmid || digits);
+  return String(citation.index ?? digits ?? '');
 };
 
 
@@ -285,28 +270,64 @@ class CitedNarrativeElement extends A2uiLitElement {
       if (walker.currentNode.data.includes('^[')) targets.push(walker.currentNode);
     }
 
+    const seenByBlock = new WeakMap();
     for (const node of targets) {
-      // Every match is collected from the original string before any of it is
-      // consumed. Slicing while stepping through the same regex let `lastIndex`
-      // drift ahead of the text it was indexing, so a marker went missing.
-      const matches = [...node.data.matchAll(new RegExp(MARKER.source, MARKER.flags))];
+      const block = node.parentElement?.closest('p, li, blockquote, dd') || prose;
+      let seen = seenByBlock.get(block);
+      if (!seen) {
+        seen = new Set();
+        seenByBlock.set(block, seen);
+      }
+
+      const matches = [...node.data.matchAll(new RegExp(CLUSTER.source, CLUSTER.flags))];
+      if (!matches.length) continue;
+
       const fragment = document.createDocumentFragment();
       let cursor = 0;
-      let afterMarker = false;
       for (const match of matches) {
-        // The gap before this marker belongs to the marker before it, so it is tightened
-        // only when something was just replaced; the gap that opens the text node is
-        // ordinary word spacing and is left as it was written.
-        const gap = node.data.slice(cursor, match.index);
-        fragment.appendChild(
-          document.createTextNode(afterMarker ? tightenedAfterMarker(gap) : gap));
-        fragment.appendChild(this._marker(match[1], citations));
+        fragment.appendChild(document.createTextNode(node.data.slice(cursor, match.index)));
+
+        const inner = [...match[2].matchAll(new RegExp(MARKER.source, MARKER.flags))];
+        const kept = [];
+        for (const item of inner) {
+          const digits = item[1];
+          const citation = this._citationFor(digits, citations);
+          const key = citation ? String(citation.index) : String(digits);
+          if (seen.has(key)) continue;
+          seen.add(key);
+          kept.push(digits);
+        }
+
+        const leadingSpace = match[1] || '';
+        const punct = match[4] || '';
+        const restStartsSpace = /^[ \t\u00a0]/.test(
+          node.data.slice(match.index + match[0].length),
+        );
+
+        if (punct) {
+          fragment.appendChild(document.createTextNode(punct));
+          if (kept.length > 0) {
+            const group = document.createElement('span');
+            group.className = 'cite-group';
+            for (const digits of kept) {
+              group.appendChild(this._marker(digits, citations));
+            }
+            fragment.appendChild(group);
+          }
+        } else if (kept.length > 0) {
+          const group = document.createElement('span');
+          group.className = 'cite-group';
+          for (const digits of kept) {
+            group.appendChild(this._marker(digits, citations));
+          }
+          fragment.appendChild(group);
+        } else if (leadingSpace && !restStartsSpace) {
+          fragment.appendChild(document.createTextNode(leadingSpace));
+        }
+
         cursor = match.index + match[0].length;
-        afterMarker = true;
       }
-      const tail = node.data.slice(cursor);
-      fragment.appendChild(
-        document.createTextNode(afterMarker ? tightenedAfterMarker(tail) : tail));
+      fragment.appendChild(document.createTextNode(node.data.slice(cursor)));
       node.parentNode.replaceChild(fragment, node);
     }
 
@@ -349,8 +370,8 @@ class CitedNarrativeElement extends A2uiLitElement {
     // a published cohort are coloured differently because they are weighed differently,
     // and which one this is has already been decided by the layer that resolved it.
     button.className = citation
-      ? `cite cite-${citation.kind === 'literature' ? 'literature' : 'note'}`
-      : 'cite missing';
+      ? `cite cite-num cite-${citation.kind === 'literature' ? 'literature' : 'note'}`
+      : 'cite cite-num missing';
     button.dataset.cite = citation ? String(citation.index) : digits;
     button.textContent = pillText(citation, digits);
     if (citation) {

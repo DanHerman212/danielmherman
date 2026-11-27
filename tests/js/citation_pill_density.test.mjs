@@ -78,22 +78,26 @@ async function settle(element) {
   await element.updateComplete;
 }
 
-test('the pill prints the server-resolved label, not the numbered one', async () => {
+test('the inline pill prints its compact numeric reference index', async () => {
   const element = mount('Admitted^[1].', [CHART]);
   await settle(element);
 
   const marker = element.shadowRoot.querySelector('button.cite');
-  assert.equal(marker.textContent, 'Brief Hospital Course');
-  // The number is the references list's, and the list still has it.
+  assert.equal(marker.textContent, '1');
+  assert.ok(marker.classList.contains('cite-num'));
+  // Full title & label still live on the accessible name and footer metadata.
   assert.equal(CHART.label, '1 · Brief hospital course');
+  assert.match(marker.getAttribute('aria-label'), /Brief hospital course/);
 });
 
-test('a published pill prints its journal alone, with no number and no year', async () => {
+test('a published inline pill prints its compact reference index too', async () => {
   const element = mount('The rate was 4.1%^[PMID: 29950074].', [LITERATURE]);
   await settle(element);
 
   const marker = element.shadowRoot.querySelector('button.cite');
-  assert.equal(marker.textContent, 'World Neurosurg');
+  assert.equal(marker.textContent, '4');
+  assert.ok(marker.classList.contains('cite-num'));
+  assert.equal(marker.dataset.cite, '4');
 });
 
 test('the pill is coloured by the kind the server sent', async () => {
@@ -106,28 +110,53 @@ test('the pill is coloured by the kind the server sent', async () => {
   assert.ok(literaturePill.shadowRoot.querySelector('button.cite.cite-literature'));
 });
 
-test('every marker the backend settled is drawn, including a repeat', async () => {
-  // The browser does not decide that the second one is redundant: `citations.py` does,
-  // before settlement, where the deletion is a flag on the trace rather than a silent
-  // side effect of rendering.
+test('cluster markers sit tightly after sentence punctuation without orphaned spaces', async () => {
+  const element = mount('In good condition ^[1] ^[PMID: 29950074] .', [CHART, LITERATURE]);
+  await settle(element);
+
+  const p = element.shadowRoot.querySelector('.prose > p');
+  const group = p.querySelector('span.cite-group');
+  assert.ok(group, 'grouped cluster container missing');
+  const markers = [...group.querySelectorAll('button.cite')];
+  assert.deepEqual(markers.map((node) => node.textContent), ['1', '4']);
+  assert.equal(p.textContent, 'In good condition.14');
+});
+
+test('identical citation indices are deduplicated within a paragraph block', async () => {
   const element = mount('Admitted^[1]. Treated^[1]. Discharged^[1].', [CHART]);
   await settle(element);
 
-  const markers = element.shadowRoot.querySelectorAll('button.cite');
-  assert.equal(markers.length, 3);
+  const p = element.shadowRoot.querySelector('.prose > p');
+  const markers = p.querySelectorAll('button.cite');
+  assert.equal(markers.length, 1);
+  assert.equal(markers[0].textContent, '1');
+  assert.equal(p.textContent, 'Admitted.1 Treated. Discharged.');
 });
 
-test('a payload from an agent that predates the field still draws a pill', async () => {
+test('separate paragraphs may each cite the same source index once', async () => {
+  const element = document.createElement('a2ui-cited-narrative');
+  element._markdown = {
+    value: () => Promise.resolve('<p>Admitted^[1]. Course^[1].</p><p>Follow-up^[1].</p>'),
+  };
+  element.controller = { props: { text: 'split', citations: [CHART] } };
+  document.body.appendChild(element);
+  await settle(element);
+
+  const paragraphs = [...element.shadowRoot.querySelectorAll('.prose > p')];
+  assert.equal(paragraphs[0].querySelectorAll('button.cite').length, 1);
+  assert.equal(paragraphs[1].querySelectorAll('button.cite').length, 1);
+});
+
+test('a payload without pill_label still renders numeric pill and note class', async () => {
   const legacy = { index: 2, source: 'Discharge note', title: 'Discharge diagnosis',
                    label: '2 · Discharge diagnosis' };
   const element = mount('Diagnosed^[2].', [legacy]);
   await settle(element);
 
   const marker = element.shadowRoot.querySelector('button.cite');
-  assert.equal(marker.textContent, '2 · Discharge diagnosis');
-  // No kind on the payload: the note colour is the safe default, because an unlabelled
-  // source in this product is a note section.
+  assert.equal(marker.textContent, '2');
   assert.ok(marker.classList.contains('cite-note'));
+  assert.ok(marker.classList.contains('cite-num'));
 });
 
 test('a leading bold section label is promoted to a block section-lead heading', async () => {

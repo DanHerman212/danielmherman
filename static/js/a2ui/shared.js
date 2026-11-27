@@ -149,10 +149,31 @@ const CITE_STYLES = css`
 
   /* Subtle editorial distinction between patient note passages and PubMed literature
      without loud saturated pill backgrounds. */
-  .cite-note { background: #f1f5f9; color: #475569; border-color: #e2e8f0; }
+  .cite-note { background: #f8fafc; color: #64748b; border-color: #e2e8f0; }
   .cite-note:hover { background: #e2e8f0; color: #1e293b; border-color: #cbd5e1; }
-  .cite-literature { background: #f4f7f6; color: #365750; border-color: #d5e2de; }
+  .cite-literature { background: #f4f8f6; color: #3d625a; border-color: #dce7e3; }
   .cite-literature:hover { background: #e6efec; color: #1f3d36; border-color: #b7ccc6; }
+
+  .cite-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    margin-left: 4px;
+    vertical-align: baseline;
+    white-space: nowrap;
+  }
+  .cite-group > .cite { margin: 0; }
+  .cite.cite-num {
+    font-size: 10.5px;
+    font-weight: 500;
+    line-height: 1;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    justify-content: center;
+    border-radius: 999px;
+    top: -0.08em;
+  }
 
   /* The marker a drawer row has just opened, set by revealCitation. It lives here
      because this stylesheet already owns the marker's outline colour — the page used

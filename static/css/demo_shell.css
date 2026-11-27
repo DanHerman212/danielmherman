@@ -467,17 +467,22 @@ button.cp-menu-item {
    items together on a single line. */
 .cp-draft-tail { white-space: pre-wrap; }
 
-/* A citation marker during the draft. Matches the settled tag geometry so the handover
-   cross-fades in place without vertical shift or reflow. */
+/* A citation marker during the draft. Matches the settled micro-pill geometry so the
+   handover cross-fades in place without vertical shift or reflow. */
+.cp-cite-group {
+  display: inline-flex; align-items: center; gap: 3px;
+  margin-left: 4px; vertical-align: baseline; white-space: nowrap;
+}
 .cp-cite {
-  font-size: 0.72em; font-weight: 500; line-height: 1.25;
-  vertical-align: baseline; position: relative; top: -0.05em;
-  display: inline-flex; align-items: center;
-  margin: 0 0 0 3px; padding: 1px 6px;
-  border: 1px dashed #cbd5e1; border-radius: 5px;
+  font-size: 10.5px; font-weight: 500; line-height: 1;
+  vertical-align: baseline; position: relative; top: -0.08em;
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 18px; height: 18px; margin: 0 0 0 3px; padding: 0 5px;
+  border: 1px dashed #cbd5e1; border-radius: 999px;
   background: #f8fafc; color: #64748b; opacity: 0.85;
   font-variant-numeric: tabular-nums; white-space: nowrap;
 }
+.cp-cite-group > .cp-cite { margin: 0; }
 
 @keyframes cp-settle {
   from { opacity: 0; transform: translateY(3px); }

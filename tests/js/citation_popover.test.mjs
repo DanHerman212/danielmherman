@@ -238,13 +238,19 @@ test('a passage shown whole carries no cue about truncation', async () => {
                'a caveat about truncation was shown over text that was never truncated');
 });
 
-test('a marker that arrived detached from its full stop is set back against it', async () => {
+test('a marker that arrived detached from its full stop is placed after it', async () => {
   const element = mount('Discontinued ^[1] . Next sentence.');
   await settle(element);
 
   const marker = element.shadowRoot.querySelector('button.cite[data-cite="1"]');
-  assert.equal(marker.nextSibling.nodeValue, '. Next sentence.',
-               'the gap between the pill and its period is still on screen');
+  const group = marker.closest('.cite-group');
+  assert.ok(group);
+  assert.equal(group.previousSibling.nodeValue, '.');
+  assert.equal(group.nextSibling.nodeValue, ' Next sentence.');
+  assert.equal(
+    element.shadowRoot.querySelector('.prose > p').textContent,
+    'Discontinued.1 Next sentence.',
+  );
 });
 
 test('whitespace that is a word gap is left alone', async () => {
@@ -252,5 +258,7 @@ test('whitespace that is a word gap is left alone', async () => {
   await settle(element);
 
   const marker = element.shadowRoot.querySelector('button.cite[data-cite="1"]');
-  assert.equal(marker.nextSibling.nodeValue, ' and treated.');
+  const group = marker.closest('.cite-group');
+  assert.ok(group);
+  assert.equal(group.nextSibling.nodeValue, ' and treated.');
 });

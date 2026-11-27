@@ -87,8 +87,9 @@ test('the marker is a control that opens a card, not a link off the page', async
   assert.equal(marker.tagName, 'BUTTON');
   assert.equal(element.shadowRoot.querySelector('a.cite-pmid'), null,
                'the marker still leaves the page instead of opening its evidence');
-  // The pill reads like every other pill: the number, the journal, the year.
-  assert.equal(marker.textContent.trim(), '1 · World Neurosurgery · 2024');
+  // The inline pill uses the compact reference number; the card carries the full title/journal.
+  assert.equal(marker.textContent.trim(), '1');
+  assert.ok(marker.classList.contains('cite-num'));
   // And it is addressable by the number the references drawer uses.
   assert.equal(marker.dataset.cite, '1');
 });
