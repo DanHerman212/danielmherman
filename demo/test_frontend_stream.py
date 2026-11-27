@@ -192,14 +192,14 @@ class IslandWiringTests(SimpleTestCase):
 
     def test_the_page_cache_busters_moved_with_the_code(self):
         # A rebuilt bundle behind an unchanged query string is a rebuild nobody sees.
-        self.assertIn("a2ui_clinical.js' %}?v=21", CONSOLE)
-        self.assertIn("copilot_answer.js' %}?v=2", CONSOLE)
+        self.assertIn("a2ui_clinical.js' %}?v=22", CONSOLE)
+        self.assertIn("copilot_answer.js' %}?v=3", CONSOLE)
         self.assertIn("copilot_ask.js' %}?v=3", CONSOLE)
         self.assertIn("copilot_canvas.js' %}?v=43", CONSOLE)
         self.assertIn("copilot_threads.js' %}?v=2", CONSOLE)
         # The drawer's own script and the stylesheet it draws against changed with it.
         self.assertIn("copilot_turn_facts.js' %}?v=2", CONSOLE)
-        self.assertIn("demo_shell.css' %}?v=35", BASE)
+        self.assertIn("demo_shell.css' %}?v=36", BASE)
 
     def test_a_follow_up_chip_declares_what_it_is(self):
         """The chip was generated from a tool result this conversation holds. The agent

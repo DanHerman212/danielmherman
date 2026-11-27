@@ -129,3 +129,14 @@ test('a payload from an agent that predates the field still draws a pill', async
   // source in this product is a note section.
   assert.ok(marker.classList.contains('cite-note'));
 });
+
+test('a leading bold section label is promoted to a block section-lead heading', async () => {
+  const element = mount('<strong>Presentation &amp; diagnosis.</strong> Admitted^[1].', [CHART]);
+  await settle(element);
+
+  const p = element.shadowRoot.querySelector('.prose > p');
+  const lead = p.querySelector('strong.section-lead');
+  assert.ok(p.classList.contains('has-section-lead'));
+  assert.ok(lead);
+  assert.equal(lead.textContent, 'Presentation & diagnosis.');
+});

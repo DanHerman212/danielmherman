@@ -79,9 +79,9 @@
 
      Applied after the renderer's own sanitizer has run, and to a literal this file owns
      — nothing that came from the model or the user passes through this substitution. */
-  function proseMarkdown(url, value) {
+    function proseMarkdown(url, value) {
     return renderer.module.renderMarkdown(value).then(function (html) {
-      return String(html).replace(/<p>/g, '<p style="margin:0 0 0.75rem">');
+      return String(html).replace(/<p>/g, '<p style="margin:0 0 1rem">');
     });
   }
 
@@ -176,6 +176,19 @@
        in the order the blocks arrived even though rendering is asynchronous: every block
        of a turn awaits the same promise, and its callbacks run in the order they were
        registered. */
+    function promoteSectionLeads(host) {
+      [].slice.call(host.querySelectorAll('p')).forEach(function (p) {
+        var first = p.firstChild;
+        if (first && first.nodeType === 1 && first.tagName === 'STRONG') {
+          var label = (first.textContent || '').trim();
+          if (label.length > 0 && label.length <= 45 && label.slice(-1) === '.' && first.nextSibling) {
+            first.classList.add('section-lead');
+            p.classList.add('has-section-lead');
+          }
+        }
+      });
+    }
+
     function renderBlock(markdown) {
       var host = el('div', 'cp-draft-block');
       host.setAttribute('aria-busy', 'true');
@@ -183,6 +196,7 @@
       scene(url).then(function () { return proseMarkdown(url, markdown); }).then(function (html) {
         host.innerHTML = html;
         host.removeAttribute('aria-busy');
+        promoteSectionLeads(host);
         decorateInert(host);
       }, function () {
         // No renderer yet, or it refused. The block is still true; it arrives as words

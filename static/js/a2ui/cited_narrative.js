@@ -83,8 +83,19 @@ const NARRATIVE_STYLES = css`
   /* The heading that opens a turn sits flush with the top of the answer. */
   .prose > h1:first-child, .prose > h2:first-child,
   .prose > h3:first-child, .prose > h4:first-child { margin-top: 0; }
-  /* Enough air that two paragraphs read as two readings rather than one block. */
-  .prose > p { margin: 0 0 0.9rem; text-wrap: pretty; }
+  /* Uniform paragraph rhythm and consistent block headings whether markdown emits headings
+     or inline bold section labels. */
+  .prose > p { margin: 0 0 1rem; line-height: 1.65; text-wrap: pretty; }
+  .prose > p.has-section-lead { margin-top: 1.35rem; }
+  .prose > p.has-section-lead:first-child { margin-top: 0; }
+  .prose > p > strong.section-lead {
+    display: block;
+    font-size: 0.96rem;
+    font-weight: 650;
+    line-height: 1.35;
+    color: #0f172a;
+    margin: 0 0 0.25rem;
+  }
 
   /* Printing (UX gap 1, 2026-11-02). The reading measure is a screen comfort — 68ch on
      paper is a narrow column down the middle of a page — so it is released, and a section
@@ -253,6 +264,17 @@ class CitedNarrativeElement extends A2uiLitElement {
   _decorate() {
     const prose = this.renderRoot.querySelector('.prose');
     if (!prose) return;
+
+    for (const p of prose.querySelectorAll('p')) {
+      const first = p.firstChild;
+      if (first && first.nodeType === 1 && first.tagName === 'STRONG') {
+        const label = (first.textContent || '').trim();
+        if (label.length > 0 && label.length <= 45 && label.endsWith('.') && first.nextSibling) {
+          first.classList.add('section-lead');
+          p.classList.add('has-section-lead');
+        }
+      }
+    }
 
     const props = this.controller?.props || {};
     const citations = props.citations || [];

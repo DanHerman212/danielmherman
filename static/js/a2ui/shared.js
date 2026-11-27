@@ -123,41 +123,36 @@ const CITE_STYLES = css`
   .cite {
     font: inherit;
     font-size: 0.72em;
-    line-height: 1;
-    vertical-align: super;
-    margin-left: 1px;
-    padding: 1px 5px;
-    /* A badge, not a block. inline-flex with an intrinsic width is what keeps the pill
-       its own size — the same rule serves the marker inside a sentence and the one in the
-       comparison table's source column, where a stretched button made the cell look like a
-       row of bibliography rather than a record being marked (2026-11-02). No backticks in
-       this block: it is a template literal, and one backtick ends it. */
+    font-weight: 500;
+    line-height: 1.25;
+    vertical-align: baseline;
+    position: relative;
+    top: -0.05em;
+    margin: 0 0 0 3px;
+    padding: 1px 6px;
+    /* A tag, not a block. inline-flex with an intrinsic width keeps the tag compact inside
+       both prose sentences and the comparative table's source column. */
     display: inline-flex;
     align-items: center;
     width: fit-content;
-    border: 1px solid #cbd5e1;
-    border-radius: 999px;
+    border: 1px solid #e2e8f0;
+    border-radius: 5px;
     background: #f1f5f9;
-    color: #334155;
+    color: #475569;
     font-variant-numeric: tabular-nums;
     cursor: pointer;
-    /* A pill is one line, always. A button wraps its own text by default, so a long label
-       broke the box across two lines and the rounded border read as a pill cut in half. The
-       agent now bounds what a label may be length-wise, and this is the half that holds
-       whatever it is handed. */
     white-space: nowrap;
+    transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
   }
-  .cite:hover { background: #e2e8f0; border-color: #94a3b8; }
-  .cite:focus-visible { outline: 2px solid #1f2937; outline-offset: 1px; }
+  .cite:hover { background: #e2e8f0; border-color: #cbd5e1; color: #1e293b; }
+  .cite:focus-visible { outline: 2px solid #334155; outline-offset: 1px; }
 
-  /* The two channels a citation can come from, which a reader weighs differently: a note
-     section is this patient's own record, and a published cohort is somebody else's
-     patients. The colour says which, and it is decided on the server — the pill carries a
-     kind and this sheet draws it. Muted on purpose: neither channel is an alert. */
-  .cite-note { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
-  .cite-note:hover { background: #dbeafe; border-color: #93c5fd; }
-  .cite-literature { background: #ecfdf5; color: #047857; border-color: #a7f3d0; }
-  .cite-literature:hover { background: #d1fae5; border-color: #6ee7b7; }
+  /* Subtle editorial distinction between patient note passages and PubMed literature
+     without loud saturated pill backgrounds. */
+  .cite-note { background: #f1f5f9; color: #475569; border-color: #e2e8f0; }
+  .cite-note:hover { background: #e2e8f0; color: #1e293b; border-color: #cbd5e1; }
+  .cite-literature { background: #f4f7f6; color: #365750; border-color: #d5e2de; }
+  .cite-literature:hover { background: #e6efec; color: #1f3d36; border-color: #b7ccc6; }
 
   /* The marker a drawer row has just opened, set by revealCitation. It lives here
      because this stylesheet already owns the marker's outline colour — the page used
